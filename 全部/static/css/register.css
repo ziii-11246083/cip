@@ -1,0 +1,39 @@
+.register-grid{display:grid;grid-template-columns:1fr 460px;gap:34px;align-items:center}.register-features{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:28px}.register-features div{background:#fff;border:1px solid var(--line);border-radius:22px;padding:18px;box-shadow:var(--shadow)}.register-features b{display:block;color:var(--dark)}.register-features span{display:block;color:var(--muted);margin-top:5px;font-weight:760}.register-form{display:grid;gap:13px}.password-hints{background:#FBF6EF;border:1px solid var(--line);border-radius:18px;padding:13px;display:grid;gap:6px;color:var(--muted);font-size:13px;font-weight:850}.password-hints .ok{color:var(--good)}.agree{display:flex;gap:10px;align-items:flex-start;background:#FBF6EF;border:1px solid var(--line);border-radius:18px;padding:13px;color:var(--muted);font-weight:800}.agree input{width:18px;height:18px}.message-box{display:none;padding:13px;border-radius:16px}.message-box.show{display:block}.message-box.success{background:rgba(22,132,92,.10);color:var(--good);border:1px solid rgba(22,132,92,.18)}.message-box.error{background:rgba(194,65,59,.10);color:var(--bad);border:1px solid rgba(194,65,59,.18)}.login-text{text-align:center;color:var(--muted);font-weight:850}.login-text button{border:none;background:transparent;color:var(--brand);font-weight:950;cursor:pointer}
+@media(max-width:1000px){.register-grid{grid-template-columns:1fr}.register-features{grid-template-columns:1fr}}
+
+/* register page polish */
+.register-grid{
+  gap:42px;
+}
+
+.register-features{
+  gap:16px;
+}
+
+.register-features div,
+.password-hints,
+.agree,
+.message-box{
+  border-radius:18px;
+}
+
+.register-form{
+  gap:15px;
+}
+
+.login-text{
+  margin-bottom:0;
+}
+
+.register-hero .hero-grid{
+  display:grid;
+  grid-template-columns:1fr 460px;
+  gap:34px;
+  align-items:center;
+}
+
+@media(max-width:980px){
+  .register-hero .hero-grid{
+    grid-template-columns:1fr;
+  }
+}
