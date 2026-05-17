@@ -1,0 +1,343 @@
+import logging
+import os
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from dotenv import load_dotenv
+from supabase import Client, create_client
+
+load_dotenv()
+
+logger = logging.getLogger(__name__)
+
+
+class SupabaseDB:
+    _instance: Optional["SupabaseDB"] = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+
+    def __init__(self):
+        if self._initialized:
+            return
+
+        self.url = os.getenv("SUPABASE_URL", "").strip()
+        self.key = (
+            os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+            or os.getenv("SUPABASE_KEY", "").strip()
+            or os.getenv("SUPABASE_ANON_KEY", "").strip()
+        )
+        self.client: Optional[Client] = None
+        self.available = False
+
+        if not self.url or not self.key:
+            logger.warning("Supabase credentials are missing; database features are disabled.")
+            self._initialized = True
+            return
+
+        try:
+            self.client = create_client(self.url, self.key)
+            self.available = True
+            logger.info("Supabase initialized successfully.")
+        except Exception as exc:
+            logger.exception("Failed to initialize Supabase: %s", exc)
+            self.client = None
+            self.available = False
+
+        self._initialized = True
+
+    def __bool__(self) -> bool:
+        return self.available and self.client is not None
+
+    def health(self) -> Dict[str, Any]:
+        return {
+            "available": bool(self),
+            "url_configured": bool(self.url),
+            "key_configured": bool(self.key),
+        }
+
+    def _table(self, table_name: str):
+        if not self.client:
+            raise RuntimeError("Supabase client is unavailable.")
+        return self.client.table(table_name)
+
+    def _get_crypto_id(self, symbol: str) -> Optional[str]:
+        response = self._table("cryptocurrencies").select("id").eq("symbol", symbol).maybe_single().execute()
+        if response and isinstance(response.data, dict):
+            return response.data.get("id")
+        return None
+
+    def create_user(self, email: str, password: str, username: Optional[str] = None) -> Dict[str, Any]:
+        if not self.client:
+            return {"success": False, "error": "Supabase client is unavailable."}
+
+        try:
+            response = self.client.auth.sign_up({"email": email, "password": password})
+            user = getattr(response, "user", None)
+            if user:
+                self._table("user_profiles").upsert({
+                    "user_id": user.id,
+                    "full_name": username or email.split("@")[0],
+                }, on_conflict="user_id").execute()
+                return {"success": True, "user_id": user.id}
+            return {"success": False, "error": "User signup returned no user object."}
+        except Exception as exc:
+            logger.exception("create_user failed: %s", exc)
+            return {"success": False, "error": str(exc)}
+
+    def get_user_profile(self, user_id: str) -> Dict[str, Any]:
+        try:
+            response = self._table("user_profiles").select("*").eq("user_id", user_id).maybe_single().execute()
+            return response.data if response and response.data else {}
+        except Exception as exc:
+            logger.exception("get_user_profile failed: %s", exc)
+            return {}
+
+    def update_user_preferences(self, user_id: str, preferences: Dict[str, Any]) -> bool:
+        try:
+            self._table("user_preferences").upsert({
+                "user_id": user_id,
+                **preferences,
+            }, on_conflict="user_id").execute()
+            return True
+        except Exception as exc:
+            logger.exception("update_user_preferences failed: %s", exc)
+            return False
+
+    def add_cryptocurrency(self, symbol: str, name: str, chinese_name: Optional[str] = None, **kwargs) -> Optional[str]:
+        try:
+            response = self._table("cryptocurrencies").insert({
+                "symbol": symbol,
+                "name": name,
+                "chinese_name": chinese_name or name,
+                **kwargs,
+            }).execute()
+            return response.data[0]["id"] if response and response.data else None
+        except Exception as exc:
+            logger.exception("add_cryptocurrency failed: %s", exc)
+            return None
+
+    def get_or_create_cryptocurrency(self, symbol: str, name: str, chinese_name: Optional[str] = None, **kwargs) -> Optional[str]:
+        try:
+            crypto_id = self._get_crypto_id(symbol)
+            if crypto_id:
+                return crypto_id
+            return self.add_cryptocurrency(symbol, name, chinese_name, **kwargs)
+        except Exception as exc:
+            logger.exception("get_or_create_cryptocurrency failed: %s", exc)
+            return None
+
+    def upsert_cryptocurrencies(self, coins: List[Dict[str, Any]]) -> Dict[str, str]:
+        result: Dict[str, str] = {}
+        if not coins:
+            return result
+
+        try:
+            response = self._table("cryptocurrencies").upsert(
+                coins,
+                on_conflict="symbol",
+                returning="representation",
+            ).execute()
+            if response and response.data:
+                for row in response.data:
+                    symbol = row.get("symbol")
+                    crypto_id = row.get("id")
+                    if symbol and crypto_id:
+                        result[symbol] = crypto_id
+            return result
+        except Exception as exc:
+            logger.exception("upsert_cryptocurrencies failed: %s", exc)
+            return result
+
+    def bulk_insert_price_data(self, price_records: List[Dict[str, Any]]) -> bool:
+        if not price_records:
+            return True
+        try:
+            self._table("coin_prices").insert(price_records).execute()
+            return True
+        except Exception as exc:
+            logger.exception("bulk_insert_price_data failed: %s", exc)
+            return False
+
+    def insert_price_data(self, symbol: str, price_data: Dict[str, Any]) -> bool:
+        try:
+            crypto_id = self._get_crypto_id(symbol)
+            if not crypto_id:
+                return False
+            self._table("coin_prices").insert({
+                "crypto_id": crypto_id,
+                "symbol": symbol,
+                **price_data,
+            }).execute()
+            return True
+        except Exception as exc:
+            logger.exception("insert_price_data failed: %s", exc)
+            return False
+
+    def get_latest_price(self, symbol: str) -> Optional[Dict[str, Any]]:
+        try:
+            response = self._table("coin_prices").select("*").eq("symbol", symbol).order("timestamp", desc=True).limit(1).execute()
+            return response.data[0] if response and response.data else None
+        except Exception as exc:
+            logger.exception("get_latest_price failed: %s", exc)
+            return None
+
+    def save_crypto_report(self, symbol: str, report_data: Dict[str, Any]) -> bool:
+        try:
+            crypto_id = self._get_crypto_id(symbol)
+            if not crypto_id:
+                return False
+            self._table("crypto_reports").insert({
+                "crypto_id": crypto_id,
+                "symbol": symbol,
+                **report_data,
+            }).execute()
+            return True
+        except Exception as exc:
+            logger.exception("save_crypto_report failed: %s", exc)
+            return False
+
+    def get_latest_report(self, symbol: str) -> Optional[Dict[str, Any]]:
+        try:
+            response = self._table("crypto_reports").select("*").eq("symbol", symbol).order("created_at", desc=True).limit(1).execute()
+            return response.data[0] if response and response.data else None
+        except Exception as exc:
+            logger.exception("get_latest_report failed: %s", exc)
+            return None
+
+    def save_sentiment_analysis(self, symbol: str, sentiment_data: Dict[str, Any]) -> bool:
+        try:
+            crypto_id = self._get_crypto_id(symbol)
+            if not crypto_id:
+                return False
+            self._table("sentiment_analysis").insert({
+                "crypto_id": crypto_id,
+                "symbol": symbol,
+                **sentiment_data,
+            }).execute()
+            return True
+        except Exception as exc:
+            logger.exception("save_sentiment_analysis failed: %s", exc)
+            return False
+
+    def get_sentiment_trends(self, symbol: str, time_period: str = "24h") -> List[Dict[str, Any]]:
+        try:
+            response = self._table("sentiment_analysis").select("*").eq("symbol", symbol).eq("time_period", time_period).order("analyzed_at", desc=True).limit(10).execute()
+            return response.data or []
+        except Exception as exc:
+            logger.exception("get_sentiment_trends failed: %s", exc)
+            return []
+
+    def log_user_activity(self, user_id: str, activity_data: Dict[str, Any]) -> bool:
+        try:
+            self._table("user_activities").insert({"user_id": user_id, **activity_data}).execute()
+            return True
+        except Exception as exc:
+            logger.exception("log_user_activity failed: %s", exc)
+            return False
+
+    def add_to_watchlist(self, user_id: str, symbol: str, watchlist_name: str = "My Watchlist") -> bool:
+        try:
+            crypto_id = self._get_crypto_id(symbol)
+            if not crypto_id:
+                return False
+            self._table("watchlist").upsert({
+                "user_id": user_id,
+                "crypto_id": crypto_id,
+                "symbol": symbol,
+                "watchlist_name": watchlist_name,
+            }).execute()
+            return True
+        except Exception as exc:
+            logger.exception("add_to_watchlist failed: %s", exc)
+            return False
+
+    def get_user_watchlist(self, user_id: str) -> List[Dict[str, Any]]:
+        try:
+            response = self._table("watchlist").select("*").eq("user_id", user_id).execute()
+            return response.data or []
+        except Exception as exc:
+            logger.exception("get_user_watchlist failed: %s", exc)
+            return []
+
+    def create_conversation(self, user_id: str, title: Optional[str] = None, ai_model: str = "gpt-4o-mini") -> Optional[str]:
+        try:
+            response = self._table("ai_conversations").insert({
+                "user_id": user_id,
+                "conversation_title": title or f"Chat - {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+                "ai_model": ai_model,
+            }).execute()
+            return response.data[0]["id"] if response and response.data else None
+        except Exception as exc:
+            logger.exception("create_conversation failed: %s", exc)
+            return None
+
+    def save_message(self, conversation_id: str, user_id: str, message_type: str, content: str, tokens_used: int = 0) -> bool:
+        try:
+            self._table("ai_messages").insert({
+                "conversation_id": conversation_id,
+                "user_id": user_id,
+                "message_type": message_type,
+                "content": content,
+                "tokens_used": tokens_used,
+            }).execute()
+            return True
+        except Exception as exc:
+            logger.exception("save_message failed: %s", exc)
+            return False
+
+    def get_conversation_history(self, conversation_id: str) -> List[Dict[str, Any]]:
+        try:
+            response = self._table("ai_messages").select("*").eq("conversation_id", conversation_id).order("created_at", desc=False).execute()
+            return response.data or []
+        except Exception as exc:
+            logger.exception("get_conversation_history failed: %s", exc)
+            return []
+
+    def insert_data(self, table_name: str, data: Dict[str, Any]) -> bool:
+        try:
+            self._table(table_name).insert(data).execute()
+            return True
+        except Exception as exc:
+            logger.exception("insert_data failed for %s: %s", table_name, exc)
+            return False
+
+    def query_data(self, table_name: str, filters: Optional[Dict[str, Any]] = None, order_by: Optional[str] = None, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        try:
+            query = self._table(table_name).select("*")
+            if filters:
+                for key, value in filters.items():
+                    query = query.eq(key, value)
+            if order_by:
+                query = query.order(order_by, desc=True)
+            if limit:
+                query = query.limit(limit)
+            response = query.execute()
+            return response.data or []
+        except Exception as exc:
+            logger.exception("query_data failed for %s: %s", table_name, exc)
+            return []
+
+    def update_data(self, table_name: str, record_id: str, data: Dict[str, Any]) -> bool:
+        try:
+            self._table(table_name).update(data).eq("id", record_id).execute()
+            return True
+        except Exception as exc:
+            logger.exception("update_data failed for %s: %s", table_name, exc)
+            return False
+
+    def delete_data(self, table_name: str, record_id: str) -> bool:
+        try:
+            self._table(table_name).delete().eq("id", record_id).execute()
+            return True
+        except Exception as exc:
+            logger.exception("delete_data failed for %s: %s", table_name, exc)
+            return False
+
+
+def get_db() -> Optional[SupabaseDB]:
+    db = SupabaseDB()
+    return db if db else None
