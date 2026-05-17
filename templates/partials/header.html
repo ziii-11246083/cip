@@ -1,0 +1,84 @@
+<header class="site-header">
+  <div class="header-inner">
+    <a href="/" class="brand">
+      <div class="brand-mark">
+        <img src="{{ url_for('static', filename='img/logo.jpg') }}" alt="Smart Invest Logo" onerror="this.style.display='none'; this.parentElement.textContent='SI';">
+      </div>
+      <div class="brand-text">
+        <strong>Smart Invest</strong>
+        <span>加密投資風險與市場分析</span>
+      </div>
+    </a>
+
+    <div class="header-right">
+      <nav class="nav">
+        <a href="/">首頁</a>
+        <a href="/market">市場總覽</a>
+        <a href="/podcast">AI Podcast</a>
+        <a href="/scam-detect">詐騙檢測</a>
+        <a href="/social-sentiment">社群分析</a>
+
+        <span class="nav-divider"></span>
+
+        <a class="member-nav" href="/member"><i class="fas fa-lock"></i> 會員中心</a>
+        <a class="member-nav" href="/health"><i class="fas fa-lock"></i> 健康度檢查</a>
+        <a class="member-nav" href="/sim-trade"><i class="fas fa-lock"></i> 模擬交易</a>
+        <a class="member-nav" href="/ai-coach"><i class="fas fa-lock"></i> AI 投資教練</a>
+        <a class="member-nav" href="/agent"><i class="fas fa-lock"></i> AI Agent</a>
+      </nav>
+
+      <div class="auth-area">
+        <button class="auth-btn" id="loginToggle" type="button">
+          <i class="fas fa-user"></i> 登入
+        </button>
+
+        <button class="guest-btn" type="button" onclick="if(window.authManager) window.authManager.continueAsGuest()">訪客使用</button>
+
+        <div class="account-popup" id="accountPopup">
+          <button class="popup-close" id="popupClose" type="button" aria-label="關閉登入視窗">×</button>
+
+          <div class="login-head">
+            <div class="login-head-icon"><i class="fas fa-lock"></i></div>
+            <div>
+              <h3>會員登入</h3>
+              <p>登入後可使用健康度檢查、AI Agent、會員中心與模擬交易。</p>
+            </div>
+          </div>
+
+          <div class="login-form">
+            <label for="emailInput">Email</label>
+            <input type="text" id="emailInput" placeholder="請輸入 Email">
+
+            <label for="passwordInput">密碼</label>
+            <input type="password" id="passwordInput" placeholder="請輸入密碼">
+
+            <button class="login-submit" type="button" onclick="if(window.authManager) window.authManager.loginWithEmail(document.getElementById('emailInput').value, document.getElementById('passwordInput').value)">登入會員</button>
+
+            <div class="member-helper">測試帳號：test@smartinvest.local / Test123456</div>
+
+            <div class="or-line">
+              <span></span>
+              <p>或使用 Google</p>
+              <span></span>
+            </div>
+
+            <button class="google-login" type="button" onclick="if(window.authManager) window.authManager.loginWithGoogle()">
+              <span class="google-mark">G</span> 使用 Google 登入
+            </button>
+
+            <button class="forgot-btn" type="button" id="forgotPasswordBtn">忘記密碼</button>
+
+            <div class="register-hint">
+              還沒有帳號？ <a href="/register">建立會員</a>
+            </div>
+          </div>
+        </div>
+
+        <div id="user-section" style="display:none; gap:10px; align-items:center;">
+          <span id="user-email" style="color:var(--muted); font-weight:800; font-size:14px;"></span>
+          <button class="guest-btn" type="button" onclick="if(window.authManager) window.authManager.logoutUser()">登出</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
