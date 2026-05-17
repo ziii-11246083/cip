@@ -1,0 +1,31 @@
+.scam-stack{display:flex;flex-direction:column;gap:24px}.example-row{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}.example-row button{border:1px solid var(--line);background:#fff;color:var(--brand);border-radius:999px;padding:10px 13px;font-weight:900;cursor:pointer}.char-count{text-align:right;color:var(--muted);font-weight:850;margin-top:6px}.danger{background:linear-gradient(135deg,var(--bad),#E07A72)!important;margin-top:16px}.report-card{padding:0;overflow:hidden}.report-head{padding:20px 24px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:16px;background:#fff}.report-head strong{display:block;color:var(--dark);font-size:20px}.report-head span{color:var(--muted)}.report-head em{font-style:normal;background:#FBF6EF;border:1px solid var(--line);border-radius:999px;padding:8px 12px;color:var(--brand);font-weight:900}.report-empty,.scan-loading{min-height:300px;display:grid;place-items:center;text-align:center;color:var(--muted);font-weight:850;background:#FBF6EF;padding:30px}.scan-loading{display:none}#reportBox{display:none}#reportHeader{padding:18px 24px;color:#fff;background:var(--brand);font-weight:950}#reportContent{padding:24px;white-space:pre-wrap;line-height:1.85}.report-actions{display:flex;justify-content:flex-end;gap:10px;border-top:1px solid var(--line);padding:16px;background:#fff}
+@media(max-width:650px){.report-head,.report-actions{flex-direction:column;align-items:stretch}}
+
+/* scam detect page polish */
+.scam-stack{
+  gap:28px;
+}
+
+.example-row{
+  gap:12px;
+}
+
+.example-row button{
+  transition:.22s ease;
+}
+
+.example-row button:hover{
+  transform:translateY(-2px);
+  border-color:var(--brand-2);
+}
+
+.report-card,
+.report-empty,
+.scan-loading,
+#reportContent{
+  border-radius:22px;
+}
+
+#reportContent{
+  line-height:1.9;
+}
