@@ -85,30 +85,13 @@ async function registerUser(e) {
   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 建立中...';
 
   try {
-    if (window.authManager && typeof window.authManager.registerWithEmail === "function") {
-      await window.authManager.registerWithEmail(email, password, {
+    if (window.authManager && typeof window.authManager.signUpWithEmail === "function") {
+      await window.authManager.signUpWithEmail(email, password, {
         display_name: name
       });
       showMessage("success", "註冊成功，請到信箱收驗證信，或直接登入開始使用。");
     } else {
-      const res = await fetch("/api/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          name: name,
-          email: email,
-          password: password
-        })
-      });
-
-      if (res.ok) {
-        showMessage("success", "註冊成功，現在可以登入。");
-      } else {
-        const data = await res.json().catch(() => ({}));
-        showMessage("error", data.message || data.detail || "註冊失敗，請稍後再試。");
-      }
+      showMessage("error", "註冊服務尚未初始化，請稍後再試。");
     }
   } catch (err) {
     console.error(err);
