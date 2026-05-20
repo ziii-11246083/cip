@@ -200,12 +200,17 @@ window.authManager = {
             alert(`登入失敗: ${error.message}`);
         }
     },
-    signUpWithEmail: async (email, password) => {
+    signUpWithEmail: async (email, password, metadata = {}) => {
         if (!requireSupabase()) return;
         if (!email || !password) return alert("請輸入信箱與密碼");
         try {
             localStorage.removeItem(GUEST_MODE_KEY);
-            const { error } = await supabase.auth.signUp({ email, password });
+            const safeMeta = metadata && typeof metadata === "object" ? metadata : {};
+            const payload = { email, password };
+            if (Object.keys(safeMeta).length) {
+                payload.options = { data: safeMeta };
+            }
+            const { error } = await supabase.auth.signUp(payload);
             if (error) throw error;
             alert("註冊成功，請檢查信箱完成驗證（若已關閉驗證則會直接登入）");
             window.location.reload();
