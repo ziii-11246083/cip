@@ -694,6 +694,11 @@ def sim_trade_page():
 def member_page():
     return render_template('member.html')
 
+@app.route('/version', methods=['GET'])
+def version():
+    commit = (os.getenv('RENDER_GIT_COMMIT') or '').strip()
+    return jsonify({"version": commit or "本地開發中"})
+
 @app.route('/api/coingecko')
 @ttl_cache(ttl_seconds=Config.CACHE_TTL)
 def live_data():
