@@ -23,7 +23,7 @@
           <p>記錄資金投放、模擬下單與持倉，讓 AI Agent 可以用一句話幫你建立模擬交易。</p>
         </div>
         <div class="member-profile-mini">
-          <img src="/static/images/agent-cat-happy.png" alt="" onerror="this.style.display='none';">
+          <img src="{{ url_for('static', filename='images/agent-cat-happy.png') }}" alt="" onerror="this.style.display='none';">
           <div>
             <span>目前會員</span>
             <strong id="memberEmail">尚未登入</strong>
@@ -139,7 +139,7 @@
     anonKey: '{{ supabase_anon_key | default("dummy") }}'
   };
 </script>
-<script type="module" src="{{ url_for('static', filename='auth.js') }}?v=member-center-20260514"></script>
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=member-center-20260514"></script>
 <script src="{{ url_for('static', filename='js/common.js') }}?v=utf8fix"></script>
 <script src="{{ url_for('static', filename='js/member.js') }}?v=member-center-20260514"></script>
 </body>

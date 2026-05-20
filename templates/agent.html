@@ -30,7 +30,7 @@
     <section class="chat-panel" aria-label="AI 投資教練對話" data-member-feature="AI Agent 巡檢報告">
       <div class="chat-panel-head">
         <div class="coach-avatar coach-avatar-lg has-image is-idle" id="coachMainAvatar">
-          <img data-coach-avatar src="/static/images/agent-cat-neutral.png" alt="AI 投資教練" onerror="this.style.display='none';">
+          <img data-coach-avatar src="{{ url_for('static', filename='images/agent-cat-neutral.png') }}" alt="AI 投資教練" onerror="this.style.display='none';">
         </div>
         <div>
           <div class="coach-title-row">
@@ -105,7 +105,7 @@
           <span>資金、持倉與風險狀態會依會員紀錄更新。</span>
         </div>
         <div class="coach-avatar patrol-avatar has-image is-idle">
-          <img data-coach-avatar src="/static/images/agent-cat-happy.png" alt="" onerror="this.style.display='none';">
+          <img data-coach-avatar src="{{ url_for('static', filename='images/agent-cat-happy.png') }}" alt="" onerror="this.style.display='none';">
         </div>
       </article>
     </aside>
@@ -131,7 +131,7 @@
     anonKey: '{{ supabase_anon_key | default("dummy") }}'
   };
 </script>
-<script type="module" src="{{ url_for('static', filename='auth.js') }}?v=agent-member-20260514"></script>
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=agent-member-20260514"></script>
 <script src="{{ url_for('static', filename='js/common.js') }}?v=utf8fix"></script>
 <script src="{{ url_for('static', filename='js/agent.js') }}?v=agent-member-20260514"></script>
 </body>
