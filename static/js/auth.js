@@ -38,68 +38,96 @@ function getCleanRedirectUrl() {
     return `${window.location.origin}${window.location.pathname}${window.location.search}`;
 }
 
-function parseAuthHash() {
-    const raw = window.location.hash || "";
-    if (!raw || raw === "#") return null;
-    const normalized = raw.replace(/^#+/, "");
+function normalizeHash(hashValue) {
+    return String(hashValue || "").replace(/^#+/, "");
+}
+
+function parseAuthHash(hashValue) {
+    const normalized = normalizeHash(hashValue);
     if (!normalized) return null;
     const params = new URLSearchParams(normalized);
     const hasAuthKeys = [...params.keys()].some((key) => AUTH_HASH_KEYS.has(key));
     return hasAuthKeys ? params : null;
 }
 
-function shouldClearAuthHash() {
-    const raw = window.location.hash || "";
-    if (!raw) return false;
-    if (raw.startsWith("##")) return true;
-    const params = parseAuthHash();
-    return Boolean(params);
+function getAuthUrlSnapshot() {
+    const hash = window.location.hash || "";
+    const search = window.location.search || "";
+    return {
+        hash,
+        search,
+        hasHash: Boolean(hash && hash !== "#"),
+        hasSearch: Boolean(search && search !== "?")
+    };
 }
 
-function clearAuthHash() {
-    if (!shouldClearAuthHash()) return;
-    const cleanUrl = window.location.pathname + window.location.search;
-    window.history.replaceState({}, document.title, cleanUrl);
+function clearUrlHashAfterLogin() {
+    window.history.replaceState(null, null, window.location.pathname);
 }
 
-async function applyAuthFromHash() {
-    if (!supabase) return;
+async function applyAuthFromUrl() {
+    if (!supabase) return { handled: false, session: null };
 
-    const params = parseAuthHash();
-    if (!params) {
-        if (window.location.hash && window.location.hash.startsWith("##")) {
-            clearAuthHash();
-        }
-        return;
-    }
+    const snapshot = getAuthUrlSnapshot();
+    const hashParams = parseAuthHash(snapshot.hash);
+    const searchParams = snapshot.hasSearch ? new URLSearchParams(snapshot.search) : null;
+    let session = null;
+    let handled = false;
 
-    const accessToken = params.get("access_token");
-    const refreshToken = params.get("refresh_token");
-
-    if (accessToken && refreshToken) {
-        try {
-            const { data, error } = await supabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: refreshToken
-            });
-            if (error) {
-                console.warn("Supabase setSession failed", error);
-            } else if (data?.session) {
-                currentSession = data.session;
-                updateMembership(data.session);
-                setAuthUiBySession(data.session);
+    if (hashParams) {
+        handled = true;
+        if (typeof supabase.auth.getSessionFromUrl === "function") {
+            try {
+                const { data, error } = await supabase.auth.getSessionFromUrl({ storeSession: true });
+                if (error) {
+                    console.warn("Supabase getSessionFromUrl failed", error);
+                }
+                session = data?.session || null;
+            } catch (error) {
+                console.warn("Supabase getSessionFromUrl error", error);
             }
-        } catch (error) {
-            console.warn("Supabase setSession error", error);
-        } finally {
-            clearAuthHash();
+        } else {
+            const accessToken = hashParams.get("access_token");
+            const refreshToken = hashParams.get("refresh_token");
+            if (accessToken && refreshToken) {
+                try {
+                    const { data, error } = await supabase.auth.setSession({
+                        access_token: accessToken,
+                        refresh_token: refreshToken
+                    });
+                    if (error) {
+                        console.warn("Supabase setSession failed", error);
+                    }
+                    session = data?.session || null;
+                } catch (error) {
+                    console.warn("Supabase setSession error", error);
+                }
+            }
         }
-        return;
     }
 
-    if (params.get("error") || params.get("error_description")) {
-        clearAuthHash();
+    if (!session && searchParams && searchParams.get("code") && typeof supabase.auth.exchangeCodeForSession === "function") {
+        handled = true;
+        try {
+            const { data, error } = await supabase.auth.exchangeCodeForSession(searchParams.get("code"));
+            if (error) {
+                console.warn("Supabase exchangeCodeForSession failed", error);
+            }
+            session = data?.session || null;
+        } catch (error) {
+            console.warn("Supabase exchangeCodeForSession error", error);
+        }
     }
+
+    if (session) {
+        currentSession = session;
+        updateMembership(session);
+        setAuthUiBySession(session);
+        console.log("[auth] redirect session", session);
+        clearUrlHashAfterLogin();
+    }
+
+    return { handled, session };
 }
 
 function updateMembership(session) {
@@ -168,6 +196,7 @@ async function refreshSession() {
     }
     updateMembership(currentSession);
     setAuthUiBySession(currentSession);
+    console.log("[auth] refresh session", currentSession);
     return currentSession;
 }
 
@@ -278,17 +307,19 @@ window.authManager = {
 
 // 監聽登入狀態並自動切換導覽列 UI
 if (supabase) {
-    applyAuthFromHash().finally(() => {
-        refreshSession();
-    });
-    supabase.auth.onAuthStateChange((_event, session) => {
-        currentSession = session || null;
-        updateMembership(session || null);
-        setAuthUiBySession(session || null);
-        if (session && shouldClearAuthHash()) {
-            clearAuthHash();
-        }
-    });
+    (async () => {
+        await applyAuthFromUrl();
+        await refreshSession();
+        supabase.auth.onAuthStateChange((_event, session) => {
+            currentSession = session || null;
+            updateMembership(session || null);
+            setAuthUiBySession(session || null);
+            console.log("[auth] onAuthStateChange", _event, session);
+            if (session) {
+                clearUrlHashAfterLogin();
+            }
+        });
+    })();
 } else {
     updateMembership(null);
     setAuthUiBySession(null);
