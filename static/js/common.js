@@ -26,6 +26,9 @@ function initCommonUI() {
   const emailInput = document.getElementById("emailInput");
   const forgotPasswordBtn = document.getElementById("forgotPasswordBtn");
   const backToTopBtn = document.getElementById("backToTopBtn");
+  const path = window.location.pathname;
+  const navMore = document.querySelector(".nav-more");
+  const userMenu = document.querySelector(".user-menu");
 
   function closePopup() {
     if (accountPopup) {
@@ -52,6 +55,27 @@ function initCommonUI() {
     document.addEventListener("click", closePopup);
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") closePopup();
+    });
+  }
+
+  if (navMore) {
+    navMore.addEventListener("click", (e) => e.stopPropagation());
+    document.addEventListener("click", () => {
+      navMore.removeAttribute("open");
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") navMore.removeAttribute("open");
+    });
+    navMore.querySelectorAll("a").forEach((link) => {
+      link.addEventListener("click", () => navMore.removeAttribute("open"));
+    });
+  }
+
+  if (userMenu) {
+    userMenu.addEventListener("click", (e) => e.stopPropagation());
+    document.addEventListener("click", () => userMenu.removeAttribute("open"));
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") userMenu.removeAttribute("open");
     });
   }
 
@@ -89,6 +113,22 @@ function initCommonUI() {
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
   }
+
+  document.querySelectorAll(".nav a").forEach((link) => {
+    const href = link.getAttribute("href") || "";
+    const isHome = href === "/" && path === "/";
+    const isCurrent = href !== "/" && path.startsWith(href);
+    link.classList.toggle("active", isHome || isCurrent);
+  });
+
+  document.querySelectorAll("[data-member-required]").forEach((link) => {
+    link.addEventListener("click", (event) => {
+      const loggedIn = Boolean(window.authManager?.isLoggedIn?.() || window.smartInvestMembership?.isMember);
+      if (loggedIn) return;
+      event.preventDefault();
+      window.authManager?.requireMember?.(link.dataset.memberRequired || "會員功能");
+    });
+  });
 
   const revealEls = document.querySelectorAll(".reveal");
   if ("IntersectionObserver" in window) {

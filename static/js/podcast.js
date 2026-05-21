@@ -2,7 +2,7 @@
  * Podcast Page Logic - Fixed Version
  * 修正重點：
  * 1. 生成後會自動把 audio_url 放進 <audio> 播放器
- * 2. 補上「更新幣種」按鈕
+ * 2. 固定 Nova / Onyx / 1.0x，使用者只需要選節目主題
  * 3. 補上「複製文字稿」按鈕
  * 4. payload 會送 hostVoice、analystVoice、speed
  * 5. 避免 API 失敗時整頁沒有反應
@@ -42,8 +42,22 @@ function resetButtonLoading(btn) {
     btn.classList.remove("loading");
 }
 
+function setStudioGenerating(isGenerating) {
+    const card = $("podcastStudioCard");
+    const market = $("podMarket");
+    if (card) card.classList.toggle("is-generating", Boolean(isGenerating));
+    if (market) market.disabled = Boolean(isGenerating);
+}
+
 let popularCoinsCache = [];
-let selectedSymbols = ["BTC", "ETH", "SOL"];
+const TOPIC_WATCHLISTS = {
+    PERSONAL: ["BTC", "ETH", "SOL"],
+    CRYPTO: ["BTC", "ETH", "SOL"],
+    ALT: ["SOL", "XRP", "DOGE", "BNB"],
+    BTC: ["BTC", "ETH"],
+    RISK: ["BTC", "ETH", "USDT"]
+};
+let selectedSymbols = TOPIC_WATCHLISTS.CRYPTO.slice();
 let podcastLines = [];
 let bubbleTimer = null;
 let bubbleIndex = 0;
@@ -78,6 +92,32 @@ async function ensurePodcastAccess() {
 
     showPodcastToast("請先啟用訪客模式", "按下「訪客使用」後即可生成 Podcast。");
     return false;
+}
+
+async function fetchPersonalPortfolioSummary() {
+    const token = await window.authManager?.getToken?.().catch(() => null);
+    if (!token) return null;
+
+    try {
+        const res = await fetch("/api/sim-trade/portfolio", {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) return null;
+        const snapshot = (await res.json()).portfolio || null;
+        if (!snapshot) return null;
+        return {
+            total_value_usd: Number(snapshot.total_value_usd || 0),
+            cash: Number(snapshot.cash || 0),
+            positions: (snapshot.positions || []).slice(0, 6).map((pos) => ({
+                symbol: pos.symbol,
+                quantity: Number(pos.quantity || 0),
+                market_value: Number(pos.market_value || 0)
+            }))
+        };
+    } catch (error) {
+        console.warn("portfolio summary unavailable", error);
+        return null;
+    }
 }
 
 function updatePodcastAccessState() {
@@ -239,16 +279,22 @@ function appendChatBubble(speaker, text) {
     const isHost = normalizedSpeaker === "主持人";
     row.className = `chatRow ${isHost ? "host" : "analyst"}`;
     row.innerHTML = `
+        <div class="chatAvatar"><img src="/static/images/${isHost ? "podcast-nova.png" : "podcast-onyx.png"}" alt=""></div>
         <div class="chatBubble">
             <div class="chatSpeaker">
                 <i class="fas ${isHost ? "fa-microphone-lines" : "fa-chart-line"}"></i>
-                ${normalizedSpeaker}
+                ${isHost ? "Nova" : "Onyx"}
             </div>
             <div class="chatText">${escapeHTML(text)}</div>
         </div>
     `;
     stream.appendChild(row);
     stream.scrollTo({ top: stream.scrollHeight, behavior: "smooth" });
+}
+
+function syncWatchlistFromTopic() {
+    const topic = $("podMarket")?.value || "CRYPTO";
+    selectedSymbols = (TOPIC_WATCHLISTS[topic] || TOPIC_WATCHLISTS.CRYPTO).slice();
 }
 
 function resetChatStream(message = "按下播放後，對話泡泡會跟著語音同步出現。") {
@@ -398,6 +444,23 @@ function setAudioStatus(text) {
     if (statusEl) statusEl.textContent = text;
 }
 
+function formatAudioError(error) {
+    const message = error?.message || "";
+    const lower = message.toLowerCase();
+    if (
+        lower.includes("authenticationerror") ||
+        lower.includes("incorrect api key") ||
+        lower.includes("invalid api key") ||
+        lower.includes("401")
+    ) {
+        return "OpenAI API Key 驗證失敗。請重新產生新的 API key，貼到 .env 的 OPENAI_API_KEY，然後重啟 Flask。";
+    }
+    if (lower.includes("quota") || lower.includes("billing")) {
+        return "OpenAI 額度或付款設定有問題。請到 OpenAI Billing / Usage 確認帳戶可用額度。";
+    }
+    return message || "請確認 OpenAI API Key、額度與 TTS 模型。";
+}
+
 function setPlayerSource(url) {
     latestAudioUrl = url || "";
     if (!player) return;
@@ -425,12 +488,14 @@ async function buildDialogueAudio(lines, speed) {
 
     const payload = {
         text: lines.map(line => `${normalizeSpeaker(line.speaker)}：${line.text}`).join("\n"),
+        lines: lines.map((line, index) => ({
+            speaker: normalizeSpeaker(line.speaker, index),
+            text: line.text
+        })),
         speed: speed
     };
 
-    const hostVoice = $("hostVoice")?.value || "nova";
-    const analystVoice = $("analystVoice")?.value || "onyx";
-    payload.voice = hostVoice || analystVoice || "nova";
+    payload.voice = "nova";
 
     const res = await fetch("/podcast/tts", {
         method: "POST",
@@ -460,20 +525,27 @@ async function generatePodcast(btn) {
         if (!canUse) return;
 
         setButtonLoading(btn, '<i class="fas fa-wand-magic-sparkles fa-spin"></i> 生成中...');
+        setStudioGenerating(true);
         clearInterval(bubbleTimer);
         if (stream) stream.innerHTML = '<div class="chat-empty">正在生成對話內容...</div>';
         setAudioStatus("正在生成 Podcast...");
 
-        const speed = parseFloat($("speed")?.value || $("speedRange")?.value || "1") || 1;
+        syncWatchlistFromTopic();
+        const speed = 1;
+        const topic = $("podMarket")?.value || "PERSONAL";
+        const portfolioSummary = topic === "PERSONAL"
+            ? await fetchPersonalPortfolioSummary()
+            : null;
         const payload = {
-            market: $("podMarket")?.value || "CRYPTO",
+            market: topic,
             watchlist: selectedSymbols,
             symbols: selectedSymbols,
-            hostVoice: $("hostVoice")?.value || "nova",
-            analystVoice: $("analystVoice")?.value || "onyx",
-            voice: $("hostVoice")?.value || "nova",
+            hostVoice: "nova",
+            analystVoice: "onyx",
+            voice: "nova",
             speed: speed
         };
+        if (portfolioSummary) payload.portfolio_summary = portfolioSummary;
 
         const res = await fetch("/podcast/generate", {
             method: "POST",
@@ -515,7 +587,7 @@ async function generatePodcast(btn) {
             } catch (audioErr) {
                 console.warn(audioErr);
                 setPlayerSource("");
-                setAudioStatus("已生成文字對話，但語音產生失敗。請確認 OpenAI API Key 與 TTS 端點。");
+                setAudioStatus(`已生成文字對話，但語音產生失敗：${formatAudioError(audioErr)}`);
             }
         }
         if (!latestAudioUrl) {
@@ -529,6 +601,7 @@ async function generatePodcast(btn) {
         setAudioStatus("生成失敗，請檢查 /podcast/generate 後端回傳格式。");
         showPodcastToast("錯誤", err.message || "生成失敗，請稍後再試");
     } finally {
+        setStudioGenerating(false);
         resetButtonLoading(btn);
     }
 }
@@ -665,8 +738,7 @@ function initPlayerButtons() {
 }
 
 function initPodcastPage() {
-    loadPopularCoins();
-    renderSelectedWatchlist();
+    syncWatchlistFromTopic();
     updatePodcastAccessState();
 
     bindClick("btnEnablePodcastGuest", async function() {
@@ -682,17 +754,18 @@ function initPodcastPage() {
         generatePodcast(this);
     });
 
-    bindClick("btnRefreshCoins", function() {
-        loadPopularCoins(this);
-    });
+    const marketSelect = $("podMarket");
+    if (marketSelect) {
+        marketSelect.addEventListener("change", syncWatchlistFromTopic);
+    }
 
     bindClick("btnCopyScript", copyScript);
 
-    initVoiceCards();
     initSpeedControl();
     initPlayerButtons();
     updateSpeakingState("主持人");
     window.addEventListener("smartinvest:guest-mode", updatePodcastAccessState);
+    window.addEventListener("smartinvest:auth-state", updatePodcastAccessState);
 }
 
 document.addEventListener("DOMContentLoaded", initPodcastPage);
