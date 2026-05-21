@@ -10,6 +10,8 @@ import copy
 import io
 import base64
 import json
+import uuid
+import wave
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Tuple
@@ -56,7 +58,7 @@ SIM_INITIAL_CASH = 100000.0
 class Config:
     CG_API_KEY: str = os.getenv("CG_API_KEY", "")
     CACHE_TTL: int = 300 
-    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "").strip().strip('"').strip("'")
     
     COIN_META = {
         'BTC': {'cn_name': '比特幣'}, 'ETH': {'cn_name': '以太幣'}, 'BNB': {'cn_name': '幣安幣'},
@@ -91,6 +93,25 @@ app = Flask(__name__)
 CORS(app) 
 np.seterr(divide='ignore', invalid='ignore')
 client: Optional[OpenAI] = OpenAI(api_key=Config.OPENAI_API_KEY) if Config.OPENAI_API_KEY and "sk-" in Config.OPENAI_API_KEY else None
+
+def refresh_openai_client() -> Optional[OpenAI]:
+    global client
+    load_dotenv(override=True)
+    latest_key = os.getenv("OPENAI_API_KEY", "").strip().strip('"').strip("'")
+    if latest_key == Config.OPENAI_API_KEY:
+        return client
+    Config.OPENAI_API_KEY = latest_key
+    client = OpenAI(api_key=latest_key) if latest_key and "sk-" in latest_key else None
+    return client
+
+def is_openai_auth_error(error: Exception) -> bool:
+    text = str(error).lower()
+    return (
+        getattr(error, "status_code", None) == 401
+        or error.__class__.__name__ == "AuthenticationError"
+        or "incorrect api key" in text
+        or "invalid api key" in text
+    )
 
 # 初始化 Supabase
 try:
@@ -548,7 +569,7 @@ class SocialMediaEngine:
             try:
                 if client:
                     prompt = f"分析以下英文新聞，提取40個核心「加密貨幣趨勢與技術」詞彙並翻譯成繁體中文。回傳 JSON，格式為 {{\"詞彙\": 分數(10~100)}}：\n\n{text_all[:4000]}"
-                    res = client.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": prompt}], response_format={"type": "json_object"})
+                    res = client.chat.completions.create(model=os.getenv("OPENAI_MODEL", "gpt-5.4"), messages=[{"role": "user", "content": prompt}], response_format={"type": "json_object"})
                     word_freqs = json.loads(res.choices[0].message.content)
             except Exception as e:
                 word_freqs = {"比特幣": 100, "以太幣": 85, "市場趨勢": 80, "區塊鏈": 75, "ETF": 95, "聯準會": 60, "機構資金": 80, "降息": 55, "牛市": 70, "波動": 45}
@@ -592,7 +613,7 @@ class SocialMediaEngine:
 # ==========================================
 # 💼 3. Pydantic Models 
 # ==========================================
-Market = Literal["CRYPTO", "ALT", "US", "JP", "BTC", "RISK"]
+Market = Literal["CRYPTO", "ALT", "US", "JP", "BTC", "RISK", "PERSONAL"]
 Speaker = Literal["主持人", "分析師"]
 
 class UserProfile(BaseModel):
@@ -607,6 +628,7 @@ class PodcastGenerateRequest(BaseModel):
     watchlist: List[str] = Field(default_factory=lambda: ["ETH", "BTC", "SOL"])
     market_snapshot: Dict[str, float] = Field(default_factory=dict)
     events: List[str] = Field(default_factory=list)
+    portfolio_summary: Dict[str, Any] = Field(default_factory=dict)
     use_coingecko: bool = True
     vs_currency: str = "usd"
 
@@ -619,8 +641,59 @@ class PodcastLLMOut(BaseModel):
     bullets: List[str] = Field(..., min_length=3, max_length=5)
     lines: List[Line] = Field(..., min_length=14, max_length=28)
 
+def build_fallback_podcast(req: PodcastGenerateRequest) -> Dict[str, Any]:
+    topic_map = {
+        "CRYPTO": "整體市場快報",
+        "ALT": "新興幣市場快報",
+        "BTC": "BTC 盤勢晨報",
+        "RISK": "風險提醒特輯",
+        "PERSONAL": "專屬資產 Podcast",
+        "US": "美股市場快報",
+        "JP": "日股市場快報",
+    }
+    topic = topic_map.get(req.market, "市場快報")
+    watchlist = [str(s).upper() for s in (req.watchlist or ["BTC", "ETH", "SOL"])][:4]
+    focus = "、".join(watchlist)
+    lines = [
+        {"speaker": "主持人", "text": f"歡迎收聽 Smart Invest，今天這集是{topic}。"},
+        {"speaker": "分析師", "text": f"這集會先用比較白話的方式看 {focus}，重點放在趨勢、風險和下一步。"},
+        {"speaker": "主持人", "text": "如果市場短線波動很大，第一件事不是追價，而是先確認自己的配置比例。"},
+        {"speaker": "分析師", "text": "對，新手最常見的風險是單一幣種太集中，或是在上漲後一次投入太多。"},
+        {"speaker": "主持人", "text": "所以今天的重點可以拆成三個：先看方向、再看風險、最後才決定要不要模擬下單。"},
+        {"speaker": "分析師", "text": "如果你看到 24 小時漲幅很大，建議先用健康度檢查或 FOMO 檢測確認是不是過熱。"},
+        {"speaker": "主持人", "text": "對於還不確定的標的，可以先放進觀察清單，不一定要立刻買。"},
+        {"speaker": "分析師", "text": "保守一點的做法，是用 BTC 和 ETH 當核心，再少量觀察波動較大的幣種。"},
+        {"speaker": "主持人", "text": "如果想練習操作，可以先到模擬交易，用小額虛擬資金測試進出場節奏。"},
+        {"speaker": "分析師", "text": "模擬交易的重點不是猜中一次，而是看自己遇到漲跌時會不會失控。"},
+        {"speaker": "主持人", "text": "總結一下，今天先不要急著追高，先把市場方向和配置風險看清楚。"},
+        {"speaker": "分析師", "text": "沒錯，等風險可控，再用分批方式建立部位，會比一次 All in 更穩。"},
+        {"speaker": "主持人", "text": "這集就到這裡，下一步可以回市場總覽或健康度檢查繼續看。"},
+        {"speaker": "分析師", "text": "記得，AI 只是輔助整理，真正下決策前還是要看自己的資金和風險承受度。"},
+    ]
+    if req.market == "PERSONAL" and req.portfolio_summary:
+        total = float(req.portfolio_summary.get("total_value_usd") or 0)
+        cash = float(req.portfolio_summary.get("cash") or 0)
+        raw_positions = req.portfolio_summary.get("positions") or []
+        position_text = "、".join([
+            f"{str(pos.get('symbol') or '').upper()} 約 {float(pos.get('market_value') or 0):,.0f} 美元"
+            for pos in raw_positions[:4] if pos.get("symbol")
+        ]) or "目前尚未投入幣種"
+        lines[1:1] = [
+            {"speaker": "分析師", "text": f"先看你的模擬帳戶，目前總資產約 {total:,.0f} 美元，保留現金約 {cash:,.0f} 美元。"},
+            {"speaker": "主持人", "text": f"目前投入的幣種摘要是 {position_text}，我們會把這個配置放進今天的觀察裡。"},
+        ]
+    return {
+        "title": topic,
+        "bullets": ["先看市場方向", "確認配置風險", "用模擬交易練習"],
+        "script": "\n".join([f"{line['speaker']}：{line['text']}" for line in lines]),
+        "estimated_seconds": 80,
+        "lines": lines,
+        "fallback": True,
+    }
+
 class TTSRequest(BaseModel):
-    text: str
+    text: str = ""
+    lines: List[Line] = Field(default_factory=list)
     voice: str = "nova"
     model: str = "gpt-4o-mini-tts"
     speed: float = 1.0
@@ -661,6 +734,10 @@ def analysis_page(symbol):
 @app.route('/social-sentiment')
 def social_sentiment_page(): 
     return render_template('social_sentiment.html')
+
+@app.route('/narrative-radar')
+def narrative_radar_page():
+    return render_template('narrative_radar.html')
 
 @app.route('/ai-coach')
 def ai_coach_page():
@@ -840,7 +917,7 @@ def api_ai_chat():
     if not client: return jsonify({"reply": "API Key 未設定，無法連線 AI。"})
     try:
         prompt = f"你是專業加密貨幣交易員。用戶目前的風險承受度為【{risk_profile}】。請根據這個風險屬性，用簡明扼要、專業的口吻回答用戶的投資問題。用戶提問：{user_msg}"
-        res = client.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": prompt}])
+        res = client.chat.completions.create(model=os.getenv("OPENAI_MODEL", "gpt-5.4"), messages=[{"role": "user", "content": prompt}])
         return jsonify({"reply": res.choices[0].message.content})
     except Exception as e: return jsonify({"reply": f"系統錯誤: {str(e)}"})
 
@@ -1071,7 +1148,7 @@ def api_agent_plan():
 }}
 """
         res = client.chat.completions.create(
-            model=os.getenv("OPENAI_MODEL_AGENT", "gpt-4o-mini"),
+            model=os.getenv("OPENAI_MODEL_AGENT", "gpt-5.4"),
             messages=[
                 {"role": "system", "content": "你是專業但易懂的加密資產投資助理。重點是風險控管、分步執行、避免追高，不提供保證獲利承諾。"},
                 {"role": "user", "content": prompt},
@@ -1152,7 +1229,7 @@ def api_scam_scan():
     if not client: return jsonify({"report": "API Key 未設定，無法連線 AI。"})
     try:
         prompt = f"你是金融反詐騙專家。請分析以下內容是否有加密貨幣詐騙風險。請輸出：1.風險等級(高/中/低) 2.疑點解析 3.防範建議。\n內容：{text}"
-        res = client.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": prompt}])
+        res = client.chat.completions.create(model=os.getenv("OPENAI_MODEL", "gpt-5.4"), messages=[{"role": "user", "content": prompt}])
         return jsonify({"report": res.choices[0].message.content})
     except Exception as e: return jsonify({"report": f"系統錯誤: {str(e)}"})
 
@@ -1160,11 +1237,15 @@ def api_scam_scan():
 def generate_podcast():
     try: req = PodcastGenerateRequest(**(request.get_json(silent=True) or {}))
     except ValidationError as e: return jsonify({"detail": str(e)}), 422
-    prompt = f"市場={req.market}\n風險={req.profile.risk_level}\n關注清單={req.watchlist}\n事件={req.events}\n請用口語播報市場與配置重點。"
+    personal_summary = ""
+    if req.market == "PERSONAL" and req.portfolio_summary:
+        personal_summary = f"\n會員模擬資產摘要={json.dumps(req.portfolio_summary, ensure_ascii=False)[:1800]}\n請在開場自然唸出會員目前總資產、現金與已投入的幣種市值摘要。"
+    prompt = f"市場={req.market}\n風險={req.profile.risk_level}\n關注清單={req.watchlist}\n事件={req.events}{personal_summary}\n請用口語播報市場與配置重點。"
     try:
-        if not client: raise RuntimeError("NO KEY")
-        completion = client.beta.chat.completions.parse(
-            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"), 
+        podcast_client = refresh_openai_client()
+        if not podcast_client: return jsonify(build_fallback_podcast(req))
+        completion = podcast_client.beta.chat.completions.parse(
+            model=os.getenv("OPENAI_MODEL", "gpt-5.4"), 
             messages=[{"role": "system", "content": "你是加密貨幣晨報 Podcast 主持人與分析師。輸出 JSON。"}, {"role": "user", "content": prompt}],
             response_format=PodcastLLMOut
         )
@@ -1172,21 +1253,108 @@ def generate_podcast():
         lines = out.lines
         estimated_seconds = max(35, int(sum(len(l.text) for l in lines) / 3.0))
         return jsonify({"title": out.title, "bullets": out.bullets, "script": "\n".join([f"{l.speaker}：{l.text}" for l in lines]), "estimated_seconds": estimated_seconds, "lines": [l.model_dump() for l in lines]})
-    except Exception as e: return jsonify({"title": "預設晨報", "bullets": ["無法連線 AI"], "script": "主持人：連線失敗", "estimated_seconds": 60, "lines": [{"speaker":"主持人","text":"連線失敗，請檢查金鑰或額度。"}]})
+    except Exception as e:
+        fallback = build_fallback_podcast(req)
+        fallback["debug"] = f"OpenAI fallback: {type(e).__name__}"
+        return jsonify(fallback)
+
+@app.route("/api/podcast/generate", methods=["POST"])
+def api_generate_podcast_alias():
+    return generate_podcast()
+
+def create_dialogue_wav(podcast_client: OpenAI, req: TTSRequest, model: str, out_path: Path) -> None:
+    segment_paths: List[Path] = []
+    output_params: Optional[Tuple[int, int, int, str, str]] = None
+    output_frames: List[bytes] = []
+    voices = {"主持人": "nova", "分析師": "onyx"}
+
+    try:
+        for index, line in enumerate(req.lines[:28]):
+            segment_text = re.sub(r"\s+", " ", line.text).strip()
+            if not segment_text:
+                continue
+
+            segment_path = AUDIO_DIR / f"{out_path.stem}_{index}.wav"
+            segment_paths.append(segment_path)
+            with podcast_client.audio.speech.with_streaming_response.create(
+                model=model,
+                voice=voices.get(line.speaker, "nova"),
+                input=segment_text[:900],
+                speed=req.speed,
+                response_format="wav",
+            ) as response:
+                response.stream_to_file(segment_path)
+
+            with wave.open(str(segment_path), "rb") as source:
+                params = (
+                    source.getnchannels(),
+                    source.getsampwidth(),
+                    source.getframerate(),
+                    source.getcomptype(),
+                    source.getcompname(),
+                )
+                if output_params and params != output_params:
+                    raise RuntimeError("TTS WAV format mismatch")
+                output_params = params
+                output_frames.append(source.readframes(source.getnframes()))
+
+        if not output_params or not output_frames:
+            raise ValueError("Podcast dialogue is empty")
+
+        channels, sample_width, frame_rate, comp_type, comp_name = output_params
+        pause_frames = max(1, int(frame_rate * 0.16))
+        pause = b"\x00" * pause_frames * channels * sample_width
+        with wave.open(str(out_path), "wb") as target:
+            target.setnchannels(channels)
+            target.setsampwidth(sample_width)
+            target.setframerate(frame_rate)
+            target.setcomptype(comp_type, comp_name)
+            for index, frames in enumerate(output_frames):
+                target.writeframes(frames)
+                if index < len(output_frames) - 1:
+                    target.writeframes(pause)
+    finally:
+        for segment_path in segment_paths:
+            segment_path.unlink(missing_ok=True)
 
 @app.route("/podcast/tts", methods=["POST"])
 def podcast_tts():
-    if not client: return jsonify({"detail": "OPENAI_API_KEY not set"}), 503
+    podcast_client = refresh_openai_client()
+    if not podcast_client: return jsonify({"detail": "OPENAI_API_KEY not set"}), 503
     try: req = TTSRequest(**(request.get_json(silent=True) or {}))
     except ValidationError as e: return jsonify({"detail": str(e)}), 422
+    if not req.lines and not req.text.strip():
+        return jsonify({"detail": "Podcast dialogue is empty"}), 422
     clean = re.sub(r"^(主持人|分析師)：", "", req.text, flags=re.MULTILINE).strip()[:3800]
-    filename = f"podcast_{date.today().isoformat()}.mp3"
+    audio_id = uuid.uuid4().hex[:10]
+    filename = f"podcast_{date.today().isoformat()}_{audio_id}.{'wav' if req.lines else 'mp3'}"
     out_path = AUDIO_DIR / filename
+    preferred_model = os.getenv("OPENAI_TTS_MODEL", req.model or "gpt-4o-mini-tts")
+    tts_models = []
+    for model_name in [preferred_model, "gpt-4o-mini-tts", "tts-1"]:
+        if model_name and model_name not in tts_models:
+            tts_models.append(model_name)
+    errors = []
     try:
-        with client.audio.speech.with_streaming_response.create(model="tts-1", voice=req.voice, input=clean, speed=req.speed, response_format="mp3") as response:
-            response.stream_to_file(out_path)
-    except Exception as e: return jsonify({"detail": f"TTS failed: {type(e).__name__}"}), 502
-    return send_file(out_path, mimetype="audio/mpeg", as_attachment=True, download_name=filename)
+        for tts_model in tts_models:
+            try:
+                if req.lines:
+                    create_dialogue_wav(podcast_client, req, tts_model, out_path)
+                    return send_file(out_path, mimetype="audio/wav", as_attachment=True, download_name=filename)
+                with podcast_client.audio.speech.with_streaming_response.create(model=tts_model, voice=req.voice, input=clean, speed=req.speed, response_format="mp3") as response:
+                    response.stream_to_file(out_path)
+                return send_file(out_path, mimetype="audio/mpeg", as_attachment=True, download_name=filename)
+            except Exception as model_error:
+                if is_openai_auth_error(model_error):
+                    return jsonify({"detail": "OpenAI API Key 驗證失敗。請重新產生一把新的 API key，貼到 .env 的 OPENAI_API_KEY，然後重啟 Flask。"}), 401
+                errors.append(f"{tts_model}: {type(model_error).__name__}: {str(model_error)[:180]}")
+        raise RuntimeError(" | ".join(errors))
+    except Exception as e:
+        return jsonify({"detail": f"TTS failed: {type(e).__name__}: {str(e)[:240]}"}), 502
+
+@app.route("/api/podcast/tts", methods=["POST"])
+def api_podcast_tts_alias():
+    return podcast_tts()
 
 @app.route("/portfolio/analyze-llm", methods=["POST"])
 def analyze_portfolio_llm():
@@ -1201,13 +1369,32 @@ def analyze_portfolio_llm():
     prompt = f"請用非常白話的中文分析配置：\n【持幣】{holdings_text}\n【指標】Top1={top1:.2f}, 年化波動={vol:.2f}, 最大回撤={mdd:.2f}"
     try:
         completion = client.beta.chat.completions.parse(
-            model=os.getenv("OPENAI_MODEL_PORTFOLIO", "gpt-4o-mini"),
+            model=os.getenv("OPENAI_MODEL_PORTFOLIO", "gpt-5.4"),
             messages=[{"role": "system", "content": "你是專業的加密貨幣財富管理顧問。"}, {"role": "user", "content": prompt}],
             response_format=PortfolioLLMOut
         )
         out = completion.choices[0].message.parsed
         return jsonify({"risk_health": rh_dict, "narrative": out.narrative, "highlights": out.highlights or []})
     except Exception as e: return jsonify({"risk_health": rh_dict, "narrative": "LLM 分析連線失敗，請檢查金鑰。", "highlights": ["連線異常"]})
+
+@app.route("/api/portfolio/analyze", methods=["POST"])
+def api_portfolio_analyze_alias():
+    req = request.get_json(silent=True) or {}
+    amount = parse_budget_amount(req.get("amount"), 10000.0)
+    risk_level = str(req.get("risk_level") or "穩健型")
+    allocation = build_agent_allocation(risk_level, amount)
+    lines = [
+        f"{item['symbol']}：{int(item['weight'] * 100)}%，約 ${item['amount_usd']:,.0f}"
+        for item in allocation
+    ]
+    return jsonify({
+        "narrative": "建議先用分散配置降低單一幣種波動，並保留現金或穩定幣做緩衝。\n" + "\n".join(lines),
+        "highlights": [
+            "這是規則型試算，仍需搭配市場總覽與健康度檢查。",
+            "若短線漲幅過大，先分批進場，避免一次追高。"
+        ],
+        "allocation": allocation,
+    })
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False)
