@@ -242,14 +242,39 @@
     return saved;
   }
 
-  function buildReply(message) {
+  async function syncOrderToSimTrade(order) {
+    const token = await window.authManager?.getToken?.().catch(() => null);
+    if (!token) return { synced: false, error: "尚未取得會員 token" };
+
+    const amountUsd = Math.max(0.01, Number(order.amount || 0) / 32);
+    const res = await fetch("/api/sim-trade/order", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        symbol: order.symbol,
+        side: order.side,
+        amount_usd: amountUsd
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return { synced: false, error: data.error || "同步模擬交易失敗" };
+    window.dispatchEvent(new CustomEvent("smartinvest:sim-trade-updated", { detail: data }));
+    return { synced: true, data };
+  }
+
+  async function buildReply(message) {
     const order = parseOrder(message);
     if (order) {
       if (!order.amount) return { text: "我有看出你想模擬下單，但金額需要大於 0。可以像這樣輸入：用 5000 TWD 模擬買入 BTC。", card: false };
       const saved = saveMockOrder(order);
       const sideText = saved.side === "buy" ? "買入" : "賣出";
+      const sync = await syncOrderToSimTrade(saved).catch((error) => ({ synced: false, error: error.message }));
+      const syncText = sync.synced ? "也已同步到模擬交易帳戶。" : `已先存到會員中心，但模擬交易同步失敗：${sync.error}`;
       return {
-        text: `已幫你建立一筆模擬下單：${sideText} ${saved.symbol}，金額 TWD ${formatMoney(saved.amount)}，約 ${saved.quantity.toFixed(6)} 顆。這筆紀錄已同步到會員中心。`,
+        text: `已幫你建立一筆模擬下單：${sideText} ${saved.symbol}，金額 TWD ${formatMoney(saved.amount)}，約 ${saved.quantity.toFixed(6)} 顆。這筆紀錄已同步到會員中心，${syncText}`,
         card: true
       };
     }
@@ -297,7 +322,7 @@
     }
 
     const typingRow = addTypingMessage();
-    window.setTimeout(() => {
+    window.setTimeout(async () => {
       if (typingRow) typingRow.remove();
       setMainAvatar("happy", "is-talking");
 
@@ -305,7 +330,7 @@
         greeted = true;
         addAiMessage("嗨！我是你的 AI 投資教練。接下來我可以幫你讀取會員資金紀錄、整理模擬持倉，也可以用一句話幫你建立模擬下單。你可以說：用 5000 TWD 模擬買入 BTC。", "happy");
       } else {
-        const reply = buildReply(message);
+        const reply = await buildReply(message);
         addAiMessage(reply.text, reply.card ? "calm" : "happy");
         if (reply.card) addAnalysisCard();
       }

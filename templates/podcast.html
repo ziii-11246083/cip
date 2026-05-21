@@ -10,26 +10,26 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/iansui@1.0/dist/iansui.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=utf8fix">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/podcast.css') }}?v=layoutfix">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/podcast.css') }}?v=shared-site-podcast">
 </head>
 <body class="podcast-page">
   
 {% include "partials/header.html" %}
 
 <main>
-  <section class="podcast-hero-section">
-    <div class="podcast-page-container podcast-hero-layout">
+  <section class="hero podcast-hero-section">
+    <div class="container hero-grid podcast-hero-layout">
       <div class="podcast-hero-copy">
-        <div class="podcast-badge"><i class="fas fa-podcast"></i> AI Podcast</div>
-        <h1>雙人對話式市場播報</h1>
-        <p>選擇市場主題、主持人與分析師聲音，再挑選你關注的幣種。AI 會生成一集雙人對話，搭配語音播放器與同步對話泡泡。</p>
+        <div class="eyebrow"><i class="fas fa-podcast"></i> AI Podcast</div>
+        <h1 class="hero-title">雙人對話式市場播報</h1>
+        <p class="hero-lead">選擇節目主題，讓 Nova 與 Onyx 生成雙人市場播報，搭配播放器與同步對話泡泡。</p>
         <div class="podcast-hero-tags">
           <div><i class="fas fa-microphone-lines"></i> 雙聲線對話</div>
           <div><i class="fas fa-chart-line"></i> 市場重點整理</div>
           <div><i class="fas fa-comments"></i> 泡泡同步顯示</div>
         </div>
       </div>
-      <aside class="podcast-hero-card">
+      <aside class="hero-card podcast-hero-card">
         <div class="podcast-hero-card-head">
           <div class="podcast-hero-icon"><i class="fas fa-wave-square"></i></div>
           <div><small>SMART INVEST RADIO</small><strong>今日市場快報</strong></div>
@@ -44,107 +44,70 @@
     </div>
   </section>
 
-  <section class="podcast-workspace-section">
-    <div class="podcast-page-container">
+  <section class="section podcast-workspace-section">
+    <div class="container wide-container">
       <div class="podcast-access-strip" id="podcastGuestGate">
         <div class="podcast-access-icon"><i class="fas fa-user-check"></i></div>
         <div><strong>Podcast 開放訪客模式使用</strong><p>按下按鈕即可啟用訪客模式；會員登入也可以直接使用。</p></div>
         <button class="button primary" id="btnEnablePodcastGuest" type="button"><i class="fas fa-user-check"></i> 啟用訪客模式</button>
       </div>
 
-      <div class="podcast-workspace-layout">
-        <section class="podcast-studio-card">
-          <div class="podcast-small-label">Studio Settings</div>
-          <div class="podcast-section-head">
-            <h2>設定市場播報</h2>
-            <p>選擇主題、聲音與語速，再挑選這集要追蹤的幣種。</p>
-          </div>
+      <div class="podcast-console">
+        <section class="podcast-studio-card" id="podcastStudioCard">
+          <div class="podcast-top-grid">
+            <div class="podcast-setup-pane">
+              <div class="podcast-simple-title">今天要聽哪種?</div>
 
-          <div class="podcast-field">
-            <label for="podMarket">節目主題</label>
-            <select id="podMarket">
-              <option value="CRYPTO" selected>整體市場 + 個人配置觀察</option>
-              <option value="ALT">新興幣市場</option>
-              <option value="BTC">BTC 盤勢晨報</option>
-              <option value="RISK">風險提醒特輯</option>
-            </select>
-          </div>
+              <div class="podcast-field simple-topic-field">
+                <select id="podMarket" aria-label="選擇節目主題">
+                  <option value="PERSONAL" selected>專屬 Podcast</option>
+                  <option value="CRYPTO">整體市場快報</option>
+                  <option value="ALT">新興幣市場</option>
+                  <option value="BTC">BTC 盤勢晨報</option>
+                  <option value="RISK">風險提醒特輯</option>
+                </select>
+              </div>
 
-          <input id="hostVoice" type="hidden" value="nova">
-          <input id="analystVoice" type="hidden" value="onyx">
-          <div class="podcast-voice-block">
-            <div class="podcast-mini-title">聲音角色</div>
-            <div class="voice-grid">
-              <button class="voice-card voicePill active" data-role="host" data-voice="nova" type="button"><b>主持人 Nova</b><span>輕快、適合開場與重點引導。</span></button>
-              <button class="voice-card voicePill" data-role="host" data-voice="shimmer" type="button"><b>主持人 Shimmer</b><span>明亮、適合節奏較快的播報。</span></button>
-              <button class="voice-card voicePill active" data-role="analyst" data-voice="onyx" type="button"><b>分析師 Onyx</b><span>沉穩、適合風險與配置分析。</span></button>
-              <button class="voice-card voicePill" data-role="analyst" data-voice="alloy" type="button"><b>分析師 Alloy</b><span>中性、適合清楚說明市場變化。</span></button>
+              <input id="hostVoice" type="hidden" value="nova">
+              <input id="analystVoice" type="hidden" value="onyx">
+              <input id="speed" type="hidden" value="1.0">
+
+              <button class="button primary generate-btn" id="btnGenPodcast" type="button"><i class="fas fa-wand-magic-sparkles"></i> 生成</button>
+            </div>
+
+            <div class="podcast-player-strip">
+              <div class="player-buttons">
+                <button class="button" id="btnPodcastPlay" type="button"><i class="fas fa-play"></i> 播放</button>
+                <button class="button" id="btnPodcastPause" type="button"><i class="fas fa-pause"></i> 暫停</button>
+              </div>
+              <div class="progress"><div id="progressFill"></div></div>
+              <div class="time" id="timeText">00:00 / 00:00</div>
+              <div class="audio-status" id="audioStatus">尚未生成音訊</div>
+              <strong id="podcastTitleText" class="hidden">Smart Invest 市場雙人播報</strong>
+              <span id="podcastBulletText" class="hidden">生成後會依照音訊時間同步顯示對話泡泡。</span>
+              <audio id="player"></audio>
             </div>
           </div>
 
-          <div class="podcast-field">
-            <label for="speedRange">語速</label>
-            <div class="speed-row">
-              <input id="speedRange" type="range" min="0.85" max="1.2" step="0.05" value="1.0">
-              <span id="speedValue">1.00x</span>
+          <div class="chat-scene">
+            <div class="chat-person nova">
+              <div class="chat-head"><img src="{{ url_for('static', filename='images/podcast-nova.png') }}" alt=""></div>
+              <span>Nova</span>
             </div>
-            <input id="speed" type="hidden" value="1.0">
-          </div>
-
-          <div class="watchlist">
-            <div class="watch-head">
-              <div><strong>關注幣種</strong><span>選擇本集會提到的市場標的。</span></div>
-              <button class="button" id="btnRefreshCoins" type="button"><i class="fas fa-rotate-right"></i></button>
-            </div>
-            <div class="selected-watchlist" id="selectedWatchlist"></div>
-            <div class="coin-bubbles" id="coinBubbleOptions"></div>
-          </div>
-
-          <button class="button primary generate-btn" id="btnGenPodcast" type="button"><i class="fas fa-wand-magic-sparkles"></i> 生成 Podcast</button>
-        </section>
-
-        <section class="podcast-content-area">
-          <div class="now-playing">
-            <div class="podcast-visual-stage" id="podcastVisualStage">
-              <div class="dialogue-cast">
-                <div class="cast-card host is-speaking" data-speaker="主持人">
-                  <div class="cast-avatar"><div class="face-core"><i class="fas fa-microphone-lines"></i></div><span class="voice-ring"></span></div>
-                  <div class="cast-meta"><strong>主持人 Nova</strong><span>用輕鬆語氣帶出今日重點。</span></div>
-                  <div class="cast-wave"><span></span><span></span><span></span><span></span></div>
-                </div>
-                <div class="cast-card analyst" data-speaker="分析師">
-                  <div class="cast-avatar"><div class="face-core"><i class="fas fa-chart-line"></i></div><span class="voice-ring"></span></div>
-                  <div class="cast-meta"><strong>分析師 Onyx</strong><span>補充風險、配置與觀察方向。</span></div>
-                  <div class="cast-wave"><span></span><span></span><span></span><span></span></div>
-                </div>
+            <div class="chat-window" id="chatStream">
+              <div class="chat-scene-bubbles chat-placeholder">
+                <span></span>
+                <span></span>
+                <span></span>
               </div>
             </div>
-
-            <small>NOW PLAYING</small>
-            <strong id="podcastTitleText">Smart Invest 市場雙人播報</strong>
-            <span id="podcastBulletText">生成後會依照音訊時間同步顯示對話泡泡。</span>
-            <div class="audio-status" id="audioStatus">尚未生成音訊</div>
-            <div class="progress"><div id="progressFill"></div></div>
-            <div class="time" id="timeText">00:00 / 00:00</div>
-            <div class="player-buttons">
-              <button class="button" id="btnPodcastPlay" type="button"><i class="fas fa-play"></i> 播放</button>
-              <button class="button" id="btnPodcastPause" type="button"><i class="fas fa-pause"></i> 暫停</button>
-              <button class="button light" id="btnPodcastRestart" type="button"><i class="fas fa-rotate-left"></i> 重播</button>
+            <div class="chat-person onyx">
+              <div class="chat-head"><img src="{{ url_for('static', filename='images/podcast-onyx.png') }}" alt=""></div>
+              <span>Onyx</span>
             </div>
-            <audio id="player" controls></audio>
           </div>
-
-          <div class="podcast-chat-panel">
-            <div class="podcast-chat-head">
-              <div class="podcast-small-label">Dialogue Stream</div>
-              <h3>對話泡泡</h3>
-            </div>
-            <div class="chat-stream" id="chatStream">
-              <div class="chat-empty"><i class="fas fa-comments"></i><strong>尚未生成 Podcast</strong><span>按下生成後，這裡會出現兩位 AI 的對話泡泡。</span></div>
-            </div>
-            <button class="button" id="btnCopyScript" type="button"><i class="fas fa-copy"></i> 複製文字稿</button>
-            <pre id="scriptBox" class="hidden"></pre>
-          </div>
+          <button class="button copy-script-btn" id="btnCopyScript" type="button"><i class="fas fa-copy"></i> 複製文字稿</button>
+          <pre id="scriptBox" class="hidden"></pre>
         </section>
       </div>
     </div>
@@ -155,8 +118,8 @@
 <footer class="footer"><div class="container footer-inner"><div>© Smart Invest Crypto · 加密資產風險與市場分析</div><div>Market · Health · Podcast · AI Agent</div></div></footer>
 <div class="toast" id="toast"><div class="t" id="toastT">提示</div><div class="m" id="toastM">--</div></div>
 <script>window.__SUPABASE_CONFIG__ = { url: '{{ supabase_url | default("https://dummy.supabase.co") }}', anonKey: '{{ supabase_anon_key | default("dummy") }}' };</script>
-<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=demo-member"></script>
-<script src="{{ url_for('static', filename='js/common.js') }}?v=utf8fix"></script>
-<script src="{{ url_for('static', filename='js/podcast.js') }}?v=layoutfix"></script>
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=avatar-menu-2"></script>
+<script src="{{ url_for('static', filename='js/common.js') }}?v=avatar-menu"></script>
+<script src="{{ url_for('static', filename='js/podcast.js') }}?v=personal-podcast-2"></script>
 </body>
 </html>
