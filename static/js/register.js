@@ -1,4 +1,4 @@
-const toast = function(title, msg) {
+const registerToast = function(title, msg) {
   const el = document.getElementById("toast");
   const titleEl = document.getElementById("toastT");
   const msgEl = document.getElementById("toastM");
@@ -140,7 +140,7 @@ document.addEventListener("DOMContentLoaded", function() {
       if (window.authManager && typeof window.authManager.loginWithGoogle === "function") {
         window.authManager.loginWithGoogle();
       } else {
-        toast("尚未串接 Google 註冊", "請確認 auth.js 是否已提供 loginWithGoogle()。");
+        registerToast("尚未串接 Google 註冊", "請確認 auth.js 是否已提供 loginWithGoogle()。");
       }
     });
   }
