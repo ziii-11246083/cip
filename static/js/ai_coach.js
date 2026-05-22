@@ -1,5 +1,6 @@
 (function () {
   const $ = (id) => document.getElementById(id);
+  const CONVERSATION_KEY = "smartinvest_ai_coach_conversation_id";
 
   function escapeHTML(value) {
     return String(value ?? "")
@@ -150,20 +151,33 @@
       const headers = { "Content-Type": "application/json" };
       if (token) headers.Authorization = `Bearer ${token}`;
 
+      const conversationId = localStorage.getItem(CONVERSATION_KEY) || "";
+      const payload = { message: text, risk_profile: riskProfile };
+      if (conversationId) payload.conversation_id = conversationId;
+
       const res = await fetch("/api/ai-chat", {
         method: "POST",
         headers,
-        body: JSON.stringify({ message: text, risk_profile: riskProfile }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json().catch(() => ({}));
       removeTypingBubble();
+
+      if (res.status === 401 || res.status === 403) {
+        localStorage.removeItem(CONVERSATION_KEY);
+        window.authManager?.requireMember?.("AI 投資教練");
+        return;
+      }
 
       if (!res.ok) {
         appendChatBubble("系統提醒", data.reply || "目前 AI 教練暫時無法回覆，請稍後再試。");
         return;
       }
 
+      if (data.conversation_id) {
+        localStorage.setItem(CONVERSATION_KEY, data.conversation_id);
+      }
       appendChatBubble("Smart Invest AI 教練", data.reply || "我收到你的問題了，但目前沒有取得完整回覆。");
     } catch {
       removeTypingBubble();

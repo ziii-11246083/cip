@@ -8,6 +8,7 @@ const DEMO_MEMBER_KEY = "si_demo_member";
 const DEMO_MEMBER_TOKEN = "smartinvest-demo-member-token";
 const DEMO_MEMBER_EMAIL = "test@smartinvest.local";
 const DEMO_MEMBER_PASSWORD = "Test123456";
+const AI_COACH_CONVERSATION_KEY = "smartinvest_ai_coach_conversation_id";
 
 const supabase = (supabaseUrl && supabaseAnonKey)
     ? createClient(supabaseUrl, supabaseAnonKey)
@@ -322,6 +323,8 @@ window.authManager = {
         try {
             localStorage.removeItem(DEMO_MEMBER_KEY);
             localStorage.removeItem(GUEST_MODE_KEY);
+            localStorage.removeItem(AI_COACH_CONVERSATION_KEY);
+            localStorage.removeItem("conversation_id");
             if (supabase) {
                 const { error } = await supabase.auth.signOut();
                 if (error) throw error;
@@ -347,6 +350,8 @@ window.authManager = {
     },
     continueAsGuest: () => {
         localStorage.removeItem(DEMO_MEMBER_KEY);
+        localStorage.removeItem(AI_COACH_CONVERSATION_KEY);
+        localStorage.removeItem("conversation_id");
         localStorage.setItem(GUEST_MODE_KEY, "1");
         currentSession = null;
         updateMembership(null);

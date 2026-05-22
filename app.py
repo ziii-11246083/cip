@@ -908,18 +908,78 @@ def api_check_fomo():
     else: return jsonify({"level": "LOW", "message": f"{symbol} 波動平緩 ({p_change}%)，無明顯 FOMO 跡象，適合依紀律執行定投。"})
 
 @app.route('/api/ai-chat', methods=['POST'])
-@optional_token
+@token_required
 def api_ai_chat():
-    user_uid = request.user.get('uid') 
+    user_uid = request.user.get('uid')
     req = request.get_json(silent=True) or {}
-    user_msg = req.get("message", "")
-    risk_profile = req.get("risk_profile", "穩健型") 
-    if not client: return jsonify({"reply": "API Key 未設定，無法連線 AI。"})
+    user_msg = (req.get("message") or "").strip()
+    risk_profile = req.get("risk_profile", "穩健型")
+    incoming_conversation_id = (req.get("conversation_id") or "").strip()
+
+    if not user_msg:
+        return jsonify({"reply": "請先輸入訊息內容。"}), 400
+    if not client:
+        return jsonify({"reply": "API Key 未設定，無法連線 AI。"})
+
+    conversation_id = None
+    if db:
+        try:
+            if incoming_conversation_id:
+                rows = db.query_data(
+                    "ai_conversations",
+                    filters={"id": incoming_conversation_id, "user_id": user_uid},
+                    limit=1,
+                )
+                if rows:
+                    conversation_id = incoming_conversation_id
+
+            if not conversation_id:
+                title = user_msg[:30].strip()
+                if len(user_msg) > 30:
+                    title = f"{title}..."
+                conversation_id = db.create_conversation(
+                    user_uid,
+                    title,
+                    os.getenv("OPENAI_MODEL", "gpt-5.4"),
+                )
+        except Exception:
+            app.logger.exception("ai_chat conversation setup failed")
+            conversation_id = None
+
+        if conversation_id:
+            try:
+                db.save_message(conversation_id, user_uid, "user", user_msg)
+            except Exception:
+                app.logger.exception("ai_chat save user message failed")
+
     try:
-        prompt = f"你是專業加密貨幣交易員。用戶目前的風險承受度為【{risk_profile}】。請根據這個風險屬性，用簡明扼要、專業的口吻回答用戶的投資問題。用戶提問：{user_msg}"
-        res = client.chat.completions.create(model=os.getenv("OPENAI_MODEL", "gpt-5.4"), messages=[{"role": "user", "content": prompt}])
-        return jsonify({"reply": res.choices[0].message.content})
-    except Exception as e: return jsonify({"reply": f"系統錯誤: {str(e)}"})
+        prompt = (
+            f"你是專業加密貨幣交易員。用戶目前的風險承受度為【{risk_profile}】。"
+            f"請根據這個風險屬性，用簡明扼要、專業的口吻回答用戶的投資問題。"
+            f"用戶提問：{user_msg}"
+        )
+        res = client.chat.completions.create(
+            model=os.getenv("OPENAI_MODEL", "gpt-5.4"),
+            messages=[{"role": "user", "content": prompt}],
+        )
+        reply_text = res.choices[0].message.content
+        tokens_used = 0
+        usage = getattr(res, "usage", None)
+        if usage:
+            tokens_used = int(getattr(usage, "total_tokens", 0) or 0)
+
+        if db and conversation_id:
+            try:
+                db.save_message(conversation_id, user_uid, "assistant", reply_text, tokens_used)
+            except Exception:
+                app.logger.exception("ai_chat save assistant message failed")
+
+        payload = {"reply": reply_text}
+        if conversation_id:
+            payload["conversation_id"] = conversation_id
+        return jsonify(payload)
+    except Exception as e:
+        return jsonify({"reply": f"系統錯誤: {str(e)}"})
 
 def parse_budget_amount(value: Any, default: float = 100000.0) -> float:
     text = str(value or "")
