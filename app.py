@@ -324,6 +324,80 @@ class DataManager:
         results.sort(key=sort_key)
         return results
 
+AI_TOOL_DEFINITIONS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_crypto_price",
+            "description": "Get the latest USD price for a crypto symbol using CoinGecko.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "symbol": {
+                        "type": "string",
+                        "description": "Crypto symbol, e.g. BTC, ETH, SOL",
+                    }
+                },
+                "required": ["symbol"],
+            },
+        },
+    }
+]
+
+def _resolve_coin_id(symbol: str) -> str:
+    symbol = (symbol or "").strip().upper()
+    if not symbol:
+        return ""
+    if symbol in CG_ID_MAP:
+        return CG_ID_MAP[symbol]
+    search_hits = DataManager.search_sfi_assets(symbol)
+    if search_hits:
+        return search_hits[0].get("id") or symbol.lower()
+    return symbol.lower()
+
+def get_crypto_price(symbol: str) -> Dict[str, Any]:
+    symbol = (symbol or "").strip().upper()
+    if not symbol:
+        return {"ok": False, "error": "symbol is required"}
+    coin_id = _resolve_coin_id(symbol)
+    if not coin_id:
+        return {"ok": False, "error": "symbol not found", "symbol": symbol}
+    payload = DataManager._cg_get(
+        "/simple/price",
+        {"ids": coin_id, "vs_currencies": "usd", "include_24hr_change": "true"},
+    ) or {}
+    raw = payload.get(coin_id) or {}
+    price = raw.get("usd")
+    change = raw.get("usd_24h_change")
+    if price is None:
+        return {"ok": False, "error": "price not found", "symbol": symbol, "coin_id": coin_id}
+    return {
+        "ok": True,
+        "symbol": symbol,
+        "coin_id": coin_id,
+        "price_usd": float(price),
+        "change_24h": float(change) if change is not None else None,
+        "source": "coingecko",
+    }
+
+def build_ai_system_prompt(risk_profile: str) -> str:
+    profile = (risk_profile or "穩健型").strip() or "穩健型"
+    return (
+        "你是專業加密貨幣交易員。"
+        f"用戶目前的風險承受度為【{profile}】。"
+        "請根據風險屬性，用簡明扼要、專業的口吻回答用戶的投資問題。"
+    )
+
+def map_history_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    messages: List[Dict[str, Any]] = []
+    for row in rows or []:
+        role = (row.get("message_type") or "").strip()
+        content = row.get("content") or ""
+        if role not in {"user", "assistant", "system"}:
+            continue
+        messages.append({"role": role, "content": content})
+    return messages
+
 class AIAssistant:
     @staticmethod
     def generate_sfi_insight(score: int) -> str:
@@ -908,10 +982,13 @@ def api_check_fomo():
 @token_required
 def api_ai_chat():
     user_uid = request.user.get('uid')
+    access_token = request.user.get('token')
+    is_demo = bool(request.user.get('is_demo'))
     req = request.get_json(silent=True) or {}
     user_msg = (req.get("message") or "").strip()
     risk_profile = req.get("risk_profile", "穩健型")
     incoming_conversation_id = (req.get("conversation_id") or "").strip()
+    client_messages = req.get("messages") if isinstance(req.get("messages"), list) else []
 
     if not user_msg:
         return jsonify({"reply": "請先輸入訊息內容。"}), 400
@@ -919,64 +996,211 @@ def api_ai_chat():
         return jsonify({"reply": "API Key 未設定，無法連線 AI。"})
 
     conversation_id = None
+    history_rows: List[Dict[str, Any]] = []
     if db:
         try:
             if incoming_conversation_id:
-                rows = db.query_data(
-                    "ai_conversations",
-                    filters={"id": incoming_conversation_id, "user_id": user_uid},
-                    limit=1,
-                )
-                if rows:
-                    conversation_id = incoming_conversation_id
+                conversation_id = incoming_conversation_id
+                if access_token:
+                    history_rows = db.get_conversation_history_authed(access_token, conversation_id)
+                else:
+                    history_rows = db.get_conversation_history(conversation_id)
 
             if not conversation_id:
                 title = user_msg[:30].strip()
                 if len(user_msg) > 30:
                     title = f"{title}..."
-                conversation_id = db.create_conversation(
-                    user_uid,
-                    title,
-                    os.getenv("OPENAI_MODEL", "gpt-5.4"),
-                )
+                if access_token:
+                    conversation_id = db.create_conversation_authed(
+                        access_token,
+                        user_uid,
+                        title,
+                        os.getenv("OPENAI_MODEL", "gpt-5.4"),
+                    )
+                else:
+                    conversation_id = db.create_conversation(
+                        user_uid,
+                        title,
+                        os.getenv("OPENAI_MODEL", "gpt-5.4"),
+                    )
         except Exception:
             app.logger.exception("ai_chat conversation setup failed")
             conversation_id = None
 
         if conversation_id:
             try:
-                db.save_message(conversation_id, user_uid, "user", user_msg)
+                save_ok = False
+                if access_token:
+                    save_ok = db.save_message_authed(
+                        access_token,
+                        conversation_id,
+                        user_uid,
+                        "user",
+                        user_msg,
+                        prompt_tokens=0,
+                        completion_tokens=0,
+                        tokens_used=0,
+                    )
+                else:
+                    save_ok = db.save_message(
+                        conversation_id,
+                        user_uid,
+                        "user",
+                        user_msg,
+                        tokens_used=0,
+                        prompt_tokens=0,
+                        completion_tokens=0,
+                    )
+
+                if not save_ok and access_token:
+                    conversation_id = db.create_conversation_authed(
+                        access_token,
+                        user_uid,
+                        user_msg[:30].strip() or "Chat",
+                        os.getenv("OPENAI_MODEL", "gpt-5.4"),
+                    )
+                    if conversation_id:
+                        db.save_message_authed(
+                            access_token,
+                            conversation_id,
+                            user_uid,
+                            "user",
+                            user_msg,
+                            prompt_tokens=0,
+                            completion_tokens=0,
+                            tokens_used=0,
+                        )
             except Exception:
                 app.logger.exception("ai_chat save user message failed")
 
     try:
-        prompt = (
-            f"你是專業加密貨幣交易員。用戶目前的風險承受度為【{risk_profile}】。"
-            f"請根據這個風險屬性，用簡明扼要、專業的口吻回答用戶的投資問題。"
-            f"用戶提問：{user_msg}"
-        )
-        res = client.chat.completions.create(
-            model=os.getenv("OPENAI_MODEL", "gpt-5.4"),
-            messages=[{"role": "user", "content": prompt}],
-        )
-        reply_text = res.choices[0].message.content
-        tokens_used = 0
-        usage = getattr(res, "usage", None)
-        if usage:
-            tokens_used = int(getattr(usage, "total_tokens", 0) or 0)
+        system_prompt = build_ai_system_prompt(risk_profile)
+        messages: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}]
+
+        if history_rows:
+            messages.extend(map_history_rows(history_rows))
+        elif client_messages:
+            for item in client_messages:
+                role = (item.get("role") or "").strip()
+                content = item.get("content") or ""
+                if role in {"user", "assistant", "system"} and content:
+                    messages.append({"role": role, "content": content})
+
+        messages.append({"role": "user", "content": user_msg})
+
+        prompt_tokens_total = 0
+        completion_tokens_total = 0
+        reply_text = ""
+        tool_loops = 0
+        while tool_loops < 3:
+            res = client.chat.completions.create(
+                model=os.getenv("OPENAI_MODEL", "gpt-5.4"),
+                messages=messages,
+                tools=AI_TOOL_DEFINITIONS,
+                tool_choice="auto",
+            )
+            usage = getattr(res, "usage", None)
+            if usage:
+                prompt_tokens_total += int(getattr(usage, "prompt_tokens", 0) or 0)
+                completion_tokens_total += int(getattr(usage, "completion_tokens", 0) or 0)
+
+            message = res.choices[0].message
+            tool_calls = getattr(message, "tool_calls", None) or []
+            if tool_calls:
+                messages.append({
+                    "role": "assistant",
+                    "content": message.content or "",
+                    "tool_calls": [
+                        {
+                            "id": call.id,
+                            "type": "function",
+                            "function": {
+                                "name": call.function.name,
+                                "arguments": call.function.arguments,
+                            },
+                        }
+                        for call in tool_calls
+                    ],
+                })
+
+                for call in tool_calls:
+                    raw_args = getattr(call.function, "arguments", "")
+                    try:
+                        args = json.loads(raw_args) if isinstance(raw_args, str) else (raw_args or {})
+                    except Exception:
+                        args = {}
+
+                    if call.function.name == "get_crypto_price":
+                        result = get_crypto_price(args.get("symbol"))
+                    else:
+                        result = {"ok": False, "error": f"Unknown tool: {call.function.name}"}
+
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": call.id,
+                        "content": json.dumps(result, ensure_ascii=True),
+                    })
+
+                tool_loops += 1
+                continue
+
+            reply_text = message.content or ""
+            break
+
+        tokens_used = prompt_tokens_total + completion_tokens_total
 
         if db and conversation_id:
             try:
-                db.save_message(conversation_id, user_uid, "assistant", reply_text, tokens_used)
+                if access_token:
+                    db.save_message_authed(
+                        access_token,
+                        conversation_id,
+                        user_uid,
+                        "assistant",
+                        reply_text,
+                        prompt_tokens=prompt_tokens_total,
+                        completion_tokens=completion_tokens_total,
+                        tokens_used=tokens_used,
+                    )
+                else:
+                    db.save_message(
+                        conversation_id,
+                        user_uid,
+                        "assistant",
+                        reply_text,
+                        tokens_used=tokens_used,
+                        prompt_tokens=prompt_tokens_total,
+                        completion_tokens=completion_tokens_total,
+                    )
             except Exception:
                 app.logger.exception("ai_chat save assistant message failed")
 
-        payload = {"reply": reply_text}
+        payload = {"reply": reply_text or ""}
         if conversation_id:
             payload["conversation_id"] = conversation_id
         return jsonify(payload)
     except Exception as e:
         return jsonify({"reply": f"系統錯誤: {str(e)}"})
+
+@app.route('/api/ai-chat/history', methods=['GET'])
+@token_required
+def api_ai_chat_history():
+    conversation_id = (request.args.get("conversation_id") or "").strip()
+    if not conversation_id:
+        return jsonify({"error": "conversation_id is required"}), 400
+    if not db:
+        return jsonify({"error": "database unavailable"}), 503
+
+    access_token = request.user.get("token")
+    try:
+        if access_token:
+            rows = db.get_conversation_history_authed(access_token, conversation_id)
+        else:
+            rows = db.get_conversation_history(conversation_id)
+        return jsonify({"conversation_id": conversation_id, "messages": rows})
+    except Exception:
+        app.logger.exception("ai_chat history failed")
+        return jsonify({"error": "history fetch failed"}), 500
 
 def parse_budget_amount(value: Any, default: float = 100000.0) -> float:
     text = str(value or "")
