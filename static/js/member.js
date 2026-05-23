@@ -1,38 +1,18 @@
 (function () {
-  const STORAGE = {
-    capital: "smartinvest_member_capital_records",
-    orders: "smartinvest_member_mock_orders",
-    holdings: "smartinvest_member_mock_holdings"
-  };
-
-  const coinPricesTwd = {
-    BTC: 3200000,
-    ETH: 160000,
-    SOL: 7200,
-    XRP: 28,
-    BNB: 28500,
-    DOGE: 5.2,
-    USDT: 32,
-    USDC: 32
-  };
-
+  const USD_TO_TWD = 32;
   const $ = (id) => document.getElementById(id);
 
-  function readJson(key, fallback) {
-    try {
-      return JSON.parse(localStorage.getItem(key) || "") ?? fallback;
-    } catch {
-      return fallback;
-    }
-  }
-
-  function writeJson(key, value) {
-    localStorage.setItem(key, JSON.stringify(value));
-  }
-
-  function fmt(value) {
-    return "TWD " + Number(value || 0).toLocaleString("zh-TW", {
+  function fmtTwdFromUsd(valueUsd) {
+    const value = Number(valueUsd || 0) * USD_TO_TWD;
+    return "TWD " + value.toLocaleString("zh-TW", {
       maximumFractionDigits: 0
+    });
+  }
+
+  function fmtQty(value) {
+    return Number(value || 0).toLocaleString(undefined, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 8
     });
   }
 
@@ -55,85 +35,57 @@
     return false;
   }
 
-  function saveOrder(side, symbol, amount) {
-    const price = coinPricesTwd[symbol] || 100;
-    const quantity = amount / price;
-    const orders = readJson(STORAGE.orders, []);
-    const holdings = readJson(STORAGE.holdings, {});
-    const current = holdings[symbol] || { symbol, quantity: 0, amount: 0 };
-
-    if (side === "buy") {
-      current.quantity += quantity;
-      current.amount += amount;
-    } else {
-      current.quantity = Math.max(0, current.quantity - quantity);
-      current.amount = Math.max(0, current.amount - amount);
+  async function request(url, options) {
+    const headers = Object.assign({ "Content-Type": "application/json" }, options?.headers || {});
+    const token = window.authManager ? await window.authManager.getToken().catch(() => null) : null;
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(url, Object.assign({}, options, { headers }));
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401) {
+      throw new Error(data.error || "請先登入會員。");
     }
-
-    if (current.amount <= 0 || current.quantity <= 0) {
-      delete holdings[symbol];
-    } else {
-      holdings[symbol] = current;
+    if (!res.ok) {
+      throw new Error(data.error || data.detail || "請求失敗");
     }
-
-    orders.unshift({
-      id: `manual-${Date.now()}`,
-      time: new Date().toISOString(),
-      side,
-      symbol,
-      amount,
-      price,
-      quantity
-    });
-
-    writeJson(STORAGE.orders, orders.slice(0, 30));
-    writeJson(STORAGE.holdings, holdings);
+    return data;
   }
 
-  function render() {
-    const capital = readJson(STORAGE.capital, []);
-    const orders = readJson(STORAGE.orders, []);
-    const holdings = readJson(STORAGE.holdings, {});
-    const capitalTotal = capital.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-    const holdingEntries = Object.values(holdings);
-    const holdingTotal = holdingEntries.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-
+  function renderPortfolio(portfolio) {
     if ($("memberEmail")) $("memberEmail").textContent = window.smartInvestMembership?.email || "測試會員";
-    if ($("kpiCapital")) $("kpiCapital").textContent = fmt(capitalTotal);
-    if ($("kpiCapitalCount")) $("kpiCapitalCount").textContent = `${capital.length} 筆資金紀錄`;
-    if ($("kpiHoldings")) $("kpiHoldings").textContent = fmt(holdingTotal);
-    if ($("kpiHoldingCount")) $("kpiHoldingCount").textContent = `${holdingEntries.length} 種資產`;
-    if ($("kpiOrders")) $("kpiOrders").textContent = orders.length;
+    if (!portfolio) return;
+
+    const cash = Number(portfolio.cash || 0);
+    const totalValue = Number(portfolio.total_value_usd || 0);
+    const holdingTotal = Math.max(0, totalValue - cash);
+    const positions = Array.isArray(portfolio.positions) ? portfolio.positions : [];
+    const equityCurve = Array.isArray(portfolio.equity_curve) ? portfolio.equity_curve : [];
+
+    if ($("kpiCapital")) $("kpiCapital").textContent = fmtTwdFromUsd(totalValue);
+    if ($("kpiCapitalCount")) $("kpiCapitalCount").textContent = `${equityCurve.length} 筆資產曲線`;
+    if ($("kpiHoldings")) $("kpiHoldings").textContent = fmtTwdFromUsd(holdingTotal);
+    if ($("kpiHoldingCount")) $("kpiHoldingCount").textContent = `${positions.length} 種資產`;
 
     const capitalList = $("capitalList");
     if (capitalList) {
-      capitalList.innerHTML = capital.length ? capital.map((item) => `
+      const points = equityCurve.slice(-8);
+      capitalList.innerHTML = points.length ? points.map((item) => `
         <div class="member-list-item">
-          <div><strong>${fmt(item.amount)}</strong><span>${item.note || "資金投放"}</span></div>
-          <time>${dateText(item.time)}</time>
+          <div><strong>${fmtTwdFromUsd(item.total_value_usd)}</strong><span>資產曲線</span></div>
+          <time>${dateText(item.timestamp || item.ts)}</time>
         </div>
-      `).join("") : '<div class="member-record-empty">尚未新增資金投放。</div>';
-    }
-
-    const orderList = $("orderList");
-    if (orderList) {
-      orderList.innerHTML = orders.length ? orders.slice(0, 8).map((order) => `
-        <div class="member-list-item">
-          <div><strong>${order.side === "buy" ? "買入" : "賣出"} ${order.symbol}</strong><span>${fmt(order.amount)} · 約 ${Number(order.quantity || 0).toFixed(6)} 顆</span></div>
-          <time>${dateText(order.time)}</time>
-        </div>
-      `).join("") : '<div class="member-record-empty">尚未建立模擬下單。</div>';
+      `).join("") : '<div class="member-record-empty">尚未產生資產曲線紀錄。</div>';
     }
 
     const holdingTable = $("holdingTable");
     if (holdingTable) {
-      holdingTable.innerHTML = holdingEntries.length ? `
+      holdingTable.innerHTML = positions.length ? `
         <table>
-          <thead><tr><th>幣種</th><th>數量</th><th>投入金額</th><th>配置比例</th></tr></thead>
+          <thead><tr><th>幣種</th><th>數量</th><th>市值</th><th>配置比例</th></tr></thead>
           <tbody>
-            ${holdingEntries.map((item) => {
-              const pct = holdingTotal ? Number(item.amount || 0) / holdingTotal * 100 : 0;
-              return `<tr><td>${item.symbol}</td><td>${Number(item.quantity || 0).toFixed(6)}</td><td>${fmt(item.amount)}</td><td>${pct.toFixed(1)}%</td></tr>`;
+            ${positions.map((item) => {
+              const marketValue = Number(item.market_value || 0);
+              const pct = totalValue ? marketValue / totalValue * 100 : 0;
+              return `<tr><td>${item.symbol}</td><td>${fmtQty(item.quantity)}</td><td>${fmtTwdFromUsd(marketValue)}</td><td>${pct.toFixed(1)}%</td></tr>`;
             }).join("")}
           </tbody>
         </table>
@@ -141,42 +93,78 @@
     }
   }
 
+  function renderTrades(trades) {
+    const orderList = $("orderList");
+    if (!orderList) return;
+    if (!Array.isArray(trades) || !trades.length) {
+      orderList.innerHTML = '<div class="member-record-empty">尚未建立模擬下單。</div>';
+      if ($("kpiOrders")) $("kpiOrders").textContent = "0";
+      return;
+    }
+
+    if ($("kpiOrders")) $("kpiOrders").textContent = trades.length;
+    orderList.innerHTML = trades.slice(0, 8).map((order) => `
+      <div class="member-list-item">
+        <div><strong>${order.side === "buy" ? "買入" : "賣出"} ${order.symbol}</strong><span>${fmtTwdFromUsd(order.amount_usd)} · 約 ${fmtQty(order.quantity)} 顆</span></div>
+        <time>${dateText(order.timestamp || order.executed_at)}</time>
+      </div>
+    `).join("");
+  }
+
+  async function refreshData() {
+    if (!isMember()) return;
+    const [portfolioData, tradeData] = await Promise.all([
+      request("/api/sim-trade/portfolio"),
+      request("/api/sim-trade/history?limit=50")
+    ]);
+    renderPortfolio(portfolioData.portfolio);
+    renderTrades(tradeData.trades || []);
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
-    render();
+    refreshData().catch(() => {});
 
     $("capitalForm")?.addEventListener("submit", (event) => {
       event.preventDefault();
       if (!requireMember()) return;
-      const amount = Number($("capitalAmount")?.value || 0);
-      if (amount <= 0) return alert("請輸入大於 0 的金額。");
-      const capital = readJson(STORAGE.capital, []);
-      capital.unshift({
-        id: `capital-${Date.now()}`,
-        time: new Date().toISOString(),
-        amount,
-        note: $("capitalNote")?.value.trim() || "資金投放"
-      });
-      writeJson(STORAGE.capital, capital.slice(0, 30));
-      $("capitalAmount").value = "";
-      $("capitalNote").value = "";
-      render();
+      alert("資金與資產以模擬交易帳戶為準，請至模擬交易頁調整。\n\n若需要重新配置，可使用重置功能。 ");
     });
 
-    $("orderForm")?.addEventListener("submit", (event) => {
+    $("orderForm")?.addEventListener("submit", async (event) => {
       event.preventDefault();
       if (!requireMember()) return;
-      const amount = Number($("orderAmount")?.value || 0);
-      if (amount <= 0) return alert("請輸入大於 0 的下單金額。");
-      saveOrder($("orderSide")?.value || "buy", $("orderSymbol")?.value || "BTC", amount);
-      $("orderAmount").value = "";
-      render();
+      const amountTwd = Number($("orderAmount")?.value || 0);
+      if (amountTwd <= 0) return alert("請輸入大於 0 的下單金額。");
+      const amountUsd = amountTwd / USD_TO_TWD;
+      try {
+        await request("/api/sim-trade/order", {
+          method: "POST",
+          body: JSON.stringify({
+            symbol: $("orderSymbol")?.value || "BTC",
+            side: $("orderSide")?.value || "buy",
+            amount_usd: amountUsd
+          })
+        });
+        $("orderAmount").value = "";
+        await refreshData();
+      } catch (error) {
+        alert(error.message || "下單失敗");
+      }
     });
 
-    $("clearMemberData")?.addEventListener("click", () => {
+    $("clearMemberData")?.addEventListener("click", async () => {
       if (!requireMember()) return;
-      if (!confirm("確定要清除會員中心的前端模擬紀錄嗎？")) return;
-      Object.values(STORAGE).forEach((key) => localStorage.removeItem(key));
-      render();
+      if (!confirm("確定要重置模擬帳戶嗎？這將清空持倉與交易紀錄。")) return;
+      try {
+        await request("/api/sim-trade/reset", { method: "POST", body: "{}" });
+        await refreshData();
+      } catch (error) {
+        alert(error.message || "重置失敗");
+      }
     });
+  });
+
+  window.addEventListener("smartinvest:sim-trade-updated", () => {
+    refreshData().catch(() => {});
   });
 })();
