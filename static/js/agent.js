@@ -4,6 +4,8 @@
   const input = document.getElementById("coachMessageInput");
   const mainAvatar = document.getElementById("coachMainAvatar");
   const sessionHint = document.getElementById("agentSessionHint");
+  const CONVERSATION_KEY = "smartinvest_ai_agent_conversation_id";
+  const messageHistory = [];
 
   const USD_TO_TWD = 32;
 
@@ -18,7 +20,6 @@
     focus: "/static/images/agent-cat-focus.png"
   };
 
-  let greeted = false;
   let idleTimer = null;
   let avatarResetTimer = null;
   let cachedPortfolio = null;
@@ -119,6 +120,35 @@
     scrollToBottom();
   }
 
+  function recordMessage(role, content) {
+    if (!content) return;
+    messageHistory.push({ role, content });
+  }
+
+  function renderHistory(rows) {
+    if (!chat) return;
+    chat.innerHTML = "";
+    messageHistory.length = 0;
+
+    rows.forEach((row) => {
+      const type = (row.message_type || "").toLowerCase();
+      const content = row.content || "";
+      if (!content) return;
+      if (type === "user") {
+        addUserMessage(content);
+        recordMessage("user", content);
+      } else if (type === "assistant") {
+        addAiMessage(content, "calm");
+        recordMessage("assistant", content);
+      }
+    });
+
+    if (rows.length) {
+      chat.classList.remove("is-empty");
+      if (sessionHint) sessionHint.classList.add("is-hidden");
+    }
+  }
+
   function addAnalysisCard() {
     if (!chat) return;
     const positions = Array.isArray(cachedPortfolio?.positions) ? cachedPortfolio.positions : [];
@@ -166,22 +196,6 @@
     input.style.height = Math.min(input.scrollHeight, 120) + "px";
   }
 
-  function parseOrder(text) {
-    const normalized = String(text || "").toUpperCase();
-    if (!/(下單|買入|買|賣出|賣|模擬)/.test(text)) return null;
-
-    const symbolMatch = normalized.match(/\b(BTC|ETH|SOL|XRP|BNB|DOGE|USDT|USDC)\b/);
-    const amountMatch = normalized.replace(/,/g, "").match(/(\d+(?:\.\d+)?)/);
-    if (!symbolMatch || !amountMatch) return null;
-
-    const side = /(賣出|賣|SELL)/i.test(text) ? "sell" : "buy";
-    return {
-      symbol: symbolMatch[1],
-      side,
-      amount: Math.max(0, Number(amountMatch[1]))
-    };
-  }
-
   async function request(url, options) {
     const headers = Object.assign({ "Content-Type": "application/json" }, options?.headers || {});
     const token = window.authManager ? await window.authManager.getToken().catch(() => null) : null;
@@ -194,6 +208,29 @@
     }
     if (!res.ok) throw new Error(data.error || data.detail || "請求失敗");
     return data;
+  }
+
+  async function loadHistory() {
+    const conversationId = localStorage.getItem(CONVERSATION_KEY) || "";
+    if (!conversationId) return;
+
+    const token = window.authManager ? await window.authManager.getToken().catch(() => null) : null;
+    const headers = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    try {
+      const res = await fetch(`/api/ai-chat/history?conversation_id=${encodeURIComponent(conversationId)}`, { headers });
+      if (res.status === 401 || res.status === 403) {
+        localStorage.removeItem(CONVERSATION_KEY);
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && Array.isArray(data.messages) && data.messages.length) {
+        renderHistory(data.messages);
+      }
+    } catch {
+      // ignore history load errors
+    }
   }
 
   async function loadSimData() {
@@ -210,73 +247,7 @@
     cachedTrades = tradeData.trades || [];
     return { portfolio: cachedPortfolio, trades: cachedTrades };
   }
-
-  async function placeSimOrder(order) {
-    const amountUsd = Math.max(0.01, Number(order.amount || 0) / USD_TO_TWD);
-    const data = await request("/api/sim-trade/order", {
-      method: "POST",
-      body: JSON.stringify({
-        symbol: order.symbol,
-        side: order.side,
-        amount_usd: amountUsd
-      })
-    });
-    window.dispatchEvent(new CustomEvent("smartinvest:sim-trade-updated", { detail: data }));
-    return data;
-  }
-
-  async function buildReply(message) {
-    const order = parseOrder(message);
-    if (order) {
-      if (!order.amount) return { text: "我有看出你想模擬下單，但金額需要大於 0。可以像這樣輸入：用 5000 TWD 模擬買入 BTC。", card: false };
-      const sideText = order.side === "buy" ? "買入" : "賣出";
-      const data = await placeSimOrder(order).catch((error) => ({ error: error.message }));
-      if (data?.error) {
-        return {
-          text: `下單失敗：${data.error}`,
-          card: false
-        };
-      }
-      await loadSimData().catch(() => null);
-      const trade = data?.trade || {};
-      const qtyText = trade.quantity ? Number(trade.quantity).toFixed(6) : "--";
-      return {
-        text: `已幫你建立一筆模擬下單：${sideText} ${order.symbol}，金額 TWD ${formatMoney(order.amount)}，約 ${qtyText} 顆。這筆紀錄已同步到模擬交易帳戶。`,
-        card: true
-      };
-    }
-
-    if (/資金|投放|會員|紀錄/.test(message)) {
-      await loadSimData().catch(() => null);
-      const total = Number(cachedPortfolio?.total_value_usd || 0);
-      const count = Array.isArray(cachedTrades) ? cachedTrades.length : 0;
-      return {
-        text: `我已讀取會員中心紀錄。目前模擬資產約 TWD ${formatMoneyTwdFromUsd(total)}，共有 ${count} 筆模擬下單。你可以到會員中心或直接叫我用某筆金額模擬買入指定幣種。`,
-        card: true
-      };
-    }
-
-    if (/組合|配置|分析|持倉/.test(message)) {
-      await loadSimData().catch(() => null);
-      const positions = Array.isArray(cachedPortfolio?.positions) ? cachedPortfolio.positions : [];
-      const top = positions
-        .map((pos) => ({ symbol: pos.symbol, value: Number(pos.market_value || 0) }))
-        .sort((a, b) => b.value - a.value)[0];
-      return {
-        text: top
-          ? `我幫你看了目前的模擬持倉，${top.symbol} 是最大持倉，約 TWD ${formatMoneyTwdFromUsd(top.value)}。若單一幣種比例太高，建議用小額模擬單逐步分散。`
-          : "目前尚未建立模擬持倉。你可以先從小額模擬下單開始。",
-        card: true
-      };
-    }
-
-    return {
-      text: "我已收到你的問題，正在根據會員資產、模擬持倉與市場狀況做初步判斷。你也可以直接說：「用 5000 TWD 模擬買入 BTC」，我會幫你建立一筆模擬下單。",
-      card: false
-    };
-  }
-
-  function sendMessage(text) {
+  async function sendMessage(text) {
     if (window.authManager && !window.authManager.isLoggedIn?.()) {
       window.authManager.requireMember?.("AI Agent");
       return;
@@ -289,6 +260,7 @@
     }
 
     addUserMessage(message);
+    recordMessage("user", message);
     if (sessionHint) sessionHint.classList.add("is-hidden");
     setMainAvatar("thinking", "is-thinking");
     if (input) {
@@ -297,21 +269,33 @@
     }
 
     const typingRow = addTypingMessage();
-    window.setTimeout(async () => {
+    try {
+      const conversationId = localStorage.getItem(CONVERSATION_KEY) || "";
+      const payload = { message, messages: messageHistory };
+      if (conversationId) payload.conversation_id = conversationId;
+
+      const data = await request("/api/ai-chat", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+
       if (typingRow) typingRow.remove();
       setMainAvatar("happy", "is-talking");
 
-      if (!greeted) {
-        greeted = true;
-        addAiMessage("嗨！我是你的 AI 投資教練。接下來我可以幫你讀取會員資金紀錄、整理模擬持倉，也可以用一句話幫你建立模擬下單。你可以說：用 5000 TWD 模擬買入 BTC。", "happy");
-      } else {
-        const reply = await buildReply(message);
-        addAiMessage(reply.text, reply.card ? "calm" : "happy");
-        if (reply.card) addAnalysisCard();
+      if (data.conversation_id) {
+        localStorage.setItem(CONVERSATION_KEY, data.conversation_id);
       }
 
+      const replyText = data.reply || "我收到你的問題了，但目前沒有取得完整回覆。";
+      addAiMessage(replyText, "happy");
+      recordMessage("assistant", replyText);
+    } catch (error) {
+      if (typingRow) typingRow.remove();
+      setMainAvatar("sad", "is-pop");
+      addAiMessage(error?.message || "連線暫時不穩，請稍後再送出一次。", "sad");
+    } finally {
       scheduleAvatarReset(2600);
-    }, 900);
+    }
   }
 
   function renderAgentSummary() {
@@ -396,6 +380,7 @@
   window.addEventListener("smartinvest:sim-trade-updated", () => {
     refreshAgentSummary().catch(() => {});
   });
+  loadHistory().catch(() => {});
   refreshAgentSummary().catch(() => {});
   setMainAvatar("neutral", "is-idle");
   startIdleBlink();

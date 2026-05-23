@@ -1,6 +1,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
   const CONVERSATION_KEY = "smartinvest_ai_coach_conversation_id";
+  const messageHistory = [];
 
   function escapeHTML(value) {
     return String(value ?? "")
@@ -28,6 +29,32 @@
 
     stream.appendChild(row);
     stream.scrollTop = stream.scrollHeight;
+  }
+
+  function recordMessage(role, content) {
+    if (!content) return;
+    messageHistory.push({ role, content });
+  }
+
+  function renderHistory(rows) {
+    const stream = $("chatStream");
+    if (!stream) return;
+
+    stream.innerHTML = "";
+    messageHistory.length = 0;
+
+    rows.forEach((row) => {
+      const type = (row.message_type || "").toLowerCase();
+      const content = row.content || "";
+      if (!content) return;
+      if (type === "user") {
+        appendChatBubble("你", content, true);
+        recordMessage("user", content);
+      } else if (type === "assistant") {
+        appendChatBubble("Smart Invest AI 教練", content, false);
+        recordMessage("assistant", content);
+      }
+    });
   }
 
   function showTypingBubble() {
@@ -124,6 +151,29 @@
     }
   }
 
+  async function loadHistory() {
+    const conversationId = localStorage.getItem(CONVERSATION_KEY) || "";
+    if (!conversationId) return;
+
+    const token = await getAuthToken();
+    const headers = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    try {
+      const res = await fetch(`/api/ai-chat/history?conversation_id=${encodeURIComponent(conversationId)}`, { headers });
+      if (res.status === 401 || res.status === 403) {
+        localStorage.removeItem(CONVERSATION_KEY);
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && Array.isArray(data.messages) && data.messages.length) {
+        renderHistory(data.messages);
+      }
+    } catch {
+      // ignore history load errors
+    }
+  }
+
   async function sendMessage() {
     if (window.authManager && !window.authManager.isLoggedIn?.()) {
       window.authManager.requireMember?.("AI 投資教練");
@@ -142,6 +192,7 @@
     }
 
     appendChatBubble("你", text, true);
+    recordMessage("user", text);
     inputEl.value = "";
     setSendLoading(true);
     showTypingBubble();
@@ -152,7 +203,7 @@
       if (token) headers.Authorization = `Bearer ${token}`;
 
       const conversationId = localStorage.getItem(CONVERSATION_KEY) || "";
-      const payload = { message: text, risk_profile: riskProfile };
+      const payload = { message: text, risk_profile: riskProfile, messages: messageHistory };
       if (conversationId) payload.conversation_id = conversationId;
 
       const res = await fetch("/api/ai-chat", {
@@ -178,7 +229,9 @@
       if (data.conversation_id) {
         localStorage.setItem(CONVERSATION_KEY, data.conversation_id);
       }
-      appendChatBubble("Smart Invest AI 教練", data.reply || "我收到你的問題了，但目前沒有取得完整回覆。");
+      const replyText = data.reply || "我收到你的問題了，但目前沒有取得完整回覆。";
+      appendChatBubble("Smart Invest AI 教練", replyText);
+      recordMessage("assistant", replyText);
     } catch {
       removeTypingBubble();
       appendChatBubble("系統提醒", "連線暫時不穩，請稍後再送出一次。");
@@ -202,5 +255,6 @@
     initRiskCards();
     initQuickAsk();
     initChatEvents();
+    loadHistory();
   });
 })();

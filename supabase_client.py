@@ -409,18 +409,69 @@ class SupabaseDB:
             logger.exception("create_conversation failed: %s", exc)
             return None
 
-    def save_message(self, conversation_id: str, user_id: str, message_type: str, content: str, tokens_used: int = 0) -> bool:
+    def create_conversation_authed(self, access_token: str, user_id: str, title: Optional[str] = None, ai_model: str = "gpt-4o-mini") -> Optional[str]:
         try:
-            self._table("ai_messages").insert({
-                "conversation_id": conversation_id,
+            response = self._authed_table(access_token, "ai_conversations").insert({
                 "user_id": user_id,
-                "message_type": message_type,
-                "content": content,
-                "tokens_used": tokens_used,
+                "conversation_title": title or f"Chat - {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+                "ai_model": ai_model,
             }).execute()
+            return response.data[0]["id"] if response and response.data else None
+        except Exception as exc:
+            logger.exception("create_conversation_authed failed: %s", exc)
+            return None
+
+    def save_message(
+        self,
+        conversation_id: str,
+        user_id: str,
+        message_type: str,
+        content: str,
+        tokens_used: int = 0,
+        prompt_tokens: int = 0,
+        completion_tokens: int = 0,
+    ) -> bool:
+        payload = {
+            "conversation_id": conversation_id,
+            "user_id": user_id,
+            "message_type": message_type,
+            "content": content,
+            "tokens_used": int(tokens_used or 0),
+            "prompt_tokens": int(prompt_tokens or 0),
+            "completion_tokens": int(completion_tokens or 0),
+        }
+        try:
+            self._table("ai_messages").insert(payload).execute()
             return True
         except Exception as exc:
             logger.exception("save_message failed: %s", exc)
+            return False
+
+    def save_message_authed(
+        self,
+        access_token: str,
+        conversation_id: str,
+        user_id: str,
+        message_type: str,
+        content: str,
+        tokens_used: int = 0,
+        prompt_tokens: int = 0,
+        completion_tokens: int = 0,
+    ) -> bool:
+        payload = {
+            "conversation_id": conversation_id,
+            "user_id": user_id,
+            "message_type": message_type,
+            "content": content,
+            "tokens_used": int(tokens_used or 0),
+            "prompt_tokens": int(prompt_tokens or 0),
+            "completion_tokens": int(completion_tokens or 0),
+        }
+        try:
+            self._authed_table(access_token, "ai_messages").insert(payload).execute()
+            return True
+        except Exception as exc:
+            logger.exception("save_message_authed failed: %s", exc)
             return False
 
     def get_conversation_history(self, conversation_id: str) -> List[Dict[str, Any]]:
@@ -429,6 +480,14 @@ class SupabaseDB:
             return response.data or []
         except Exception as exc:
             logger.exception("get_conversation_history failed: %s", exc)
+            return []
+
+    def get_conversation_history_authed(self, access_token: str, conversation_id: str) -> List[Dict[str, Any]]:
+        try:
+            response = self._authed_table(access_token, "ai_messages").select("*").eq("conversation_id", conversation_id).order("created_at", desc=False).execute()
+            return response.data or []
+        except Exception as exc:
+            logger.exception("get_conversation_history_authed failed: %s", exc)
             return []
 
     def insert_data(self, table_name: str, data: Dict[str, Any]) -> bool:
