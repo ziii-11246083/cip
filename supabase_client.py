@@ -25,10 +25,12 @@ class SupabaseDB:
             return
 
         self.url = os.getenv("SUPABASE_URL", "").strip()
+        self.anon_key = os.getenv("SUPABASE_ANON_KEY", "").strip()
+        self.service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
         self.key = (
-            os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+            self.service_key
             or os.getenv("SUPABASE_KEY", "").strip()
-            or os.getenv("SUPABASE_ANON_KEY", "").strip()
+            or self.anon_key
         )
         self.client: Optional[Client] = None
         self.available = False
@@ -57,12 +59,32 @@ class SupabaseDB:
             "available": bool(self),
             "url_configured": bool(self.url),
             "key_configured": bool(self.key),
+            "anon_key_configured": bool(self.anon_key),
         }
 
     def _table(self, table_name: str):
         if not self.client:
             raise RuntimeError("Supabase client is unavailable.")
         return self.client.table(table_name)
+
+    def _authed_client(self, access_token: str) -> Client:
+        if not self.url:
+            raise RuntimeError("Supabase URL is missing.")
+        if not access_token:
+            raise RuntimeError("Supabase access token is required.")
+        api_key = self.anon_key or self.key
+        if not api_key:
+            raise RuntimeError("Supabase anon key is missing.")
+        client = create_client(self.url, api_key)
+        try:
+            client.postgrest.auth(access_token)
+        except Exception as exc:
+            logger.exception("Failed to apply access token to Supabase client: %s", exc)
+            raise
+        return client
+
+    def _authed_table(self, access_token: str, table_name: str):
+        return self._authed_client(access_token).table(table_name)
 
     def _get_crypto_id(self, symbol: str) -> Optional[str]:
         response = self._table("cryptocurrencies").select("id").eq("symbol", symbol).maybe_single().execute()
@@ -262,6 +284,118 @@ class SupabaseDB:
         except Exception as exc:
             logger.exception("get_user_watchlist failed: %s", exc)
             return []
+
+    def sim_get_or_create_portfolio(self, access_token: str, initial_cash: float = 100000.0) -> Dict[str, Any]:
+        try:
+            client = self._authed_client(access_token)
+            response = client.rpc("sim_get_or_create_portfolio", {
+                "p_initial_cash": float(initial_cash),
+            }).execute()
+            if response and response.data:
+                return response.data if isinstance(response.data, dict) else response.data[0]
+            return {}
+        except Exception as exc:
+            logger.exception("sim_get_or_create_portfolio failed: %s", exc)
+            return {}
+
+    def sim_list_positions(self, access_token: str) -> List[Dict[str, Any]]:
+        try:
+            response = self._authed_table(access_token, "sim_positions")\
+                .select("symbol, quantity, avg_price")\
+                .order("symbol", desc=False)\
+                .execute()
+            return response.data or []
+        except Exception as exc:
+            logger.exception("sim_list_positions failed: %s", exc)
+            return []
+
+    def sim_list_transactions(self, access_token: str, limit: int = 50) -> List[Dict[str, Any]]:
+        try:
+            response = self._authed_table(access_token, "sim_transactions")\
+                .select("symbol, side, price, quantity, amount_usd, executed_at")\
+                .order("executed_at", desc=True)\
+                .limit(limit)\
+                .execute()
+            return response.data or []
+        except Exception as exc:
+            logger.exception("sim_list_transactions failed: %s", exc)
+            return []
+
+    def sim_list_equity_curve(self, access_token: str, limit: int = 80) -> List[Dict[str, Any]]:
+        try:
+            response = self._authed_table(access_token, "sim_equity_curve")\
+                .select("ts, total_value_usd, cash_balance")\
+                .order("ts", desc=True)\
+                .limit(limit)\
+                .execute()
+            return response.data or []
+        except Exception as exc:
+            logger.exception("sim_list_equity_curve failed: %s", exc)
+            return []
+
+    def sim_insert_equity_point(
+        self,
+        access_token: str,
+        user_id: str,
+        portfolio_id: str,
+        total_value_usd: float,
+        cash_balance: float,
+    ) -> bool:
+        try:
+            self._authed_table(access_token, "sim_equity_curve").insert({
+                "user_id": user_id,
+                "portfolio_id": portfolio_id,
+                "total_value_usd": float(total_value_usd),
+                "cash_balance": float(cash_balance),
+            }).execute()
+            return True
+        except Exception as exc:
+            logger.exception("sim_insert_equity_point failed: %s", exc)
+            return False
+
+    def sim_execute_order(
+        self,
+        access_token: str,
+        symbol: str,
+        side: str,
+        price: float,
+        quantity: Optional[float] = None,
+        amount_usd: Optional[float] = None,
+        total_value_usd: Optional[float] = None,
+        initial_cash: float = 100000.0,
+    ) -> Dict[str, Any]:
+        try:
+            client = self._authed_client(access_token)
+            payload = {
+                "p_symbol": symbol,
+                "p_side": side,
+                "p_price": float(price),
+                "p_quantity": float(quantity) if quantity is not None else None,
+                "p_amount_usd": float(amount_usd) if amount_usd is not None else None,
+                "p_total_value_usd": float(total_value_usd) if total_value_usd is not None else None,
+                "p_initial_cash": float(initial_cash),
+            }
+            response = client.rpc("sim_execute_order", payload).execute()
+            if response and response.data:
+                return response.data if isinstance(response.data, dict) else response.data[0]
+            return {}
+        except Exception as exc:
+            logger.exception("sim_execute_order failed: %s", exc)
+            return {}
+
+    def sim_reset_portfolio(self, access_token: str, initial_cash: float = 100000.0, total_value_usd: float = 100000.0) -> Dict[str, Any]:
+        try:
+            client = self._authed_client(access_token)
+            response = client.rpc("sim_reset_portfolio", {
+                "p_initial_cash": float(initial_cash),
+                "p_total_value_usd": float(total_value_usd),
+            }).execute()
+            if response and response.data:
+                return response.data if isinstance(response.data, dict) else response.data[0]
+            return {}
+        except Exception as exc:
+            logger.exception("sim_reset_portfolio failed: %s", exc)
+            return {}
 
     def create_conversation(self, user_id: str, title: Optional[str] = None, ai_model: str = "gpt-4o-mini") -> Optional[str]:
         try:

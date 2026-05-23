@@ -17,7 +17,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Tuple
 from functools import wraps
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from threading import Lock
 
 import requests
 import pandas as pd
@@ -51,8 +50,6 @@ BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 AUDIO_DIR = DATA_DIR / "audio"
 AUDIO_DIR.mkdir(parents=True, exist_ok=True)
-SIM_PORTFOLIOS: Dict[str, Dict[str, Any]] = {}
-SIM_LOCK = Lock()
 SIM_INITIAL_CASH = 100000.0
 
 class Config:
@@ -147,14 +144,14 @@ def token_required(f):
         if not token:
             return jsonify({'error': '請先登入系統', 'code': 'auth/unauthorized'}), 401
         if token == DEMO_MEMBER_TOKEN:
-            request.user = DEMO_MEMBER_USER.copy()
+            request.user = {**DEMO_MEMBER_USER.copy(), "token": None, "is_demo": True}
             return f(*args, **kwargs)
         try:
             if not db: return jsonify({'error': '登入服務暫時不可用', 'code': 'auth/service-unavailable'}), 503
             user_response = db.client.auth.get_user(token)
             user = getattr(user_response, 'user', None)
             if not user: return jsonify({'error': '憑證無效或已過期', 'code': 'auth/invalid-token'}), 401
-            request.user = {'uid': user.id, 'email': user.email}
+            request.user = {'uid': user.id, 'email': user.email, 'token': token, 'is_demo': False}
         except Exception:
             return jsonify({'error': '憑證無效或已過期', 'code': 'auth/invalid-token'}), 401
         return f(*args, **kwargs)
@@ -169,17 +166,17 @@ def optional_token(f):
             if auth_header.startswith('Bearer '):
                 token = auth_header.split(' ')[1]
         if not token:
-            request.user = {'uid': 'guest', 'email': None, 'is_guest': True}
+            request.user = {'uid': 'guest', 'email': None, 'is_guest': True, 'token': None}
             return f(*args, **kwargs)
         if token == DEMO_MEMBER_TOKEN:
-            request.user = DEMO_MEMBER_USER.copy()
+            request.user = {**DEMO_MEMBER_USER.copy(), "token": None, "is_demo": True}
             return f(*args, **kwargs)
         try:
             if not db: return jsonify({'error': '登入服務暫時不可用', 'code': 'auth/service-unavailable'}), 503
             user_response = db.client.auth.get_user(token)
             user = getattr(user_response, 'user', None)
             if not user: return jsonify({'error': '憑證無效或已過期', 'code': 'auth/invalid-token'}), 401
-            request.user = {'uid': user.id, 'email': user.email, 'is_guest': False}
+            request.user = {'uid': user.id, 'email': user.email, 'is_guest': False, 'token': token, 'is_demo': False}
         except Exception:
             return jsonify({'error': '憑證無效或已過期', 'code': 'auth/invalid-token'}), 401
         return f(*args, **kwargs)
@@ -1018,28 +1015,100 @@ def get_coin_price_usd(symbol: str) -> float:
     return float(fallback.get(symbol, 10))
 
 
-def get_sim_portfolio(user_id: str) -> Dict[str, Any]:
-    if user_id not in SIM_PORTFOLIOS:
-        SIM_PORTFOLIOS[user_id] = {
-            "cash": SIM_INITIAL_CASH,
-            "positions": {},
-            "trades": [],
-            "equity_curve": [{"timestamp": datetime.utcnow().isoformat(), "total_value_usd": SIM_INITIAL_CASH}],
+def require_sim_trade_token() -> Tuple[Optional[str], Optional[Tuple[Any, int]]]:
+    if not db:
+        return None, (jsonify({'error': '交易服務暫時不可用', 'code': 'sim-trade/service-unavailable'}), 503)
+    if request.user.get("is_demo"):
+        return None, (jsonify({'error': 'Demo 會員不支援持久化模擬交易，請使用正式會員登入。', 'code': 'sim-trade/demo-not-supported'}), 403)
+    token = request.user.get("token")
+    if not token:
+        return None, (jsonify({'error': '請先登入系統', 'code': 'auth/unauthorized'}), 401)
+    return token, None
+
+
+def normalize_trade(row: Dict[str, Any]) -> Dict[str, Any]:
+    if not row:
+        return {}
+    return {
+        "timestamp": row.get("executed_at") or row.get("timestamp"),
+        "symbol": row.get("symbol"),
+        "side": row.get("side"),
+        "price": float(row.get("price") or 0),
+        "quantity": float(row.get("quantity") or 0),
+        "amount_usd": float(row.get("amount_usd") or 0),
+    }
+
+
+def estimate_total_value_after_order(
+    portfolio: Dict[str, Any],
+    position_rows: List[Dict[str, Any]],
+    symbol: str,
+    side: str,
+    quantity: float,
+    amount_usd: float,
+) -> float:
+    cash = float(portfolio.get("cash_balance", 0))
+    positions: Dict[str, Dict[str, float]] = {}
+    for row in position_rows:
+        sym = str(row.get("symbol", "")).upper()
+        if not sym:
+            continue
+        positions[sym] = {
+            "quantity": float(row.get("quantity") or 0),
+            "avg_price": float(row.get("avg_price") or 0),
         }
-    return SIM_PORTFOLIOS[user_id]
 
+    if side == "buy":
+        if cash < amount_usd:
+            raise ValueError("模擬帳戶現金不足。")
+        current = positions.get(symbol, {"quantity": 0.0, "avg_price": 0.0})
+        old_qty = float(current.get("quantity", 0))
+        old_cost = old_qty * float(current.get("avg_price", 0))
+        new_qty = old_qty + quantity
+        new_avg = (old_cost + amount_usd) / new_qty if new_qty > 0 else 0
+        positions[symbol] = {"quantity": new_qty, "avg_price": new_avg}
+        cash -= amount_usd
+    elif side == "sell":
+        current = positions.get(symbol, {"quantity": 0.0, "avg_price": 0.0})
+        old_qty = float(current.get("quantity", 0))
+        if old_qty < quantity:
+            raise ValueError("持倉不足，無法賣出。")
+        new_qty = old_qty - quantity
+        if new_qty <= 0:
+            positions.pop(symbol, None)
+        else:
+            positions[symbol] = {"quantity": new_qty, "avg_price": float(current.get("avg_price", 0))}
+        cash += amount_usd
+    else:
+        raise ValueError("下單方向只能是 buy 或 sell。")
 
-def sim_snapshot(user_id: str) -> Dict[str, Any]:
-    portfolio = get_sim_portfolio(user_id)
-    cash = float(portfolio.get("cash", 0))
-    positions = []
     total_value = cash
-    for symbol, raw in portfolio.get("positions", {}).items():
-        qty = float(raw.get("quantity", 0))
+    for sym, pos in positions.items():
+        qty = float(pos.get("quantity", 0))
         if qty <= 0:
             continue
+        current_price = get_coin_price_usd(sym)
+        total_value += qty * current_price
+    return total_value
+
+
+def sim_snapshot(access_token: str) -> Dict[str, Any]:
+    portfolio = db.sim_get_or_create_portfolio(access_token, SIM_INITIAL_CASH) if db else {}
+    if not portfolio:
+        raise ValueError("無法取得模擬投資組合。")
+    cash = float(portfolio.get("cash_balance", 0))
+    initial_cash = float(portfolio.get("initial_cash") or SIM_INITIAL_CASH)
+
+    position_rows = db.sim_list_positions(access_token) if db else []
+    positions = []
+    total_value = cash
+    for row in position_rows:
+        symbol = str(row.get("symbol", "")).upper()
+        qty = float(row.get("quantity", 0))
+        if not symbol or qty <= 0:
+            continue
         current_price = get_coin_price_usd(symbol)
-        avg_price = float(raw.get("avg_price", current_price))
+        avg_price = float(row.get("avg_price") or current_price)
         market_value = qty * current_price
         total_value += market_value
         positions.append({
@@ -1050,21 +1119,50 @@ def sim_snapshot(user_id: str) -> Dict[str, Any]:
             "market_value": market_value,
             "unrealized_pnl": (current_price - avg_price) * qty,
         })
-    unrealized_pnl = total_value - SIM_INITIAL_CASH
-    pnl_pct = (unrealized_pnl / SIM_INITIAL_CASH * 100) if SIM_INITIAL_CASH else 0
-    portfolio["equity_curve"].append({"timestamp": datetime.utcnow().isoformat(), "total_value_usd": total_value})
-    portfolio["equity_curve"] = portfolio["equity_curve"][-80:]
+
+    unrealized_pnl = total_value - initial_cash
+    pnl_pct = (unrealized_pnl / initial_cash * 100) if initial_cash else 0
+
+    equity_rows = db.sim_list_equity_curve(access_token, limit=80) if db else []
+    if not equity_rows and db:
+        portfolio_id = portfolio.get("id")
+        user_id = portfolio.get("user_id")
+        if portfolio_id and user_id:
+            db.sim_insert_equity_point(
+                access_token,
+                str(user_id),
+                str(portfolio_id),
+                total_value,
+                cash,
+            )
+            equity_rows = db.sim_list_equity_curve(access_token, limit=80)
+
+    equity_rows = sorted(equity_rows, key=lambda row: row.get("ts") or "")
+    equity_curve = [
+        {
+            "timestamp": row.get("ts"),
+            "total_value_usd": float(row.get("total_value_usd") or 0),
+        }
+        for row in equity_rows
+    ]
+
     return {
         "cash": cash,
         "positions": positions,
         "total_value_usd": total_value,
         "unrealized_pnl": unrealized_pnl,
         "pnl_pct": pnl_pct,
-        "equity_curve": portfolio["equity_curve"],
+        "equity_curve": equity_curve,
     }
 
 
-def execute_sim_order(user_id: str, symbol: str, side: str, quantity: Optional[float] = None, amount_usd: Optional[float] = None) -> Dict[str, Any]:
+def execute_sim_order(
+    access_token: str,
+    symbol: str,
+    side: str,
+    quantity: Optional[float] = None,
+    amount_usd: Optional[float] = None,
+) -> Dict[str, Any]:
     symbol = symbol.upper()
     side = side.lower()
     price = get_coin_price_usd(symbol)
@@ -1075,58 +1173,47 @@ def execute_sim_order(user_id: str, symbol: str, side: str, quantity: Optional[f
     if quantity <= 0 or amount <= 0:
         raise ValueError("請輸入有效的下單數量或金額。")
 
-    portfolio = get_sim_portfolio(user_id)
-    positions = portfolio["positions"]
-    if side == "buy":
-        if portfolio["cash"] < amount:
-            raise ValueError("模擬帳戶現金不足。")
-        current = positions.get(symbol, {"quantity": 0.0, "avg_price": 0.0})
-        old_qty = float(current.get("quantity", 0))
-        old_cost = old_qty * float(current.get("avg_price", 0))
-        new_qty = old_qty + quantity
-        positions[symbol] = {"quantity": new_qty, "avg_price": (old_cost + amount) / new_qty}
-        portfolio["cash"] -= amount
-    elif side == "sell":
-        current = positions.get(symbol, {"quantity": 0.0, "avg_price": price})
-        old_qty = float(current.get("quantity", 0))
-        if old_qty < quantity:
-            raise ValueError("持倉不足，無法賣出。")
-        current["quantity"] = old_qty - quantity
-        if current["quantity"] <= 0:
-            positions.pop(symbol, None)
-        else:
-            positions[symbol] = current
-        portfolio["cash"] += amount
-    else:
-        raise ValueError("下單方向只能是 buy 或 sell。")
+    portfolio = db.sim_get_or_create_portfolio(access_token, SIM_INITIAL_CASH) if db else {}
+    if not portfolio:
+        raise ValueError("無法取得模擬投資組合。")
+    position_rows = db.sim_list_positions(access_token) if db else []
+    total_value = estimate_total_value_after_order(portfolio, position_rows, symbol, side, quantity, amount)
 
-    trade = {
-        "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
-        "symbol": symbol,
-        "side": side,
-        "price": price,
-        "quantity": quantity,
-        "amount_usd": amount,
-    }
-    portfolio["trades"].insert(0, trade)
-    portfolio["trades"] = portfolio["trades"][:100]
+    result = db.sim_execute_order(
+        access_token,
+        symbol,
+        side,
+        price=price,
+        quantity=quantity,
+        amount_usd=amount,
+        total_value_usd=total_value,
+        initial_cash=float(portfolio.get("initial_cash") or SIM_INITIAL_CASH),
+    ) if db else {}
+
+    trade = normalize_trade(result.get("trade") if isinstance(result, dict) else {})
+    if not trade:
+        raise ValueError(result.get("error") if isinstance(result, dict) and result.get("error") else "下單失敗，請稍後再試。")
     return trade
 
 
 @app.route("/api/sim-trade/portfolio", methods=["GET"])
 @token_required
 def api_sim_trade_portfolio():
-    with SIM_LOCK:
-        return jsonify({"portfolio": sim_snapshot(request.user["uid"])})
+    access_token, error = require_sim_trade_token()
+    if error:
+        return error
+    return jsonify({"portfolio": sim_snapshot(access_token)})
 
 
 @app.route("/api/sim-trade/history", methods=["GET"])
 @token_required
 def api_sim_trade_history():
     limit = int(request.args.get("limit", 50))
-    with SIM_LOCK:
-        portfolio = get_sim_portfolio(request.user["uid"])
-        return jsonify({"trades": portfolio.get("trades", [])[:limit]})
+    access_token, error = require_sim_trade_token()
+    if error:
+        return error
+    trades = db.sim_list_transactions(access_token, limit=limit) if db else []
+    return jsonify({"trades": [normalize_trade(row) for row in trades]})
 
 
 @app.route("/api/sim-trade/order", methods=["POST"])
@@ -1134,15 +1221,17 @@ def api_sim_trade_history():
 def api_sim_trade_order():
     req = request.get_json(silent=True) or {}
     try:
-        with SIM_LOCK:
-            trade = execute_sim_order(
-                request.user["uid"],
-                req.get("symbol", "BTC"),
-                req.get("side", "buy"),
-                req.get("quantity"),
-                req.get("amount_usd"),
-            )
-            return jsonify({"success": True, "trade": trade, "portfolio": sim_snapshot(request.user["uid"])})
+        access_token, error = require_sim_trade_token()
+        if error:
+            return error
+        trade = execute_sim_order(
+            access_token,
+            req.get("symbol", "BTC"),
+            req.get("side", "buy"),
+            req.get("quantity"),
+            req.get("amount_usd"),
+        )
+        return jsonify({"success": True, "trade": trade, "portfolio": sim_snapshot(access_token)})
     except Exception as exc:
         return jsonify({"error": str(exc)}), 400
 
@@ -1150,9 +1239,12 @@ def api_sim_trade_order():
 @app.route("/api/sim-trade/reset", methods=["POST"])
 @token_required
 def api_sim_trade_reset():
-    with SIM_LOCK:
-        SIM_PORTFOLIOS.pop(request.user["uid"], None)
-        return jsonify({"success": True, "portfolio": sim_snapshot(request.user["uid"])})
+    access_token, error = require_sim_trade_token()
+    if error:
+        return error
+    if db:
+        db.sim_reset_portfolio(access_token, SIM_INITIAL_CASH, SIM_INITIAL_CASH)
+    return jsonify({"success": True, "portfolio": sim_snapshot(access_token)})
 
 
 @app.route('/api/agent-plan', methods=['POST'])
@@ -1252,33 +1344,35 @@ def api_agent_auto_order():
         return jsonify({"error": "Agent 尚未產生有效的推薦配置。"}), 400
 
     try:
-        with SIM_LOCK:
-            snapshot = sim_snapshot(request.user["uid"])
-            available_cash = float(snapshot.get("cash", 0))
-            planned_total = sum(item["amount_usd"] for item in cleaned_allocation)
-            scale = min(1.0, available_cash / planned_total) if planned_total > 0 else 0
-            if scale <= 0:
-                return jsonify({"error": "模擬帳戶現金不足，請先重置或調整配置。"}), 400
+        access_token, error = require_sim_trade_token()
+        if error:
+            return error
+        snapshot = sim_snapshot(access_token)
+        available_cash = float(snapshot.get("cash", 0))
+        planned_total = sum(item["amount_usd"] for item in cleaned_allocation)
+        scale = min(1.0, available_cash / planned_total) if planned_total > 0 else 0
+        if scale <= 0:
+            return jsonify({"error": "模擬帳戶現金不足，請先重置或調整配置。"}), 400
 
-            trades = []
-            for item in cleaned_allocation:
-                order_amount = round(item["amount_usd"] * scale, 2)
-                if order_amount <= 0:
-                    continue
-                trades.append(execute_sim_order(
-                    request.user["uid"],
-                    item["symbol"],
-                    "buy",
-                    amount_usd=order_amount,
-                ))
+        trades = []
+        for item in cleaned_allocation:
+            order_amount = round(item["amount_usd"] * scale, 2)
+            if order_amount <= 0:
+                continue
+            trades.append(execute_sim_order(
+                access_token,
+                item["symbol"],
+                "buy",
+                amount_usd=order_amount,
+            ))
 
-            return jsonify({
-                "success": True,
-                "scaled": scale < 1.0,
-                "scale": scale,
-                "trades": trades,
-                "portfolio": sim_snapshot(request.user["uid"]),
-            })
+        return jsonify({
+            "success": True,
+            "scaled": scale < 1.0,
+            "scale": scale,
+            "trades": trades,
+            "portfolio": sim_snapshot(access_token),
+        })
     except Exception as exc:
         return jsonify({"error": str(exc)}), 400
 
