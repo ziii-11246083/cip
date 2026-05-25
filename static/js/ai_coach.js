@@ -2,6 +2,9 @@
   const $ = (id) => document.getElementById(id);
   const CONVERSATION_KEY = "smartinvest_ai_coach_conversation_id";
   const messageHistory = [];
+  const conversationList = $("aiCoachConversationList");
+  const newChatBtn = $("aiCoachNewChatBtn");
+  let conversationCache = [];
 
   function escapeHTML(value) {
     return String(value ?? "")
@@ -55,6 +58,104 @@
         recordMessage("assistant", content);
       }
     });
+  }
+
+  function renderDefaultWelcome() {
+    const stream = $("chatStream");
+    if (!stream) return;
+    stream.innerHTML = `
+      <div class="chat-row ai"><div class="avatar">AI</div><div class="bubble"><b>AI 投資教練</b><p>你好，請問你現在最想解決的投資問題是什麼？</p></div></div>
+    `;
+  }
+
+  function setActiveConversation(conversationId) {
+    if (!conversationList) return;
+    conversationList.querySelectorAll(".conversation-item").forEach((btn) => {
+      btn.classList.toggle("is-active", btn.dataset.id === conversationId);
+    });
+  }
+
+  function renderConversationList(items) {
+    if (!conversationList) return;
+    conversationCache = Array.isArray(items) ? items : [];
+    const activeId = localStorage.getItem(CONVERSATION_KEY) || "";
+
+    if (!conversationCache.length) {
+      conversationList.innerHTML = '<div class="conversation-empty">尚無對話紀錄</div>';
+      return;
+    }
+
+    conversationList.innerHTML = conversationCache.map((item) => {
+      const id = escapeHTML(item.id || "");
+      const title = escapeHTML(item.title || "Chat");
+      return `
+        <button class="conversation-item" type="button" data-id="${id}">
+          <span>${title}</span>
+        </button>
+      `;
+    }).join("");
+
+    conversationList.querySelectorAll(".conversation-item").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.id || "";
+        selectConversation(id);
+      });
+    });
+
+    setActiveConversation(activeId);
+  }
+
+  async function loadConversations() {
+    if (!conversationList) return;
+    if (window.authManager && !window.authManager.isLoggedIn?.()) {
+      renderConversationList([]);
+      return;
+    }
+
+    const token = await getAuthToken();
+    const headers = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    try {
+      const res = await fetch("/api/ai-chat/conversations?limit=50", { headers });
+      if (res.status === 401 || res.status === 403) {
+        localStorage.removeItem(CONVERSATION_KEY);
+        renderConversationList([]);
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && Array.isArray(data.conversations)) {
+        renderConversationList(data.conversations);
+      } else {
+        renderConversationList([]);
+      }
+    } catch {
+      renderConversationList([]);
+    }
+  }
+
+  async function selectConversation(conversationId) {
+    if (!conversationId) return;
+    if (window.authManager && !window.authManager.isLoggedIn?.()) {
+      window.authManager.requireMember?.("AI 投資教練");
+      return;
+    }
+
+    localStorage.setItem(CONVERSATION_KEY, conversationId);
+    renderHistory([]);
+    setActiveConversation(conversationId);
+    await loadHistory(conversationId);
+  }
+
+  function resetChat(showWelcome = true) {
+    messageHistory.length = 0;
+    if (showWelcome) {
+      renderDefaultWelcome();
+    } else {
+      const stream = $("chatStream");
+      if (stream) stream.innerHTML = "";
+    }
+    setActiveConversation("");
   }
 
   function showTypingBubble() {
@@ -151,22 +252,22 @@
     }
   }
 
-  async function loadHistory() {
-    const conversationId = localStorage.getItem(CONVERSATION_KEY) || "";
-    if (!conversationId) return;
+  async function loadHistory(conversationId) {
+    const activeId = conversationId || localStorage.getItem(CONVERSATION_KEY) || "";
+    if (!activeId) return;
 
     const token = await getAuthToken();
     const headers = {};
     if (token) headers.Authorization = `Bearer ${token}`;
 
     try {
-      const res = await fetch(`/api/ai-chat/history?conversation_id=${encodeURIComponent(conversationId)}`, { headers });
+      const res = await fetch(`/api/ai-chat/history?conversation_id=${encodeURIComponent(activeId)}`, { headers });
       if (res.status === 401 || res.status === 403) {
         localStorage.removeItem(CONVERSATION_KEY);
         return;
       }
       const data = await res.json().catch(() => ({}));
-      if (res.ok && Array.isArray(data.messages) && data.messages.length) {
+      if (res.ok && Array.isArray(data.messages)) {
         renderHistory(data.messages);
       }
     } catch {
@@ -228,6 +329,8 @@
 
       if (data.conversation_id) {
         localStorage.setItem(CONVERSATION_KEY, data.conversation_id);
+        loadConversations();
+        setActiveConversation(data.conversation_id);
       }
       const replyText = data.reply || "我收到你的問題了，但目前沒有取得完整回覆。";
       appendChatBubble("Smart Invest AI 教練", replyText);
@@ -248,6 +351,11 @@
       event.preventDefault();
       sendMessage();
     });
+    newChatBtn?.addEventListener("click", () => {
+      localStorage.removeItem(CONVERSATION_KEY);
+      resetChat(true);
+      loadConversations();
+    });
   }
 
   document.addEventListener("DOMContentLoaded", () => {
@@ -255,6 +363,7 @@
     initRiskCards();
     initQuickAsk();
     initChatEvents();
+    loadConversations();
     loadHistory();
   });
 })();

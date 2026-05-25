@@ -6,6 +6,9 @@
   const sessionHint = document.getElementById("agentSessionHint");
   const CONVERSATION_KEY = "smartinvest_ai_agent_conversation_id";
   const messageHistory = [];
+  const conversationList = document.getElementById("aiCoachConversationList");
+  const newChatBtn = document.getElementById("aiCoachNewChatBtn");
+  let conversationCache = [];
 
   const USD_TO_TWD = 32;
 
@@ -149,6 +152,96 @@
     }
   }
 
+  function resetChat(showHint = true) {
+    if (chat) {
+      chat.innerHTML = "";
+      chat.classList.add("is-empty");
+    }
+    messageHistory.length = 0;
+    if (sessionHint) {
+      sessionHint.classList.toggle("is-hidden", !showHint);
+    }
+  }
+
+  function setActiveConversation(conversationId) {
+    if (!conversationList) return;
+    conversationList.querySelectorAll(".conversation-item").forEach((btn) => {
+      btn.classList.toggle("is-active", btn.dataset.id === conversationId);
+    });
+  }
+
+  function renderConversationList(items) {
+    if (!conversationList) return;
+    conversationCache = Array.isArray(items) ? items : [];
+    const activeId = localStorage.getItem(CONVERSATION_KEY) || "";
+
+    if (!conversationCache.length) {
+      conversationList.innerHTML = '<div class="conversation-empty">尚無對話紀錄</div>';
+      return;
+    }
+
+    conversationList.innerHTML = conversationCache.map((item) => {
+      const id = escapeHtml(item.id || "");
+      const title = escapeHtml(item.title || "Chat");
+      return `
+        <button class="conversation-item" type="button" data-id="${id}">
+          <span>${title}</span>
+        </button>
+      `;
+    }).join("");
+
+    conversationList.querySelectorAll(".conversation-item").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.id || "";
+        selectConversation(id);
+      });
+    });
+
+    setActiveConversation(activeId);
+  }
+
+  async function loadConversations() {
+    if (!conversationList) return;
+    if (window.authManager && !window.authManager.isLoggedIn?.()) {
+      renderConversationList([]);
+      return;
+    }
+
+    const token = window.authManager ? await window.authManager.getToken().catch(() => null) : null;
+    const headers = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    try {
+      const res = await fetch("/api/ai-chat/conversations?limit=50", { headers });
+      if (res.status === 401 || res.status === 403) {
+        localStorage.removeItem(CONVERSATION_KEY);
+        renderConversationList([]);
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && Array.isArray(data.conversations)) {
+        renderConversationList(data.conversations);
+      } else {
+        renderConversationList([]);
+      }
+    } catch {
+      renderConversationList([]);
+    }
+  }
+
+  async function selectConversation(conversationId) {
+    if (!conversationId) return;
+    if (window.authManager && !window.authManager.isLoggedIn?.()) {
+      window.authManager.requireMember?.("AI Agent");
+      return;
+    }
+
+    localStorage.setItem(CONVERSATION_KEY, conversationId);
+    resetChat(false);
+    setActiveConversation(conversationId);
+    await loadHistory(conversationId);
+  }
+
   function addAnalysisCard() {
     if (!chat) return;
     const positions = Array.isArray(cachedPortfolio?.positions) ? cachedPortfolio.positions : [];
@@ -210,22 +303,22 @@
     return data;
   }
 
-  async function loadHistory() {
-    const conversationId = localStorage.getItem(CONVERSATION_KEY) || "";
-    if (!conversationId) return;
+  async function loadHistory(conversationId) {
+    const activeId = conversationId || localStorage.getItem(CONVERSATION_KEY) || "";
+    if (!activeId) return;
 
     const token = window.authManager ? await window.authManager.getToken().catch(() => null) : null;
     const headers = {};
     if (token) headers.Authorization = `Bearer ${token}`;
 
     try {
-      const res = await fetch(`/api/ai-chat/history?conversation_id=${encodeURIComponent(conversationId)}`, { headers });
+      const res = await fetch(`/api/ai-chat/history?conversation_id=${encodeURIComponent(activeId)}`, { headers });
       if (res.status === 401 || res.status === 403) {
         localStorage.removeItem(CONVERSATION_KEY);
         return;
       }
       const data = await res.json().catch(() => ({}));
-      if (res.ok && Array.isArray(data.messages) && data.messages.length) {
+      if (res.ok && Array.isArray(data.messages)) {
         renderHistory(data.messages);
       }
     } catch {
@@ -284,6 +377,8 @@
 
       if (data.conversation_id) {
         localStorage.setItem(CONVERSATION_KEY, data.conversation_id);
+        loadConversations();
+        setActiveConversation(data.conversation_id);
       }
 
       const replyText = data.reply || "我收到你的問題了，但目前沒有取得完整回覆。";
@@ -350,6 +445,12 @@
     });
   }
 
+  newChatBtn?.addEventListener("click", () => {
+    localStorage.removeItem(CONVERSATION_KEY);
+    resetChat(true);
+    loadConversations();
+  });
+
   if (input) {
     input.addEventListener("input", resizeInput);
     input.addEventListener("focus", () => {
@@ -380,6 +481,7 @@
   window.addEventListener("smartinvest:sim-trade-updated", () => {
     refreshAgentSummary().catch(() => {});
   });
+  loadConversations().catch(() => {});
   loadHistory().catch(() => {});
   refreshAgentSummary().catch(() => {});
   setMainAvatar("neutral", "is-idle");

@@ -421,6 +421,56 @@ class SupabaseDB:
             logger.exception("create_conversation_authed failed: %s", exc)
             return None
 
+    def list_conversations(self, user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+        try:
+            base_query = self._table("ai_conversations")\
+                .select("id, conversation_title, created_at, updated_at")\
+                .eq("user_id", user_id)
+
+            try:
+                response = base_query.order("updated_at", desc=True).order("created_at", desc=True).limit(limit).execute()
+                if getattr(response, "error", None):
+                    raise RuntimeError(response.error)
+                return response.data or []
+            except Exception:
+                response = self._table("ai_conversations")\
+                    .select("id, conversation_title, created_at")\
+                    .eq("user_id", user_id)\
+                    .order("created_at", desc=True)\
+                    .limit(limit)\
+                    .execute()
+                if getattr(response, "error", None):
+                    raise RuntimeError(response.error)
+                return response.data or []
+        except Exception as exc:
+            logger.exception("list_conversations failed: %s", exc)
+            return []
+
+    def list_conversations_authed(self, access_token: str, user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+        try:
+            base_query = self._authed_table(access_token, "ai_conversations")\
+                .select("id, conversation_title, created_at, updated_at")\
+                .eq("user_id", user_id)
+
+            try:
+                response = base_query.order("updated_at", desc=True).order("created_at", desc=True).limit(limit).execute()
+                if getattr(response, "error", None):
+                    raise RuntimeError(response.error)
+                return response.data or []
+            except Exception:
+                response = self._authed_table(access_token, "ai_conversations")\
+                    .select("id, conversation_title, created_at")\
+                    .eq("user_id", user_id)\
+                    .order("created_at", desc=True)\
+                    .limit(limit)\
+                    .execute()
+                if getattr(response, "error", None):
+                    raise RuntimeError(response.error)
+                return response.data or []
+        except Exception as exc:
+            logger.exception("list_conversations_authed failed: %s", exc)
+            return []
+
     def save_message(
         self,
         conversation_id: str,

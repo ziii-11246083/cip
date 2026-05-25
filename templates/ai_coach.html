@@ -29,20 +29,32 @@
 
   <section class="section">
     <div class="container wide-container coach-layout">
-      <section class="card coach-panel" data-member-feature="AI 投資教練">
-        <h2 class="section-title small-title">選擇你的風險偏好</h2>
-        <input type="hidden" id="riskProfile" value="穩健型">
-        <div class="risk-card-grid">
-          <button class="risk-card" data-risk="保守型" type="button"><strong>保守型</strong></button>
-          <button class="risk-card active" data-risk="穩健型" type="button"><strong>穩健型</strong></button>
-          <button class="risk-card" data-risk="積極型" type="button"><strong>積極型</strong></button>
-        </div>
-        <div class="quick-prompts">
-          <strong>快速提問</strong>
-          <button type="button" data-question="BTC 和 ETH 的配置比例該怎麼抓？">BTC / ETH 配置</button>
-          <button type="button" data-question="我該如何降低加密貨幣投資風險？">降低風險</button>
-        </div>
-      </section>
+      <div class="coach-side-stack">
+        <section class="card coach-panel" data-member-feature="AI 投資教練">
+          <h2 class="section-title small-title">選擇你的風險偏好</h2>
+          <input type="hidden" id="riskProfile" value="穩健型">
+          <div class="risk-card-grid">
+            <button class="risk-card" data-risk="保守型" type="button"><strong>保守型</strong></button>
+            <button class="risk-card active" data-risk="穩健型" type="button"><strong>穩健型</strong></button>
+            <button class="risk-card" data-risk="積極型" type="button"><strong>積極型</strong></button>
+          </div>
+          <div class="quick-prompts">
+            <strong>快速提問</strong>
+            <button type="button" data-question="BTC 和 ETH 的配置比例該怎麼抓？">BTC / ETH 配置</button>
+            <button type="button" data-question="我該如何降低加密貨幣投資風險？">降低風險</button>
+          </div>
+        </section>
+
+        <section class="card coach-history-card" data-member-feature="AI 投資教練">
+          <div class="coach-history-head">
+            <h2>對話紀錄</h2>
+            <button class="button primary coach-history-new" id="aiCoachNewChatBtn" type="button">
+              <i class="fas fa-plus"></i> New Chat
+            </button>
+          </div>
+          <div class="conversation-list" id="aiCoachConversationList"></div>
+        </section>
+      </div>
 
       <section class="card coach-chat" data-member-feature="AI 投資教練">
         <div class="chat-head"><div><strong>AI 教練聊天室</strong><span>輸入問題後，AI 會整理成可執行的建議。</span></div></div>

@@ -136,6 +136,87 @@
   align-items:start;
 }
 
+.coach-side-stack{
+  display:grid;
+  gap:24px;
+  align-content:start;
+}
+
+.coach-history-card{
+  padding:24px;
+  display:grid;
+  gap:16px;
+}
+
+.coach-history-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+
+.coach-history-head h2{
+  margin:0;
+  color:var(--dark);
+  font-size:22px;
+  font-weight:950;
+}
+
+.coach-history-new{
+  min-height:40px;
+  padding:0 14px;
+  font-size:13px;
+}
+
+.conversation-list{
+  display:grid;
+  gap:10px;
+  max-height:360px;
+  overflow:auto;
+  padding-right:4px;
+}
+
+.conversation-item{
+  border:1px solid var(--line);
+  background:#fff;
+  border-radius:14px;
+  padding:12px 14px;
+  text-align:left;
+  font-weight:900;
+  color:var(--dark);
+  cursor:pointer;
+  transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease;
+}
+
+.conversation-item span{
+  display:block;
+  font-size:14px;
+  line-height:1.4;
+}
+
+.conversation-item:hover{
+  transform:translateY(-1px);
+  border-color:var(--brand-2);
+  box-shadow:0 10px 20px rgba(60,38,18,.08);
+}
+
+.conversation-item.is-active{
+  background:#FFF7ED;
+  border-color:var(--brand-2);
+  color:var(--brand);
+  box-shadow:0 12px 24px rgba(154,91,37,.12);
+}
+
+.conversation-empty{
+  padding:14px;
+  border:1px dashed rgba(196,122,50,.32);
+  border-radius:14px;
+  color:var(--muted);
+  font-size:13px;
+  font-weight:800;
+  text-align:center;
+}
+
 .coach-panel{
   padding:28px;
 }

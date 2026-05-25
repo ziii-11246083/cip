@@ -1202,6 +1202,37 @@ def api_ai_chat_history():
         app.logger.exception("ai_chat history failed")
         return jsonify({"error": "history fetch failed"}), 500
 
+@app.route('/api/ai-chat/conversations', methods=['GET'])
+@token_required
+def api_ai_chat_conversations():
+    if not db:
+        return jsonify({"error": "database unavailable"}), 503
+
+    access_token = request.user.get("token")
+    user_uid = request.user.get("uid")
+    limit_raw = request.args.get("limit", "50")
+    try:
+        limit = int(limit_raw)
+    except (TypeError, ValueError):
+        limit = 50
+    limit = max(1, min(200, limit))
+
+    try:
+        if access_token:
+            rows = db.list_conversations_authed(access_token, user_uid, limit=limit)
+        else:
+            rows = db.list_conversations(user_uid, limit=limit)
+
+        conversations = [
+            {"id": row.get("id"), "title": row.get("conversation_title") or "Chat"}
+            for row in rows
+            if row.get("id")
+        ]
+        return jsonify({"conversations": conversations})
+    except Exception:
+        app.logger.exception("ai_chat conversations failed")
+        return jsonify({"error": "conversation list fetch failed"}), 500
+
 def parse_budget_amount(value: Any, default: float = 100000.0) -> float:
     text = str(value or "")
     match = re.search(r"[\d,]+(?:\.\d+)?", text)
