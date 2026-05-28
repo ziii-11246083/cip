@@ -29,6 +29,37 @@
     return Boolean(window.authManager?.isLoggedIn?.() || window.smartInvestMembership?.isMember);
   }
 
+  async function getAuthToken() {
+    try {
+      return window.authManager ? await window.authManager.getToken() : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function waitForAuthToken(timeoutMs = 1600) {
+    const token = await getAuthToken();
+    if (token) return token;
+
+    const waitForAuthEvent = new Promise((resolve) => {
+      let settled = false;
+      const timer = window.setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        resolve(false);
+      }, timeoutMs);
+      window.addEventListener("smartinvest:auth-state", () => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timer);
+        resolve(true);
+      }, { once: true });
+    });
+
+    await waitForAuthEvent;
+    return await getAuthToken();
+  }
+
   function requireMember() {
     if (isMember()) return true;
     window.authManager?.requireMember?.("會員中心");
@@ -37,8 +68,10 @@
 
   async function request(url, options) {
     const headers = Object.assign({ "Content-Type": "application/json" }, options?.headers || {});
-    const token = window.authManager ? await window.authManager.getToken().catch(() => null) : null;
-    if (token) headers.Authorization = `Bearer ${token}`;
+    if (!headers.Authorization) {
+      const token = await getAuthToken();
+      if (token) headers.Authorization = `Bearer ${token}`;
+    }
     const res = await fetch(url, Object.assign({}, options, { headers }));
     const data = await res.json().catch(() => ({}));
     if (res.status === 401) {
@@ -112,10 +145,12 @@
   }
 
   async function refreshData() {
-    if (!isMember()) return;
+    const token = await waitForAuthToken();
+    if (!token) return;
+    const headers = { Authorization: `Bearer ${token}` };
     const [portfolioData, tradeData] = await Promise.all([
-      request("/api/sim-trade/portfolio"),
-      request("/api/sim-trade/history?limit=50")
+      request("/api/sim-trade/portfolio", { headers }),
+      request("/api/sim-trade/history?limit=50", { headers })
     ]);
     renderPortfolio(portfolioData.portfolio);
     renderTrades(tradeData.trades || []);
@@ -165,6 +200,10 @@
   });
 
   window.addEventListener("smartinvest:sim-trade-updated", () => {
+    refreshData().catch(() => {});
+  });
+
+  window.addEventListener("smartinvest:auth-state", () => {
     refreshData().catch(() => {});
   });
 })();
