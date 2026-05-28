@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+    <style>
+        html.js-enabled body{opacity:0;transition:opacity .5s ease;}
+        html.js-enabled body.page-ready{opacity:1;}
+    </style>
+    <script>document.documentElement.classList.add('js-enabled');</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
     <title>智慧投資決策分析平台</title>

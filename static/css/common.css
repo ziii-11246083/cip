@@ -33,13 +33,6 @@ body{
     linear-gradient(180deg,#FFF7ED 0%,#FFFBF5 55%,#FFF7ED 100%);
   -webkit-font-smoothing:antialiased;
 }
-html.js-enabled body{
-  opacity:0;
-  transition:opacity .4s ease;
-}
-html.js-enabled body.page-ready{
-  opacity:1;
-}
 a{text-decoration:none;color:inherit}
 button,input,select,textarea{font-family:inherit}
 .container{width:min(1180px,calc(100% - 48px));margin:0 auto}
