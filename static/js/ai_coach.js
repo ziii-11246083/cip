@@ -2,7 +2,6 @@
   const $ = (id) => document.getElementById(id);
   const CONVERSATION_KEY = "smartinvest_ai_coach_conversation_id";
   const messageHistory = [];
-  const conversationList = $("aiCoachConversationList");
   const newChatBtn = $("aiCoachNewChatBtn");
   let conversationCache = [];
 
@@ -69,23 +68,25 @@
   }
 
   function setActiveConversation(conversationId) {
-    if (!conversationList) return;
-    conversationList.querySelectorAll(".conversation-item").forEach((btn) => {
+    const listEl = document.getElementById("aiCoachConversationList");
+    if (!listEl) return;
+    listEl.querySelectorAll(".conversation-item").forEach((btn) => {
       btn.classList.toggle("is-active", btn.dataset.id === conversationId);
     });
   }
 
   function renderConversationList(items) {
-    if (!conversationList) return;
+    const listEl = document.getElementById("aiCoachConversationList");
+    if (!listEl) return;
     conversationCache = Array.isArray(items) ? items : [];
     const activeId = localStorage.getItem(CONVERSATION_KEY) || "";
 
     if (!conversationCache.length) {
-      conversationList.innerHTML = '<div class="conversation-empty">尚無對話紀錄</div>';
+      listEl.innerHTML = '<div class="conversation-empty">尚無對話紀錄</div>';
       return;
     }
 
-    conversationList.innerHTML = conversationCache.map((item) => {
+    listEl.innerHTML = conversationCache.map((item) => {
       const id = escapeHTML(item.id || "");
       const title = escapeHTML(item.title || "Chat");
       return `
@@ -95,7 +96,7 @@
       `;
     }).join("");
 
-    conversationList.querySelectorAll(".conversation-item").forEach((btn) => {
+    listEl.querySelectorAll(".conversation-item").forEach((btn) => {
       btn.addEventListener("click", () => {
         const id = btn.dataset.id || "";
         selectConversation(id);
@@ -106,15 +107,16 @@
   }
 
   async function loadConversations() {
-    if (!conversationList) return;
-    if (window.authManager && !window.authManager.isLoggedIn?.()) {
+    const listEl = document.getElementById("aiCoachConversationList");
+    if (!listEl) return;
+
+    const token = await getAuthToken();
+    if (!token) {
       renderConversationList([]);
       return;
     }
 
-    const token = await getAuthToken();
-    const headers = {};
-    if (token) headers.Authorization = `Bearer ${token}`;
+    const headers = { Authorization: `Bearer ${token}` };
 
     try {
       const res = await fetch("/api/ai-chat/conversations?limit=50", { headers });
