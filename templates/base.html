@@ -22,6 +22,8 @@
     }
     *{box-sizing:border-box}
     body{ margin:0; font-family:var(--sans); color:var(--ink); background:var(--bg); font-size:16px; -webkit-font-smoothing:antialiased; }
+    html.js-enabled body{ opacity:0; transition:opacity .4s ease; }
+    html.js-enabled body.page-ready{ opacity:1; }
     a{color:inherit;text-decoration:none}
     
     /* Navbar CSS (暗黑風格) */
@@ -158,9 +160,9 @@
   
   <script>
     function initBaseMotion() {
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => document.body.classList.add('page-ready'));
-        });
+      const markReady = () => requestAnimationFrame(() => document.body.classList.add('page-ready'));
+      if (document.readyState === 'complete') markReady();
+      else window.addEventListener('load', markReady, { once: true });
         
         // 簡單的導覽列 Active 狀態切換
         const path = window.location.pathname;

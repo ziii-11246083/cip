@@ -1,4 +1,15 @@
+document.documentElement.classList.add("js-enabled");
 window.__COMMON_UI_ACTIVE__ = true;
+
+function markPageReady() {
+  if (document.body) document.body.classList.add("page-ready");
+}
+
+if (document.readyState === "complete") {
+  markPageReady();
+} else {
+  window.addEventListener("load", markPageReady, { once: true });
+}
 
 function toast(title, msg) {
   const el = document.getElementById("toast");
