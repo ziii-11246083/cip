@@ -646,6 +646,7 @@ class SocialMediaEngine:
                 word_freqs = {"比特幣": 100, "以太幣": 85, "市場趨勢": 80, "區塊鏈": 75, "ETF": 95, "聯準會": 60, "機構資金": 80, "降息": 55, "牛市": 70, "波動": 45}
 
             font_path = "C:/Windows/Fonts/msjh.ttc" if os.path.exists("C:/Windows/Fonts/msjh.ttc") else None
+            buf = None
             try:
                 wc = WordCloud(width=1000, height=450, background_color="#f8fafc", colormap="tab20", font_path=font_path, max_words=60)
                 if word_freqs: wc.generate_from_frequencies(word_freqs)
@@ -655,11 +656,15 @@ class SocialMediaEngine:
                 ax.axis("off")
                 plt.tight_layout(pad=0)
                 buf = io.BytesIO()
-                fig.savefig(buf, format="png", bbox_inches='tight', transparent=True)
-                plt.close(fig)
+                fig.savefig(buf, format="png", bbox_inches="tight", transparent=True)
                 buf.seek(0)
-                wc_base64 = base64.b64encode(buf.read()).decode('utf-8')
-            except Exception as e: pass
+                wc_base64 = base64.b64encode(buf.read()).decode("utf-8")
+            except Exception:
+                pass
+            finally:
+                if buf is not None:
+                    buf.close()
+                plt.close("all")
 
         top_coins_data = []
         if top_narrative:
