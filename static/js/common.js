@@ -5,11 +5,19 @@ function markPageReady() {
   if (document.body) document.body.classList.add("page-ready");
 }
 
-if (document.readyState === "complete") {
-  markPageReady();
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", markPageReady, { once: true });
 } else {
-  window.addEventListener("load", markPageReady, { once: true });
+  markPageReady();
 }
+
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) markPageReady();
+});
+
+window.setTimeout(() => {
+  if (!document.body?.classList.contains("page-ready")) markPageReady();
+}, 900);
 
 function toast(title, msg) {
   const el = document.getElementById("toast");
