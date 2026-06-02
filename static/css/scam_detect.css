@@ -29,3 +29,43 @@
 #reportContent{
   line-height:1.9;
 }
+
+#reportHeader.risk-high{
+  background:linear-gradient(135deg,var(--bad),#B91C1C);
+}
+
+#reportHeader.risk-medium{
+  background:linear-gradient(135deg,var(--warn),#B45309);
+}
+
+#reportHeader.risk-low{
+  background:linear-gradient(135deg,var(--good),#047857);
+}
+
+#reportHeader.risk-unknown{
+  background:linear-gradient(135deg,#9CA3AF,#6B7280);
+}
+
+.report-head em.risk-high{
+  color:var(--bad);
+  background:rgba(239,68,68,.10);
+  border-color:rgba(239,68,68,.20);
+}
+
+.report-head em.risk-medium{
+  color:var(--warn);
+  background:rgba(245,158,11,.10);
+  border-color:rgba(245,158,11,.20);
+}
+
+.report-head em.risk-low{
+  color:var(--good);
+  background:rgba(16,185,129,.10);
+  border-color:rgba(16,185,129,.20);
+}
+
+.report-head em.risk-unknown{
+  color:var(--muted);
+  background:#F3F4F6;
+  border-color:#E5E7EB;
+}

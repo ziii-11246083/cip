@@ -29,27 +29,40 @@ function setReportState(type) {
 
   if (!reportHeader || !reportBadge) return;
 
-  if (type === "high") {
-    reportHeader.style.background = "linear-gradient(135deg, var(--bad), #B91C1C)";
-    reportHeader.innerHTML = '<i class="fas fa-triangle-exclamation"></i> 高風險詐騙警示';
-    reportBadge.innerHTML = '<i class="fas fa-triangle-exclamation"></i> 高風險';
-    reportBadge.style.color = "var(--bad)";
-    reportBadge.style.background = "rgba(239,68,68,.10)";
-    reportBadge.style.borderColor = "rgba(239,68,68,.20)";
-  } else if (type === "medium") {
-    reportHeader.style.background = "linear-gradient(135deg, var(--warn), #B45309)";
-    reportHeader.innerHTML = '<i class="fas fa-circle-exclamation"></i> 中度風險提醒';
-    reportBadge.innerHTML = '<i class="fas fa-circle-exclamation"></i> 中風險';
-    reportBadge.style.color = "var(--warn)";
-    reportBadge.style.background = "rgba(245,158,11,.10)";
-    reportBadge.style.borderColor = "rgba(245,158,11,.20)";
-  } else {
-    reportHeader.style.background = "linear-gradient(135deg, var(--good), #047857)";
-    reportHeader.innerHTML = '<i class="fas fa-circle-check"></i> 低風險內容';
-    reportBadge.innerHTML = '<i class="fas fa-circle-check"></i> 低風險';
-    reportBadge.style.color = "var(--good)";
-    reportBadge.style.background = "rgba(16,185,129,.10)";
-    reportBadge.style.borderColor = "rgba(16,185,129,.20)";
+  reportHeader.classList.remove("risk-high", "risk-medium", "risk-low", "risk-unknown");
+  reportBadge.classList.remove("risk-high", "risk-medium", "risk-low", "risk-unknown");
+  reportHeader.style.background = "";
+  reportBadge.style.color = "";
+  reportBadge.style.background = "";
+  reportBadge.style.borderColor = "";
+
+  const normalized = ["high", "medium", "low"].includes(type) ? type : "unknown";
+
+  switch (normalized) {
+    case "high":
+      reportHeader.textContent = "高風險詐騙警示";
+      reportBadge.textContent = "高風險";
+      reportHeader.classList.add("risk-high");
+      reportBadge.classList.add("risk-high");
+      break;
+    case "medium":
+      reportHeader.textContent = "中度風險提醒";
+      reportBadge.textContent = "中風險";
+      reportHeader.classList.add("risk-medium");
+      reportBadge.classList.add("risk-medium");
+      break;
+    case "low":
+      reportHeader.textContent = "低風險內容";
+      reportBadge.textContent = "低風險";
+      reportHeader.classList.add("risk-low");
+      reportBadge.classList.add("risk-low");
+      break;
+    default:
+      reportHeader.textContent = "風險待判斷";
+      reportBadge.textContent = "待判斷";
+      reportHeader.classList.add("risk-unknown");
+      reportBadge.classList.add("risk-unknown");
+      break;
   }
 }
 
@@ -59,29 +72,6 @@ function updateCounter() {
   if (input && counter) {
     counter.textContent = `${input.value.length} 字`;
   }
-}
-
-function inferRiskLevel(reportStr) {
-  const normalized = String(reportStr || "").toLowerCase();
-
-  if (
-    normalized.includes("高風險") ||
-    normalized.includes("詐騙") ||
-    normalized.includes("保證獲利") ||
-    normalized.includes("立即匯款")
-  ) {
-    return "high";
-  }
-
-  if (
-    normalized.includes("中風險") ||
-    normalized.includes("可疑") ||
-    normalized.includes("需要留意")
-  ) {
-    return "medium";
-  }
-
-  return "low";
 }
 
 async function runScan() {
@@ -136,8 +126,9 @@ async function runScan() {
 
     const data = await res.json();
     const reportStr = data.report || "目前沒有取得分析報告。";
+    const riskLevel = typeof data.risk_level === "string" ? data.risk_level.toLowerCase() : "unknown";
     reportContent.textContent = reportStr;
-    setReportState(inferRiskLevel(reportStr));
+    setReportState(riskLevel);
     reportBox.style.display = "block";
   } catch (error) {
     scanLoading.classList.remove("show");
@@ -197,12 +188,17 @@ function initReportButtons() {
       if (reportBox) reportBox.style.display = "none";
       if (scanLoading) scanLoading.classList.remove("show");
       if (reportEmpty) reportEmpty.style.display = "grid";
-      if (reportHeader) reportHeader.textContent = "風險分析報告";
+      if (reportHeader) {
+        reportHeader.textContent = "檢測結果";
+        reportHeader.classList.remove("risk-high", "risk-medium", "risk-low", "risk-unknown");
+        reportHeader.style.background = "";
+      }
       if (reportBadge) {
-        reportBadge.innerHTML = '<i class="fas fa-circle-info"></i> 尚未檢測';
-        reportBadge.style.color = "var(--primary)";
-        reportBadge.style.background = "#FFF3E4";
-        reportBadge.style.borderColor = "rgba(254,215,170,.92)";
+        reportBadge.textContent = "等待檢測";
+        reportBadge.classList.remove("risk-high", "risk-medium", "risk-low", "risk-unknown");
+        reportBadge.style.color = "";
+        reportBadge.style.background = "";
+        reportBadge.style.borderColor = "";
       }
       updateCounter();
     });

@@ -717,6 +717,10 @@ class PodcastLLMOut(BaseModel):
     bullets: List[str] = Field(..., min_length=3, max_length=5)
     lines: List[Line] = Field(..., min_length=14, max_length=28)
 
+class ScamScanResult(BaseModel):
+    risk_level: Literal["high", "medium", "low"]
+    report: str = Field(..., min_length=1)
+
 def build_fallback_podcast(req: PodcastGenerateRequest) -> Dict[str, Any]:
     topic_map = {
         "CRYPTO": "整體市場快報",
@@ -1639,13 +1643,33 @@ def api_agent_auto_order():
 @app.route('/api/scam-scan', methods=['POST'])
 def api_scam_scan():
     req = request.get_json(silent=True) or {}
-    text = req.get("text", "")
-    if not client: return jsonify({"report": "API Key 未設定，無法連線 AI。"})
+    text = (req.get("text") or "").strip()
+    scam_client = refresh_openai_client()
+    if not scam_client:
+        return jsonify({"risk_level": "unknown", "report": "API Key 未設定，無法連線 AI。"})
+    if not text:
+        return jsonify({"risk_level": "unknown", "report": "請提供要檢測的內容。"})
     try:
-        prompt = f"你是金融反詐騙專家。請分析以下內容是否有加密貨幣詐騙風險。請輸出：1.風險等級(高/中/低) 2.疑點解析 3.防範建議。\n內容：{text}"
-        res = client.chat.completions.create(model=os.getenv("OPENAI_MODEL", "gpt-5.4"), messages=[{"role": "user", "content": prompt}])
-        return jsonify({"report": res.choices[0].message.content})
-    except Exception as e: return jsonify({"report": f"系統錯誤: {str(e)}"})
+        system_prompt = (
+            "你是金融反詐騙專家。請只輸出 JSON，格式為 "
+            "{\"risk_level\": \"high|medium|low\", \"report\": \"...\"}。"
+            "risk_level 必須是 high、medium 或 low。report 請用中文整理："
+            "1.風險等級 2.疑點解析 3.防範建議。"
+        )
+        completion = scam_client.beta.chat.completions.parse(
+            model=os.getenv("OPENAI_MODEL", "gpt-5.4"),
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"內容：{text}"}
+            ],
+            response_format=ScamScanResult
+        )
+        parsed = completion.choices[0].message.parsed
+        risk_level = parsed.risk_level if parsed and parsed.risk_level in {"high", "medium", "low"} else "unknown"
+        report = parsed.report if parsed and parsed.report else "目前沒有取得分析報告。"
+        return jsonify({"risk_level": risk_level, "report": report})
+    except Exception as e:
+        return jsonify({"risk_level": "unknown", "report": f"系統錯誤: {str(e)}"})
 
 @app.route("/podcast/generate", methods=["POST"])
 def generate_podcast():
