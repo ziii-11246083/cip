@@ -795,6 +795,88 @@ class PortfolioLLMOut(BaseModel):
     narrative: str
     highlights: List[str] = Field(default_factory=list)
 
+
+def _resolve_yahoo_ticker(symbol: str) -> str:
+    clean_symbol = str(symbol or "").strip().upper()
+    if not clean_symbol:
+        return ""
+    if clean_symbol.endswith("-USD") or clean_symbol.endswith("-USDT"):
+        return clean_symbol
+    return f"{clean_symbol}-USD"
+
+
+def calculate_portfolio_risk_health(req: RiskHealthRequest) -> Dict[str, float]:
+    holdings = [holding for holding in (req.holdings or []) if str(holding.ticker or "").strip()]
+    if not holdings:
+        return {
+            "top1_weight": 0.0,
+            "top3_weight": 0.0,
+            "annual_vol": 0.0,
+            "max_drawdown": 0.0,
+            "herfindahl": 0.0,
+        }
+
+    raw_weights = np.array([max(0.0, float(holding.weight or 0.0)) for holding in holdings], dtype=float)
+    total_weight = float(raw_weights.sum())
+    if total_weight <= 0:
+        weights = np.zeros_like(raw_weights)
+    else:
+        weights = raw_weights / total_weight
+
+    top_weights = sorted((float(weight) for weight in weights), reverse=True)
+    top1 = top_weights[0] if top_weights else 0.0
+    top3 = float(sum(top_weights[:3])) if top_weights else 0.0
+    herfindahl = float(np.sum(np.square(weights))) if len(weights) else 0.0
+
+    period_days = max(30, int(req.days or 90))
+    aligned_returns: Dict[str, pd.Series] = {}
+
+    for holding in holdings:
+        yahoo_symbol = _resolve_yahoo_ticker(holding.ticker)
+        if not yahoo_symbol:
+            continue
+        try:
+            history = yf.Ticker(yahoo_symbol).history(period=f"{period_days}d", interval="1d", auto_adjust=True)
+        except Exception:
+            continue
+
+        if history is None or history.empty or "Close" not in history:
+            continue
+
+        close_prices = pd.to_numeric(history["Close"], errors="coerce").dropna()
+        if len(close_prices) < 2:
+            continue
+
+        returns = close_prices.pct_change().dropna()
+        if returns.empty:
+            continue
+
+        aligned_returns[str(holding.ticker).strip().upper()] = returns.tail(period_days)
+
+    if aligned_returns:
+        returns_df = pd.DataFrame(aligned_returns).sort_index().fillna(0.0)
+        weight_lookup = {
+            str(holding.ticker).strip().upper(): float(weight)
+            for holding, weight in zip(holdings, weights)
+        }
+        portfolio_returns = returns_df.mul(pd.Series(weight_lookup), axis=1).sum(axis=1)
+        portfolio_value = (1.0 + portfolio_returns).cumprod()
+        running_max = portfolio_value.cummax()
+        drawdowns = portfolio_value / running_max - 1.0
+        annual_vol = float(portfolio_returns.std(ddof=0) * math.sqrt(365)) if len(portfolio_returns) else 0.0
+        max_drawdown = float(abs(drawdowns.min())) if len(drawdowns) else 0.0
+    else:
+        annual_vol = 0.0
+        max_drawdown = 0.0
+
+    return {
+        "top1_weight": round(top1, 6),
+        "top3_weight": round(top3, 6),
+        "annual_vol": round(max(0.0, annual_vol), 6),
+        "max_drawdown": round(max(0.0, max_drawdown), 6),
+        "herfindahl": round(herfindahl, 6),
+    }
+
 # ==========================================
 # 🚦 4. Flask Routes & APIs
 # ==========================================
@@ -1794,17 +1876,24 @@ def podcast_tts():
 def api_podcast_tts_alias():
     return podcast_tts()
 
+
+@app.route("/portfolio/risk-health", methods=["POST"])
+def portfolio_risk_health():
+    try:
+        req = RiskHealthRequest(**(request.get_json(silent=True) or {}))
+    except ValidationError as e:
+        return jsonify({"detail": str(e)}), 422
+
+    return jsonify({"risk_health": calculate_portfolio_risk_health(req)})
+
 @app.route("/portfolio/analyze-llm", methods=["POST"])
 def analyze_portfolio_llm():
     try: req = RiskHealthRequest(**(request.get_json(silent=True) or {}))
     except ValidationError as e: return jsonify({"detail": str(e)}), 422
-    weights = [h.weight for h in req.holdings]
-    total, top1, top3 = sum(weights), sorted(weights, reverse=True)[0] if weights else 0, sum(sorted(weights, reverse=True)[:3]) if weights else 0
-    vol, mdd = (random.uniform(0.3, 0.8) if weights else 0), (random.uniform(0.1, 0.4) if weights else 0)
-    rh_dict = {"top1_weight": top1, "top3_weight": top3, "annual_vol": vol, "max_drawdown": mdd, "herfindahl": sum(w*w for w in weights)}
+    rh_dict = calculate_portfolio_risk_health(req)
     if client is None: return jsonify({"risk_health": rh_dict, "narrative": "未設定金鑰，改用規則摘要。請注意波動風險。", "highlights": ["提醒：無 AI 金鑰"]})
     holdings_text = ", ".join([f"{h.ticker}({h.weight:.2f})" for h in req.holdings])
-    prompt = f"請用非常白話的中文分析配置：\n【持幣】{holdings_text}\n【指標】Top1={top1:.2f}, 年化波動={vol:.2f}, 最大回撤={mdd:.2f}"
+    prompt = f"請用非常白話的中文分析配置：\n【持幣】{holdings_text}\n【指標】Top1={rh_dict['top1_weight']:.2f}, 年化波動={rh_dict['annual_vol']:.2f}, 最大回撤={rh_dict['max_drawdown']:.2f}"
     try:
         completion = client.beta.chat.completions.parse(
             model=os.getenv("OPENAI_MODEL_PORTFOLIO", "gpt-5.4"),
