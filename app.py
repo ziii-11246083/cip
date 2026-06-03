@@ -805,6 +805,81 @@ def _resolve_yahoo_ticker(symbol: str) -> str:
     return f"{clean_symbol}-USD"
 
 
+def _parse_positive_int(value: Any, default: int) -> int:
+    try:
+        parsed = int(float(value))
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed > 0 else default
+
+
+def _normalize_price_series(points: Any) -> List[List[float]]:
+    normalized: List[List[float]] = []
+    for point in points or []:
+        timestamp = None
+        price = None
+
+        if isinstance(point, (list, tuple)) and len(point) >= 2:
+            timestamp, price = point[0], point[1]
+        elif isinstance(point, dict):
+            timestamp = point.get("timestamp") or point.get("time") or point.get("date")
+            price = point.get("price") or point.get("close")
+
+        try:
+            timestamp_ms = int(float(timestamp))
+            price_value = float(price)
+        except (TypeError, ValueError):
+            continue
+
+        if not np.isfinite(price_value):
+            continue
+        normalized.append([timestamp_ms, price_value])
+
+    normalized.sort(key=lambda item: item[0])
+
+    deduped: List[List[float]] = []
+    seen_timestamps = set()
+    for timestamp, price in normalized:
+        if timestamp in seen_timestamps:
+            continue
+        seen_timestamps.add(timestamp)
+        deduped.append([timestamp, price])
+
+    return deduped
+
+
+def _fetch_yfinance_series(symbol: str, days: int) -> List[List[float]]:
+    yahoo_symbol = _resolve_yahoo_ticker(symbol)
+    if not yahoo_symbol:
+        return []
+
+    period_days = max(30, int(days or 30))
+    try:
+        history = yf.Ticker(yahoo_symbol).history(period=f"{period_days}d", interval="1d", auto_adjust=True)
+    except Exception:
+        return []
+
+    if history is None or history.empty or "Close" not in history:
+        return []
+
+    close_prices = pd.to_numeric(history["Close"], errors="coerce").dropna()
+    if close_prices.empty:
+        return []
+
+    prices: List[List[float]] = []
+    for timestamp, price in close_prices.items():
+        try:
+            timestamp_ms = int(pd.Timestamp(timestamp).timestamp() * 1000)
+            price_value = float(price)
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if not np.isfinite(price_value):
+            continue
+        prices.append([timestamp_ms, price_value])
+
+    return prices
+
+
 def calculate_portfolio_risk_health(req: RiskHealthRequest) -> Dict[str, float]:
     holdings = [holding for holding in (req.holdings or []) if str(holding.ticker or "").strip()]
     if not holdings:
@@ -1043,12 +1118,24 @@ def search_sfi_assets():
 def crypto_price_series():
     ticker = request.args.get("ticker", "ETH").upper()
     vs_currency = request.args.get("vs_currency", "usd")
-    days = request.args.get("days", "30")
+    days = _parse_positive_int(request.args.get("days", "30"), 30)
     cid = CG_ID_MAP.get(ticker, ticker.lower()) 
+    prices: List[List[float]] = []
+    source = "coingecko"
+
     try:
         data = DataManager._cg_get(f"/coins/{cid}/market_chart", {"vs_currency": vs_currency, "days": days}) or {}
-        return jsonify({"ticker": ticker, "coin_id": cid, "vs": vs_currency, "days": days, "prices": data.get("prices", [])})
-    except Exception: return jsonify({"ticker": ticker, "coin_id": cid, "vs": vs_currency, "days": days, "prices": []})
+        prices = _normalize_price_series(data.get("prices", []))
+    except Exception:
+        prices = []
+
+    if len(prices) < min(30, days):
+        fallback_prices = _fetch_yfinance_series(ticker, days)
+        if len(fallback_prices) > len(prices):
+            prices = fallback_prices
+            source = "yfinance"
+
+    return jsonify({"ticker": ticker, "coin_id": cid, "vs": vs_currency, "days": days, "source": source, "prices": prices})
 
 @app.route("/crypto/debug/snapshot", methods=["POST"])
 def crypto_debug_snapshot():
