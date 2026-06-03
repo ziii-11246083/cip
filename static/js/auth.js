@@ -190,7 +190,8 @@ function updateMembership(session) {
         detail: {
             isMember: Boolean(user),
             isGuest,
-            email: user?.email || ""
+            email: user?.email || "",
+            userId: user?.id || ""
         }
     }));
 }
@@ -365,6 +366,7 @@ window.authManager = {
         return notifyRequireLogin(featureName);
     },
     openLogin: () => openLoginPopup(),
+    getUserId: () => currentSession?.user?.id || null,
     getToken: async () => {
         if (localStorage.getItem(GUEST_MODE_KEY) === "1") return null;
         if (isDemoMemberActive()) {

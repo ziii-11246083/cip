@@ -2,7 +2,8 @@
 let portfolioAssets = {};
 let popularCoinsCache = [];
 let weightsChartInstance = null;
-const HEALTH_RECORD_KEY = "smartinvest_health_records";
+const HEALTH_RECORD_KEY_PREFIX = "smartinvest_health_records";
+let activeHealthUserId = null;
 
 const DEFAULT_COINS = [
   { symbol:"BTC", name:"Bitcoin" },
@@ -64,6 +65,45 @@ function coinIcon(symbol){
     DOGE:"Ð", ADA:"A", AVAX:"A", LINK:"L", DOT:"D"
   };
   return map[symbol] || symbol.slice(0, 1);
+}
+
+function getHealthUserId(){
+  const userId = window.authManager?.getUserId?.() || window.smartInvestMembership?.userId || "";
+  return String(userId || "").trim();
+}
+
+function getHealthRecordKey(userId = getHealthUserId()){
+  const safeUserId = String(userId || "").trim();
+  return safeUserId ? `${HEALTH_RECORD_KEY_PREFIX}:${safeUserId}` : `${HEALTH_RECORD_KEY_PREFIX}:guest`;
+}
+
+function resetHealthWorkspace(){
+  portfolioAssets = {};
+
+  if(weightsChartInstance){
+    weightsChartInstance.destroy();
+    weightsChartInstance = null;
+  }
+
+  if($("assetAmount")) $("assetAmount").value = "";
+  if($("coinSearchInput")) $("coinSearchInput").value = "";
+  if($("fomoChange")) {
+    $("fomoChange").value = "";
+    delete $("fomoChange").dataset.change;
+  }
+
+  if($("assetBubbles")) $("assetBubbles").innerHTML = `<div class="empty">尚未加入配置。</div>`;
+  if($("riskBadgeMini")) $("riskBadgeMini").textContent = "尚未計算";
+  if($("kTop1")) $("kTop1").textContent = "--";
+  if($("kTop3")) $("kTop3").textContent = "--";
+  if($("kVol")) $("kVol").textContent = "--";
+  if($("kMdd")) $("kMdd").textContent = "--";
+  if($("riskMeterText")) $("riskMeterText").textContent = "尚未分析";
+  if($("riskBar")) $("riskBar").style.width = "0%";
+  if($("aiReport")) $("aiReport").textContent = "完成健康度檢查後，這裡會顯示配置摘要。";
+
+  updateBudgetSummary();
+  drawChart();
 }
 
 function updateBudgetSummary(){
@@ -519,8 +559,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  renderHealthRecords();
-  window.addEventListener("smartinvest:auth-state", renderHealthRecords);
+  handleHealthAuthStateChange({ detail: { userId: getHealthUserId() } });
+  window.addEventListener("smartinvest:auth-state", handleHealthAuthStateChange);
 });
 
 
@@ -697,7 +737,7 @@ function readHealthRecords(){
   if(!isHealthMember()) return [];
 
   try{
-    const parsed = JSON.parse(localStorage.getItem(HEALTH_RECORD_KEY) || "[]");
+    const parsed = JSON.parse(localStorage.getItem(getHealthRecordKey()) || "[]");
     return Array.isArray(parsed) ? parsed : [];
   }catch(error){
     return [];
@@ -705,7 +745,7 @@ function readHealthRecords(){
 }
 
 function writeHealthRecords(records){
-  localStorage.setItem(HEALTH_RECORD_KEY, JSON.stringify(records.slice(0, 8)));
+  localStorage.setItem(getHealthRecordKey(), JSON.stringify(records.slice(0, 8)));
 }
 
 function saveHealthRecord(record){
@@ -761,6 +801,15 @@ function renderHealthRecords(){
 
 function clearHealthRecords(){
   if(!requireHealthMember("投資健康度紀錄")) return;
-  localStorage.removeItem(HEALTH_RECORD_KEY);
+  localStorage.removeItem(getHealthRecordKey());
+  renderHealthRecords();
+}
+
+function handleHealthAuthStateChange(event){
+  const nextUserId = String(event?.detail?.userId || getHealthUserId() || "").trim();
+  if (nextUserId !== activeHealthUserId) {
+    activeHealthUserId = nextUserId;
+    resetHealthWorkspace();
+  }
   renderHealthRecords();
 }
