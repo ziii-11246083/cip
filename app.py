@@ -684,7 +684,7 @@ class SocialMediaEngine:
                     top_coins_data.append({"symbol": sym.replace("-USD", ""), "price": None, "change": None})
 
         related_news = []
-        return {"scores": scores, "top_narrative": top_narrative, "top_score": top_score, "wordcloud": wc_base64, "top_coins": top_coins_data, "related_news": related_news}
+        return {"narrative_scores": scores, "top_narrative": top_narrative, "top_score": top_score, "wordcloud": wc_base64, "top_coins": top_coins_data, "related_news": related_news}
 
 # ==========================================
 # 💼 3. Pydantic Models 
