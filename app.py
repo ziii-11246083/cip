@@ -951,6 +951,31 @@ def live_data():
         if 'history_prices' in coin: del coin['history_prices']
     return jsonify({"timestamp": "", "data": crypto_list})
 
+@app.route('/api/market', methods=['GET'])
+@ttl_cache(ttl_seconds=Config.CACHE_TTL)
+def api_market():
+    crypto_list = DataManager.get_all_tickers()
+    if not crypto_list:
+        return jsonify({"timestamp": "", "data": []})
+
+    market_rows = []
+    for coin in crypto_list:
+        symbol = (coin.get('symbol') or '').upper()
+        market_rows.append({
+            "id": coin.get('id') or symbol.lower(),
+            "symbol": symbol,
+            "name": coin.get('name') or coin.get('cn_name') or symbol,
+            "cn_name": coin.get('cn_name') or coin.get('name') or symbol,
+            "current_price": coin.get('price_usd', 0),
+            "price_usd": coin.get('price_usd', 0),
+            "price_change_percentage_24h": coin.get('change', 0),
+            "change": coin.get('change', 0),
+            "market_cap_rank": coin.get('rank', 0),
+            "rank": coin.get('rank', 0),
+        })
+
+    return jsonify({"timestamp": "", "data": market_rows})
+
 @app.route('/api/narratives')
 def get_narratives():
     return jsonify(SocialMediaEngine.fetch_narratives_full())
