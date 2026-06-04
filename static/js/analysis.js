@@ -1,7 +1,7 @@
 function setInsightText(id, text) {
   const el = document.getElementById(id);
   if (!el) return;
-  el.textContent = text;
+  el.innerHTML = text;
 }
 
 function setInsightError(id, text) {
