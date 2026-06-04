@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-Hant">
 <head>
   <style>
@@ -13,7 +13,7 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/iansui@1.0/dist/iansui.min.css">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=agent-member-20260514">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=member-overlay-20260604">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/agent.css') }}?v=agent-member-20260514">
 </head>
 <body class="ai-coach-page">
@@ -146,8 +146,8 @@
     anonKey: '{{ supabase_anon_key | default("dummy") }}'
   };
 </script>
-<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=agent-member-20260514"></script>
-<script src="{{ url_for('static', filename='js/common.js') }}?v=utf8fix"></script>
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=member-nav-lock-20260604"></script>
+<script src="{{ url_for('static', filename='js/common.js') }}?v=member-nav-lock-20260604"></script>
 <script src="{{ url_for('static', filename='js/agent.js') }}?v=agent-member-20260514"></script>
 </body>
 </html>

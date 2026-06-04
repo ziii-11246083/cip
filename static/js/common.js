@@ -141,7 +141,18 @@ function initCommonUI() {
   });
 
   document.querySelectorAll("[data-member-required]").forEach((link) => {
-    link.addEventListener("click", (event) => {
+    link.addEventListener("click", async (event) => {
+      if (window.authManager?.whenReady && !window.authManager?.isReady?.()) {
+        event.preventDefault();
+        await window.authManager.whenReady();
+        const loggedInAfterReady = Boolean(window.authManager?.isLoggedIn?.() || window.smartInvestMembership?.isMember);
+        if (loggedInAfterReady) {
+          window.location.href = link.href;
+        } else {
+          window.authManager?.requireMember?.(link.dataset.memberRequired || "會員功能");
+        }
+        return;
+      }
       const loggedIn = Boolean(window.authManager?.isLoggedIn?.() || window.smartInvestMembership?.isMember);
       if (loggedIn) return;
       event.preventDefault();

@@ -86,27 +86,35 @@
   function renderPortfolio(portfolio) {
     if ($("memberEmail")) $("memberEmail").textContent = window.smartInvestMembership?.email || "測試會員";
     if (!portfolio) return;
+    const isDemo = Boolean(window.authManager?.isDemoMember?.());
 
     const cash = Number(portfolio.cash || 0);
     const totalValue = Number(portfolio.total_value_usd || 0);
     const holdingTotal = Math.max(0, totalValue - cash);
     const positions = Array.isArray(portfolio.positions) ? portfolio.positions : [];
     const equityCurve = Array.isArray(portfolio.equity_curve) ? portfolio.equity_curve : [];
+    const capitalRecords = Array.isArray(portfolio.capital_records) ? portfolio.capital_records : [];
 
     if ($("kpiCapital")) $("kpiCapital").textContent = fmtTwdFromUsd(totalValue);
-    if ($("kpiCapitalCount")) $("kpiCapitalCount").textContent = `${equityCurve.length} 筆資產曲線`;
+    if ($("kpiCapitalCount")) $("kpiCapitalCount").textContent = `${capitalRecords.length || equityCurve.length} 筆資金紀錄`;
     if ($("kpiHoldings")) $("kpiHoldings").textContent = fmtTwdFromUsd(holdingTotal);
     if ($("kpiHoldingCount")) $("kpiHoldingCount").textContent = `${positions.length} 種資產`;
 
     const capitalList = $("capitalList");
     if (capitalList) {
-      const points = equityCurve.slice(-8);
-      capitalList.innerHTML = points.length ? points.map((item) => `
+      const records = capitalRecords.length ? capitalRecords.slice(0, 8) : equityCurve.slice(-8).reverse();
+      capitalList.innerHTML = records.length ? records.map((item) => {
+        const recordId = item.id || item.timestamp || item.ts || "";
+        return `
         <div class="member-list-item">
-          <div><strong>${fmtTwdFromUsd(item.total_value_usd)}</strong><span>資產曲線</span></div>
-          <time>${dateText(item.timestamp || item.ts)}</time>
+          <div><strong>${fmtTwdFromUsd(item.amount_usd || item.total_value_usd)}</strong><span>${item.note || "資金紀錄"}</span></div>
+          <div class="member-list-actions">
+            <time>${dateText(item.timestamp || item.ts)}</time>
+            ${isDemo && recordId ? `<button class="capital-delete-btn" type="button" data-capital-id="${recordId}">刪除</button>` : ""}
+          </div>
         </div>
-      `).join("") : '<div class="member-record-empty">尚未產生資產曲線紀錄。</div>';
+      `;
+      }).join("") : '<div class="member-record-empty">尚未產生資產曲線紀錄。</div>';
     }
 
     const holdingTable = $("holdingTable");
@@ -162,7 +170,41 @@
     $("capitalForm")?.addEventListener("submit", (event) => {
       event.preventDefault();
       if (!requireMember()) return;
-      alert("資金與資產以模擬交易帳戶為準，請至模擬交易頁調整。\n\n若需要重新配置，可使用重置功能。 ");
+      const amountTwd = Number($("capitalAmount")?.value || 0);
+      if (amountTwd <= 0) return alert("請輸入大於 0 的新增資金。");
+      request("/api/sim-trade/deposit", {
+        method: "POST",
+        body: JSON.stringify({
+          amount_twd: amountTwd,
+          note: $("capitalNote")?.value || ""
+        })
+      }).then(() => {
+        $("capitalAmount").value = "";
+        $("capitalNote").value = "";
+        return refreshData();
+      }).catch((error) => {
+        alert(error.message || "新增資金失敗");
+      });
+    });
+
+    $("capitalList")?.addEventListener("click", async (event) => {
+      const btn = event.target.closest(".capital-delete-btn");
+      if (!btn) return;
+      if (!window.authManager?.isDemoMember?.()) {
+        alert("只有 Demo 帳號可以刪除資金紀錄。");
+        return;
+      }
+      const recordId = btn.dataset.capitalId || "";
+      if (!recordId) return;
+      if (!confirm("確定刪除此筆資金紀錄？帳戶現金會同步扣回。")) return;
+      try {
+        await request(`/api/sim-trade/capital/${encodeURIComponent(recordId)}`, {
+          method: "DELETE"
+        });
+        await refreshData();
+      } catch (error) {
+        alert(error.message || "刪除資金失敗");
+      }
     });
 
     $("orderForm")?.addEventListener("submit", async (event) => {

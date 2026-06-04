@@ -438,40 +438,67 @@ label{
 
 .member-feature-locked{
   position:relative;
+  overflow:hidden;
   border-color:#dedede !important;
   background:#f3f3f3 !important;
   color:#999 !important;
-  filter:grayscale(.68);
+}
+
+.member-feature-locked > :not(.member-lock-overlay){
+  filter:blur(5px) grayscale(.72);
+  opacity:.42;
+  pointer-events:none;
+  user-select:none;
 }
 
 .member-feature-locked :where(h1,h2,h3,strong,p,span,label,small,i){
   color:#999 !important;
 }
 
-.member-feature-locked :where(input,select,textarea,button){
+.member-feature-locked > :not(.member-lock-overlay) :where(input,select,textarea,button){
   border-color:#d8d8d8 !important;
   background:#ececec !important;
   color:#999 !important;
   cursor:not-allowed !important;
 }
 
-.member-feature-locked::after{
-  content:"登入後即可使用此功能";
+.member-lock-overlay{
   position:absolute;
-  inset:auto 18px 18px auto;
-  z-index:5;
-  display:inline-flex;
+  inset:0;
+  z-index:20;
+  display:flex;
+  flex-direction:column;
   align-items:center;
+  justify-content:center;
   gap:8px;
-  min-height:34px;
-  padding:0 14px;
-  border:1px solid #d6d6d6;
+  min-height:140px;
+  width:100%;
+  border:0;
+  border-radius:inherit;
+  color:var(--dark);
+  background:rgba(255,255,255,.62);
+  backdrop-filter:blur(2px);
+  cursor:pointer;
+  text-align:center;
+  font-weight:950;
+}
+
+.member-lock-overlay i{
+  width:58px;
+  height:58px;
+  display:grid;
+  place-items:center;
   border-radius:999px;
-  color:#777;
-  background:rgba(255,255,255,.92);
-  box-shadow:0 10px 24px rgba(0,0,0,.08);
-  font-size:12px;
-  font-weight:900;
+  color:#fff;
+  background:linear-gradient(135deg,var(--brand),var(--brand-3));
+  box-shadow:0 16px 34px rgba(249,115,22,.22);
+  font-size:24px;
+}
+
+.member-lock-overlay strong{
+  color:var(--dark) !important;
+  font-size:18px;
+  letter-spacing:0;
 }
 
 .member-feature-unlocked{
@@ -534,9 +561,8 @@ label{
     flex-direction:column;
   }
 
-  .member-feature-locked::after{
-    position:static;
-    margin-top:14px;
+  .member-lock-overlay{
+    min-height:120px;
   }
 }
 
@@ -624,7 +650,8 @@ label{
   border-radius:24px;
 }
 
-.sim-dashboard{
+.sim-dashboard,
+.order-panel{
   grid-column:1 / -1;
 }
 
@@ -676,6 +703,115 @@ label{
   display:grid;
   grid-template-columns:repeat(2,minmax(0,1fr));
   gap:14px;
+}
+
+.order-workspace{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:28px;
+  align-items:start;
+}
+
+.order-form-area{
+  min-width:0;
+}
+
+.coin-market-panel{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+  min-height:100%;
+  padding:18px;
+  border:1px solid rgba(251,106,16,.16);
+  border-radius:20px;
+  background:linear-gradient(180deg,#fff,#FFF8EF);
+}
+
+.coin-market-panel .sim-title{
+  margin-bottom:4px;
+}
+
+.coin-market-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  padding-bottom:12px;
+  border-bottom:1px solid var(--line);
+}
+
+.coin-market-head span{
+  color:var(--dark);
+  font-size:28px;
+  font-weight:950;
+}
+
+.coin-market-head small,
+.coin-market-grid span,
+.coin-order-estimate span{
+  color:var(--muted);
+  font-size:12px;
+  font-weight:900;
+}
+
+.coin-market-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+}
+
+.coin-market-grid div,
+.coin-order-estimate{
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:#fff;
+}
+
+.coin-market-grid strong,
+.coin-order-estimate strong{
+  display:block;
+  margin-top:6px;
+  color:var(--dark);
+  font-size:18px;
+  line-height:1.25;
+  overflow-wrap:anywhere;
+}
+
+#quoteChange.ok{
+  color:#2f6f46;
+}
+
+#quoteChange.bad{
+  color:#b91c1c;
+}
+
+.coin-order-advice{
+  padding:14px;
+  border-radius:16px;
+  background:#fff;
+  border:1px solid var(--line);
+  color:var(--muted);
+  font-weight:850;
+  line-height:1.6;
+}
+
+.coin-order-advice.ok{
+  color:#2f6f46;
+  border-color:rgba(47,111,70,.22);
+  background:#F2FBF4;
+}
+
+.coin-order-advice.warn{
+  color:#9a5a00;
+  border-color:rgba(245,158,11,.25);
+  background:#FFF8E8;
+}
+
+.coin-order-advice.bad{
+  color:#b91c1c;
+  border-color:rgba(220,38,38,.22);
+  background:#FEF2F2;
 }
 
 .order-actions{
@@ -748,8 +884,12 @@ label{
 }
 
 @media(max-width:1080px){
-  .sim-app,
   .analysis-grid{
+    grid-template-columns:1fr;
+  }
+
+  .sim-app,
+  .order-workspace{
     grid-template-columns:1fr;
   }
 

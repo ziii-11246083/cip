@@ -12,10 +12,12 @@ import base64
 import json
 import uuid
 import wave
+import hashlib
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Tuple
 from functools import wraps
+from threading import Lock
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
@@ -51,6 +53,8 @@ DATA_DIR = BASE_DIR / "data"
 AUDIO_DIR = DATA_DIR / "audio"
 AUDIO_DIR.mkdir(parents=True, exist_ok=True)
 SIM_INITIAL_CASH = 100000.0
+SIM_DATA_FILE = DATA_DIR / "sim_trade_local.json"
+SIM_DATA_LOCK = Lock()
 
 class Config:
     CG_API_KEY: str = os.getenv("CG_API_KEY", "")
@@ -125,6 +129,138 @@ DEMO_MEMBER_USER = {
     "is_guest": False,
     "is_demo": True,
 }
+
+def sim_user_key(access_token: str) -> str:
+    if access_token == DEMO_MEMBER_TOKEN:
+        return "demo-member"
+    digest = hashlib.sha256(str(access_token).encode("utf-8")).hexdigest()
+    return f"user-{digest[:24]}"
+
+def load_local_sim_store() -> Dict[str, Any]:
+    with SIM_DATA_LOCK:
+        try:
+            if SIM_DATA_FILE.exists():
+                data = json.loads(SIM_DATA_FILE.read_text(encoding="utf-8"))
+                if isinstance(data, dict):
+                    return data
+        except Exception as exc:
+            print(f"Local sim store read failed: {exc}")
+        return {"users": {}}
+
+def save_local_sim_store(store: Dict[str, Any]) -> None:
+    with SIM_DATA_LOCK:
+        SIM_DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
+        SIM_DATA_FILE.write_text(json.dumps(store, ensure_ascii=False, indent=2), encoding="utf-8")
+
+def default_local_sim_state(user_key: str, initial_cash: float = SIM_INITIAL_CASH) -> Dict[str, Any]:
+    now = datetime.utcnow().isoformat()
+    portfolio_id = f"local-{user_key}"
+    return {
+        "portfolio": {
+            "id": portfolio_id,
+            "user_id": user_key,
+            "cash_balance": float(initial_cash),
+            "initial_cash": float(initial_cash),
+        },
+        "positions": {},
+        "trades": [],
+        "equity_curve": [{
+            "ts": now,
+            "total_value_usd": float(initial_cash),
+            "cash_balance": float(initial_cash),
+        }],
+        "capital_records": [{
+            "id": str(uuid.uuid4()),
+            "timestamp": now,
+            "amount_usd": float(initial_cash),
+            "note": "Demo 初始資金",
+        }],
+    }
+
+def get_local_sim_state(access_token: str, initial_cash: float = SIM_INITIAL_CASH) -> Tuple[str, Dict[str, Any], Dict[str, Any]]:
+    user_key = sim_user_key(access_token)
+    store = load_local_sim_store()
+    users = store.setdefault("users", {})
+    if user_key not in users:
+        users[user_key] = default_local_sim_state(user_key, initial_cash)
+        save_local_sim_store(store)
+    return user_key, users[user_key], store
+
+def local_sim_preferred(access_token: str) -> bool:
+    if access_token == DEMO_MEMBER_TOKEN:
+        return True
+    user_key = sim_user_key(access_token)
+    store = load_local_sim_store()
+    state = (store.get("users") or {}).get(user_key) or {}
+    return bool(state.get("prefer_local"))
+
+def local_position_rows(state: Dict[str, Any]) -> List[Dict[str, Any]]:
+    rows = []
+    for symbol, pos in (state.get("positions") or {}).items():
+        qty = float(pos.get("quantity") or 0)
+        if qty > 0:
+            rows.append({
+                "symbol": symbol,
+                "quantity": qty,
+                "avg_price": float(pos.get("avg_price") or 0),
+            })
+    return sorted(rows, key=lambda row: row["symbol"])
+
+def append_local_equity_point(state: Dict[str, Any], total_value: float, cash: float) -> None:
+    curve = state.setdefault("equity_curve", [])
+    curve.append({
+        "ts": datetime.utcnow().isoformat(),
+        "total_value_usd": float(total_value),
+        "cash_balance": float(cash),
+    })
+    del curve[:-80]
+
+def local_execute_sim_order(
+    access_token: str,
+    symbol: str,
+    side: str,
+    price: float,
+    quantity: float,
+    amount: float,
+) -> Dict[str, Any]:
+    _, state, store = get_local_sim_state(access_token)
+    state["prefer_local"] = True
+    portfolio = state.get("portfolio") or {}
+    position_rows = local_position_rows(state)
+    total_value = estimate_total_value_after_order(portfolio, position_rows, symbol, side, quantity, amount)
+    cash = float(portfolio.get("cash_balance") or 0)
+    positions = state.setdefault("positions", {})
+    current = positions.get(symbol, {"quantity": 0.0, "avg_price": 0.0})
+    old_qty = float(current.get("quantity") or 0)
+    old_avg = float(current.get("avg_price") or 0)
+
+    if side == "buy":
+        new_qty = old_qty + quantity
+        new_avg = ((old_qty * old_avg) + amount) / new_qty if new_qty > 0 else 0
+        positions[symbol] = {"quantity": new_qty, "avg_price": new_avg}
+        cash -= amount
+    elif side == "sell":
+        new_qty = old_qty - quantity
+        cash += amount
+        if new_qty <= 0:
+            positions.pop(symbol, None)
+        else:
+            positions[symbol] = {"quantity": new_qty, "avg_price": old_avg}
+
+    portfolio["cash_balance"] = cash
+    trade = {
+        "timestamp": datetime.utcnow().isoformat(),
+        "symbol": symbol,
+        "side": side,
+        "price": price,
+        "quantity": quantity,
+        "amount_usd": amount,
+    }
+    state.setdefault("trades", []).insert(0, trade)
+    del state["trades"][200:]
+    append_local_equity_point(state, total_value, cash)
+    save_local_sim_store(store)
+    return trade
 
 @app.context_processor
 def inject_public_config() -> Dict[str, str]:
@@ -1106,7 +1242,7 @@ def crypto_popular():
     per_page = int(request.args.get("per_page", 20))
     params = {"vs_currency": vs_currency, "order": "market_cap_desc", "per_page": per_page, "page": 1, "sparkline": "false"}
     data = DataManager._cg_get("/coins/markets", params) or []
-    return jsonify([{"id": c.get("id"), "symbol": (c.get("symbol") or "").upper(), "name": c.get("name"), "current_price": c.get("current_price"), "price_change_percentage_24h": c.get("price_change_percentage_24h"), "market_cap_rank": c.get("market_cap_rank")} for c in data])
+    return jsonify([{"id": c.get("id"), "symbol": (c.get("symbol") or "").upper(), "name": c.get("name"), "current_price": c.get("current_price"), "market_cap": c.get("market_cap"), "price_change_percentage_24h": c.get("price_change_percentage_24h"), "market_cap_rank": c.get("market_cap_rank")} for c in data])
 
 @app.route("/api/sfi/search", methods=["GET"])
 def search_sfi_assets():
@@ -1474,10 +1610,10 @@ def get_coin_price_usd(symbol: str) -> float:
 
 
 def require_sim_trade_token() -> Tuple[Optional[str], Optional[Tuple[Any, int]]]:
-    if not db:
-        return None, (jsonify({'error': '交易服務暫時不可用', 'code': 'sim-trade/service-unavailable'}), 503)
     if request.user.get("is_demo"):
-        return None, (jsonify({'error': 'Demo 會員不支援持久化模擬交易，請使用正式會員登入。', 'code': 'sim-trade/demo-not-supported'}), 403)
+        return DEMO_MEMBER_TOKEN, None
+    if not db:
+        return None, (jsonify({'error': '交易服務暫時不可用，Demo 會員仍可使用本機模擬交易。', 'code': 'sim-trade/service-unavailable'}), 503)
     token = request.user.get("token")
     if not token:
         return None, (jsonify({'error': '請先登入系統', 'code': 'auth/unauthorized'}), 401)
@@ -1551,13 +1687,24 @@ def estimate_total_value_after_order(
 
 
 def sim_snapshot(access_token: str) -> Dict[str, Any]:
-    portfolio = db.sim_get_or_create_portfolio(access_token, SIM_INITIAL_CASH) if db else {}
+    use_local = local_sim_preferred(access_token)
+    capital_records: List[Dict[str, Any]] = []
+    portfolio = {} if use_local else (db.sim_get_or_create_portfolio(access_token, SIM_INITIAL_CASH) if db else {})
+    if not portfolio:
+        _, state, _ = get_local_sim_state(access_token)
+        use_local = True
+        portfolio = state.get("portfolio") or {}
+        position_rows = local_position_rows(state)
+        equity_rows = state.get("equity_curve") or []
+        capital_records = state.get("capital_records") or []
+    else:
+        position_rows = db.sim_list_positions(access_token) if db else []
+        equity_rows = db.sim_list_equity_curve(access_token, limit=80) if db else []
     if not portfolio:
         raise ValueError("無法取得模擬投資組合。")
     cash = float(portfolio.get("cash_balance", 0))
     initial_cash = float(portfolio.get("initial_cash") or SIM_INITIAL_CASH)
 
-    position_rows = db.sim_list_positions(access_token) if db else []
     positions = []
     total_value = cash
     for row in position_rows:
@@ -1581,8 +1728,7 @@ def sim_snapshot(access_token: str) -> Dict[str, Any]:
     unrealized_pnl = total_value - initial_cash
     pnl_pct = (unrealized_pnl / initial_cash * 100) if initial_cash else 0
 
-    equity_rows = db.sim_list_equity_curve(access_token, limit=80) if db else []
-    if not equity_rows and db:
+    if not equity_rows and db and not use_local:
         portfolio_id = portfolio.get("id")
         user_id = portfolio.get("user_id")
         if portfolio_id and user_id:
@@ -1594,6 +1740,14 @@ def sim_snapshot(access_token: str) -> Dict[str, Any]:
                 cash,
             )
             equity_rows = db.sim_list_equity_curve(access_token, limit=80)
+
+    if use_local:
+        _, state, store = get_local_sim_state(access_token)
+        capital_records = state.get("capital_records") or []
+        if not equity_rows:
+            append_local_equity_point(state, total_value, cash)
+            save_local_sim_store(store)
+            equity_rows = state.get("equity_curve") or []
 
     equity_rows = sorted(equity_rows, key=lambda row: row.get("ts") or "")
     equity_curve = [
@@ -1611,6 +1765,7 @@ def sim_snapshot(access_token: str) -> Dict[str, Any]:
         "unrealized_pnl": unrealized_pnl,
         "pnl_pct": pnl_pct,
         "equity_curve": equity_curve,
+        "capital_records": capital_records,
     }
 
 
@@ -1631,11 +1786,25 @@ def execute_sim_order(
     if quantity <= 0 or amount <= 0:
         raise ValueError("請輸入有效的下單數量或金額。")
 
-    portfolio = db.sim_get_or_create_portfolio(access_token, SIM_INITIAL_CASH) if db else {}
+    use_local = local_sim_preferred(access_token)
+    portfolio = {} if use_local else (db.sim_get_or_create_portfolio(access_token, SIM_INITIAL_CASH) if db else {})
+    position_rows = []
+    state = None
+    store = None
+    if not portfolio:
+        _, state, store = get_local_sim_state(access_token)
+        use_local = True
+        portfolio = state.get("portfolio") or {}
+        position_rows = local_position_rows(state)
+        use_local = True
+    else:
+        position_rows = db.sim_list_positions(access_token) if db else []
     if not portfolio:
         raise ValueError("無法取得模擬投資組合。")
-    position_rows = db.sim_list_positions(access_token) if db else []
     total_value = estimate_total_value_after_order(portfolio, position_rows, symbol, side, quantity, amount)
+
+    if use_local:
+        return local_execute_sim_order(access_token, symbol, side, price, quantity, amount)
 
     result = db.sim_execute_order(
         access_token,
@@ -1650,7 +1819,7 @@ def execute_sim_order(
 
     trade = normalize_trade(result.get("trade") if isinstance(result, dict) else {})
     if not trade:
-        raise ValueError(result.get("error") if isinstance(result, dict) and result.get("error") else "下單失敗，請稍後再試。")
+        return local_execute_sim_order(access_token, symbol, side, price, quantity, amount)
     return trade
 
 
@@ -1670,7 +1839,14 @@ def api_sim_trade_history():
     access_token, error = require_sim_trade_token()
     if error:
         return error
-    trades = db.sim_list_transactions(access_token, limit=limit) if db else []
+    if access_token == DEMO_MEMBER_TOKEN:
+        _, state, _ = get_local_sim_state(access_token)
+        trades = state.get("trades") or []
+    else:
+        trades = db.sim_list_transactions(access_token, limit=limit) if db else []
+        if not trades:
+            _, state, _ = get_local_sim_state(access_token)
+            trades = state.get("trades") or []
     return jsonify({"trades": [normalize_trade(row) for row in trades]})
 
 
@@ -1700,9 +1876,90 @@ def api_sim_trade_reset():
     access_token, error = require_sim_trade_token()
     if error:
         return error
-    if db:
+    if access_token == DEMO_MEMBER_TOKEN or not db:
+        user_key = sim_user_key(access_token)
+        store = load_local_sim_store()
+        store.setdefault("users", {})[user_key] = default_local_sim_state(user_key, SIM_INITIAL_CASH)
+        save_local_sim_store(store)
+    else:
         db.sim_reset_portfolio(access_token, SIM_INITIAL_CASH, SIM_INITIAL_CASH)
     return jsonify({"success": True, "portfolio": sim_snapshot(access_token)})
+
+
+@app.route("/api/sim-trade/deposit", methods=["POST"])
+@token_required
+def api_sim_trade_deposit():
+    req = request.get_json(silent=True) or {}
+    try:
+        access_token, error = require_sim_trade_token()
+        if error:
+            return error
+        amount_usd = req.get("amount_usd")
+        amount_twd = req.get("amount_twd")
+        if amount_usd is None and amount_twd is not None:
+            amount_usd = float(amount_twd) / 32.0
+        amount = float(amount_usd or 0)
+        if amount <= 0:
+            return jsonify({"error": "請輸入大於 0 的新增資金。"}), 400
+
+        _, state, store = get_local_sim_state(access_token)
+        state["prefer_local"] = True
+        portfolio = state.get("portfolio") or {}
+        portfolio["cash_balance"] = float(portfolio.get("cash_balance") or 0) + amount
+        portfolio["initial_cash"] = float(portfolio.get("initial_cash") or 0) + amount
+        snapshot_total = portfolio["cash_balance"]
+        for row in local_position_rows(state):
+            snapshot_total += float(row.get("quantity") or 0) * get_coin_price_usd(str(row.get("symbol") or ""))
+        now = datetime.utcnow().isoformat()
+        state.setdefault("capital_records", []).insert(0, {
+            "id": str(uuid.uuid4()),
+            "timestamp": now,
+            "amount_usd": amount,
+            "note": str(req.get("note") or "").strip(),
+        })
+        del state["capital_records"][100:]
+        append_local_equity_point(state, snapshot_total, portfolio["cash_balance"])
+        save_local_sim_store(store)
+        return jsonify({"success": True, "portfolio": sim_snapshot(access_token), "capital_records": state.get("capital_records") or []})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@app.route("/api/sim-trade/capital/<record_id>", methods=["DELETE"])
+@token_required
+def api_sim_trade_delete_capital(record_id: str):
+    if not request.user.get("is_demo"):
+        return jsonify({"error": "只有 Demo 帳號可以刪除資金紀錄。"}), 403
+
+    try:
+        access_token = DEMO_MEMBER_TOKEN
+        _, state, store = get_local_sim_state(access_token)
+        records = state.setdefault("capital_records", [])
+        target_index = next((
+            idx for idx, item in enumerate(records)
+            if str(item.get("id") or item.get("timestamp") or "") == str(record_id)
+        ), -1)
+        if target_index < 0:
+            return jsonify({"error": "找不到要刪除的資金紀錄。"}), 404
+
+        record = records[target_index]
+        amount = float(record.get("amount_usd") or 0)
+        portfolio = state.get("portfolio") or {}
+        cash = float(portfolio.get("cash_balance") or 0)
+        if amount > cash:
+            return jsonify({"error": "目前現金不足以刪除此筆資金，請先賣出持倉或重置 Demo 帳戶。"}), 400
+
+        records.pop(target_index)
+        portfolio["cash_balance"] = cash - amount
+        portfolio["initial_cash"] = max(0.0, float(portfolio.get("initial_cash") or 0) - amount)
+        total_value = portfolio["cash_balance"]
+        for row in local_position_rows(state):
+            total_value += float(row.get("quantity") or 0) * get_coin_price_usd(str(row.get("symbol") or ""))
+        append_local_equity_point(state, total_value, portfolio["cash_balance"])
+        save_local_sim_store(store)
+        return jsonify({"success": True, "portfolio": sim_snapshot(access_token), "capital_records": records})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 400
 
 
 @app.route('/api/agent-plan', methods=['POST'])
