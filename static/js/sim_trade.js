@@ -3,7 +3,28 @@
   let equityChart = null;
   let allocChart = null;
   let coinOptions = [];
+  let currentPortfolio = null;
   let isLocked = false;
+  const DEFAULT_COINS = [
+    { symbol: "BTC", name: "Bitcoin" },
+    { symbol: "ETH", name: "Ethereum" },
+    { symbol: "SOL", name: "Solana" },
+    { symbol: "XRP", name: "XRP" },
+    { symbol: "BNB", name: "BNB" },
+    { symbol: "DOGE", name: "Dogecoin" },
+    { symbol: "USDT", name: "Tether" },
+    { symbol: "USDC", name: "USD Coin" }
+  ];
+  const FALLBACK_PRICES = {
+    BTC: 65000,
+    ETH: 3200,
+    SOL: 150,
+    XRP: 0.55,
+    BNB: 600,
+    DOGE: 0.12,
+    USDT: 1,
+    USDC: 1
+  };
 
   function fmtUSD(value) {
     const n = Number(value || 0);
@@ -19,6 +40,15 @@
       minimumFractionDigits: 0,
       maximumFractionDigits: 8
     });
+  }
+
+  function fmtCompactUSD(value) {
+    const n = Number(value || 0);
+    if (!n) return "--";
+    if (n >= 1_000_000_000_000) return "$" + (n / 1_000_000_000_000).toFixed(2) + "T";
+    if (n >= 1_000_000_000) return "$" + (n / 1_000_000_000).toFixed(2) + "B";
+    if (n >= 1_000_000) return "$" + (n / 1_000_000).toFixed(2) + "M";
+    return fmtUSD(n);
   }
 
   function setStatus(message, type) {
@@ -51,19 +81,52 @@
     return data;
   }
 
+  async function getAuthToken() {
+    try {
+      if (window.authManager?.whenReady) {
+        await window.authManager.whenReady();
+      }
+      return window.authManager ? await window.authManager.getToken().catch(() => null) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function waitForAuthToken(timeoutMs = 1800) {
+    const token = await getAuthToken();
+    if (token) return token;
+
+    await new Promise((resolve) => {
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        window.clearTimeout(timer);
+        resolve();
+      };
+      const timer = window.setTimeout(finish, timeoutMs);
+      window.addEventListener("smartinvest:auth-state", finish, { once: true });
+      window.addEventListener("smartinvest:auth-ready", finish, { once: true });
+    });
+
+    return await getAuthToken();
+  }
+
   async function loadCoins() {
+    const bySymbol = new Map(DEFAULT_COINS.map((coin) => [coin.symbol, coin]));
     try {
       const res = await fetch("/crypto/popular?vs_currency=usd&per_page=20");
       const data = await res.json();
-      coinOptions = Array.isArray(data) ? data : [];
+      const apiCoins = Array.isArray(data) ? data : [];
+      apiCoins.forEach((coin) => {
+        const symbol = String(coin.symbol || "").toUpperCase();
+        if (!symbol) return;
+        bySymbol.set(symbol, Object.assign({}, coin, { symbol }));
+      });
     } catch {
-      coinOptions = [
-        { symbol: "btc", name: "Bitcoin" },
-        { symbol: "eth", name: "Ethereum" },
-        { symbol: "sol", name: "Solana" },
-        { symbol: "xrp", name: "XRP" }
-      ];
+      // Keep default coins when market API is unavailable.
     }
+    coinOptions = Array.from(bySymbol.values());
 
     const select = $("orderSymbol");
     if (!select) return;
@@ -73,6 +136,88 @@
       if (!symbol) return;
       select.add(new Option(`${symbol} | ${coin.name || symbol}`, symbol));
     });
+    updateQuotePanel();
+  }
+
+  function getSelectedCoin() {
+    const symbol = String($("orderSymbol")?.value || "BTC").toUpperCase();
+    return coinOptions.find((coin) => String(coin.symbol || "").toUpperCase() === symbol)
+      || DEFAULT_COINS.find((coin) => coin.symbol === symbol)
+      || { symbol, name: symbol };
+  }
+
+  function getSelectedPosition(symbol) {
+    const positions = Array.isArray(currentPortfolio?.positions) ? currentPortfolio.positions : [];
+    return positions.find((pos) => String(pos.symbol || "").toUpperCase() === symbol) || null;
+  }
+
+  function setAdvice(message, type) {
+    const el = $("quoteAdvice");
+    if (!el) return;
+    el.textContent = message;
+    el.className = "coin-order-advice " + (type || "");
+  }
+
+  function updateQuotePanel() {
+    const coin = getSelectedCoin();
+    const symbol = String(coin.symbol || "BTC").toUpperCase();
+    const price = Number(coin.current_price || FALLBACK_PRICES[symbol] || 0);
+    const marketCap = Number(coin.market_cap || 0);
+    const change24h = Number(coin.price_change_percentage_24h || 0);
+    const side = $("orderSide")?.value || "buy";
+    const qtyRaw = $("orderQty")?.value.trim();
+    const amountRaw = $("orderAmt")?.value.trim();
+    const qty = Number(qtyRaw || 0);
+    const amount = Number(amountRaw || 0);
+
+    if ($("quoteSymbol")) $("quoteSymbol").textContent = symbol;
+    if ($("quoteName")) $("quoteName").textContent = coin.name || symbol;
+    if ($("quotePrice")) $("quotePrice").textContent = price ? fmtUSD(price) : "--";
+    if ($("quoteChange")) {
+      $("quoteChange").textContent = Number.isFinite(change24h)
+        ? `${change24h >= 0 ? "+" : ""}${change24h.toFixed(2)}%`
+        : "--";
+      $("quoteChange").className = change24h >= 0 ? "ok" : "bad";
+    }
+    if ($("quoteMarketCap")) $("quoteMarketCap").textContent = marketCap ? fmtCompactUSD(marketCap) : "--";
+    if ($("quoteOne")) $("quoteOne").textContent = price ? fmtUSD(price) : "--";
+    if ($("quotePointOne")) $("quotePointOne").textContent = price ? fmtUSD(price * 0.1) : "--";
+
+    let estimateText = "請輸入數量或金額";
+    let orderAmount = 0;
+    let orderQty = 0;
+    if (price && qty > 0) {
+      orderQty = qty;
+      orderAmount = qty * price;
+      estimateText = `${fmtQty(orderQty)} ${symbol} ≈ ${fmtUSD(orderAmount)}`;
+    } else if (price && amount > 0) {
+      orderAmount = amount;
+      orderQty = amount / price;
+      estimateText = `${fmtUSD(orderAmount)} ≈ ${fmtQty(orderQty)} ${symbol}`;
+    }
+    if ($("quoteEstimate")) $("quoteEstimate").textContent = estimateText;
+
+    const cash = Number(currentPortfolio?.cash || 0);
+    const position = getSelectedPosition(symbol);
+    const holdingQty = Number(position?.quantity || 0);
+
+    if (!price) {
+      setAdvice("目前沒有可用市價，建議先重新整理行情後再下單。", "warn");
+    } else if (side === "buy" && orderAmount > cash) {
+      setAdvice(`現金不足，帳戶目前可用現金 ${fmtUSD(cash)}。`, "bad");
+    } else if (side === "sell" && orderQty > holdingQty) {
+      setAdvice(`持倉不足，目前持有 ${fmtQty(holdingQty)} ${symbol}。`, "bad");
+    } else if (side === "sell" && holdingQty <= 0) {
+      setAdvice(`目前沒有 ${symbol} 持倉，暫不適合送出賣單。`, "bad");
+    } else if (side === "buy" && change24h >= 8) {
+      setAdvice(`24 小時漲幅約 +${change24h.toFixed(2)}%，價格偏熱，較適合小額分批。`, "warn");
+    } else if (side === "buy" && change24h <= -8) {
+      setAdvice(`24 小時跌幅約 ${change24h.toFixed(2)}%，波動偏大，建議降低單筆金額。`, "warn");
+    } else if (orderAmount > 0 || orderQty > 0) {
+      setAdvice("條件可送出模擬單；仍建議保留部分現金，避免一次投入過多。", "ok");
+    } else {
+      setAdvice("選好幣種後，可先用 0.1 顆或小額金額試算，再決定是否下單。", "ok");
+    }
   }
 
   function updateKpis(snapshot) {
@@ -210,10 +355,12 @@
 
   async function refreshPortfolio() {
     const data = await request("/api/sim-trade/portfolio");
+    currentPortfolio = data.portfolio || null;
     updateKpis(data.portfolio);
     renderPositions(data.portfolio);
     drawEquity(data.portfolio);
     drawAlloc(data.portfolio);
+    updateQuotePanel();
   }
 
   async function refreshTrades() {
@@ -267,7 +414,7 @@
   }
 
   document.addEventListener("DOMContentLoaded", async function () {
-    const token = window.authManager ? await window.authManager.getToken().catch(() => null) : null;
+    const token = await waitForAuthToken();
     if (!token) {
       setLockedState(true);
       setStatus("目前是訪客模式，請先登入會員。", "bad");
@@ -297,6 +444,11 @@
     $("btnReset")?.addEventListener("click", function () {
       if (isLocked) return;
       resetPortfolio();
+    });
+
+    ["orderSymbol", "orderSide", "orderQty", "orderAmt"].forEach((id) => {
+      $(id)?.addEventListener("input", updateQuotePanel);
+      $(id)?.addEventListener("change", updateQuotePanel);
     });
   });
 })();

@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-Hant">
 <head>
   <style>
@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/iansui@1.0/dist/iansui.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=member-lock">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=member-overlay-20260604">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/health.css') }}?v=health-sim-board">
 </head>
 <body>
@@ -147,8 +147,8 @@
 <footer class="footer"><div class="container footer-inner"><div>© Smart Invest Crypto · 加密資產風險與市場分析</div><div>Market · Health · Podcast · AI Agent</div></div></footer>
 <div class="toast" id="toast"><div class="t" id="toastT">提示</div><div class="m" id="toastM">--</div></div>
 <script>window.__SUPABASE_CONFIG__ = { url: '{{ supabase_url | default("https://dummy.supabase.co") }}', anonKey: '{{ supabase_anon_key | default("dummy") }}' };</script>
-<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=member-lock"></script>
-<script src="{{ url_for('static', filename='js/common.js') }}?v=utf8fix"></script>
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=member-nav-lock-20260604"></script>
+<script src="{{ url_for('static', filename='js/common.js') }}?v=member-nav-lock-20260604"></script>
 <script src="{{ url_for('static', filename='js/health.js') }}?v=member-records"></script>
 </body>
 </html>

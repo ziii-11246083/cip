@@ -14,6 +14,8 @@ const supabase = (supabaseUrl && supabaseAnonKey)
     ? createClient(supabaseUrl, supabaseAnonKey)
     : null;
 
+localStorage.removeItem(DEMO_MEMBER_KEY);
+
 const AUTH_HASH_KEYS = new Set([
     "access_token",
     "refresh_token",
@@ -26,6 +28,25 @@ const AUTH_HASH_KEYS = new Set([
 ]);
 
 let currentSession = null;
+let authReady = false;
+let resolveAuthReady;
+const authReadyPromise = new Promise((resolve) => {
+    resolveAuthReady = resolve;
+});
+
+function markAuthReady() {
+    if (authReady) return;
+    authReady = true;
+    window.smartInvestAuthReady = true;
+    resolveAuthReady?.(currentSession);
+    window.dispatchEvent(new CustomEvent("smartinvest:auth-ready", {
+        detail: {
+            isMember: isLoggedIn(),
+            email: currentSession?.user?.email || "",
+            userId: currentSession?.user?.id || ""
+        }
+    }));
+}
 
 function buildDemoSession() {
     return {
@@ -39,15 +60,17 @@ function buildDemoSession() {
 }
 
 function isDemoMemberActive() {
-    return localStorage.getItem(DEMO_MEMBER_KEY) === "1";
+    return sessionStorage.getItem(DEMO_MEMBER_KEY) === "1";
 }
 
 function activateDemoMember() {
-    localStorage.setItem(DEMO_MEMBER_KEY, "1");
+    sessionStorage.setItem(DEMO_MEMBER_KEY, "1");
+    localStorage.removeItem(DEMO_MEMBER_KEY);
     localStorage.removeItem(GUEST_MODE_KEY);
     currentSession = buildDemoSession();
     updateMembership(currentSession);
     setAuthUiBySession(currentSession);
+    markAuthReady();
 }
 
 function requireSupabase() {
@@ -234,11 +257,10 @@ function openLoginPopup() {
 }
 
 function notifyRequireLogin(featureName) {
-    const label = featureName ? `${featureName} 需要登入會員才能使用。` : "此功能需要登入會員才能使用。";
     if (typeof window.toast === "function") {
-        window.toast("需要登入", label);
+        window.toast("會員限定", "請登入");
     } else {
-        alert(label);
+        alert("會員限定\n請登入");
     }
     openLoginPopup();
     return false;
@@ -292,6 +314,7 @@ window.authManager = {
         if (!requireSupabase()) return;
         try {
             localStorage.removeItem(DEMO_MEMBER_KEY);
+            sessionStorage.removeItem(DEMO_MEMBER_KEY);
             localStorage.removeItem(GUEST_MODE_KEY);
             const { error } = await supabase.auth.signInWithPassword({ email, password });
             if (error) throw error;
@@ -306,6 +329,7 @@ window.authManager = {
         if (!email || !password) return alert("請輸入信箱與密碼");
         try {
             localStorage.removeItem(DEMO_MEMBER_KEY);
+            sessionStorage.removeItem(DEMO_MEMBER_KEY);
             localStorage.removeItem(GUEST_MODE_KEY);
             const safeMeta = metadata && typeof metadata === "object" ? metadata : {};
             const payload = { email, password };
@@ -323,6 +347,7 @@ window.authManager = {
     logoutUser: async () => {
         try {
             localStorage.removeItem(DEMO_MEMBER_KEY);
+            sessionStorage.removeItem(DEMO_MEMBER_KEY);
             localStorage.removeItem(GUEST_MODE_KEY);
             localStorage.removeItem(AI_COACH_CONVERSATION_KEY);
             localStorage.removeItem("conversation_id");
@@ -350,7 +375,8 @@ window.authManager = {
         }
     },
     continueAsGuest: () => {
-        localStorage.removeItem(DEMO_MEMBER_KEY);
+            localStorage.removeItem(DEMO_MEMBER_KEY);
+            sessionStorage.removeItem(DEMO_MEMBER_KEY);
         localStorage.removeItem(AI_COACH_CONVERSATION_KEY);
         localStorage.removeItem("conversation_id");
         localStorage.setItem(GUEST_MODE_KEY, "1");
@@ -360,7 +386,10 @@ window.authManager = {
         alert("已切換為訪客模式");
     },
     isGuestMode: () => localStorage.getItem(GUEST_MODE_KEY) === "1",
+    isDemoMember: () => isDemoMemberActive(),
     isLoggedIn: () => isLoggedIn(),
+    isReady: () => authReady,
+    whenReady: () => authReadyPromise,
     requireMember: (featureName) => {
         if (isLoggedIn()) return true;
         return notifyRequireLogin(featureName);
@@ -394,18 +423,22 @@ window.authManager = {
 // 監聽登入狀態並自動切換導覽列 UI
 if (supabase) {
     (async () => {
-        await applyAuthFromUrl();
-        await refreshSession();
-        supabase.auth.onAuthStateChange((_event, session) => {
-            currentSession = session || null;
-            updateMembership(session || null);
-            setAuthUiBySession(session || null);
-            console.log("[auth] onAuthStateChange", _event, session);
-            if (session) {
-                clearUrlHashAfterLogin();
-            }
-        });
+        try {
+            await applyAuthFromUrl();
+            await refreshSession();
+            supabase.auth.onAuthStateChange((_event, session) => {
+                currentSession = session || null;
+                updateMembership(session || null);
+                setAuthUiBySession(session || null);
+                console.log("[auth] onAuthStateChange", _event, session);
+                if (session) {
+                    clearUrlHashAfterLogin();
+                }
+            });
+        } finally {
+            markAuthReady();
+        }
     })();
 } else {
-    refreshSession();
+    refreshSession().finally(markAuthReady);
 }
