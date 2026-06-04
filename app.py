@@ -604,11 +604,58 @@ class RiskModel:
 class SocialMediaEngine:
     SIGNAL_KEYWORDS = ["ETF", "升息", "降息", "通膨", "監管", "支撐", "壓力", "均線", "鯨魚", "鏈上", "TVL", "質押", "空投", "白皮書", "核准", "通過", "上市", "減半", "現貨", "合約", "回購", "增持", "銷毀", "新高", "大漲", "突破", "趨勢", "佈局", "創新", "整合"]
     STRONG_HEADERS = ["[新聞]", "[情報]", "[翻譯]", "[數據]", "[分析]", "快訊"]
+    PTT_HEADERS = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+        "Upgrade-Insecure-Requests": "1",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "sec-ch-ua": '"Google Chrome";v="125", "Chromium";v="125", ";Not A Brand";v="24"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Windows"',
+    }
+
+    @staticmethod
+    def _build_ptt_session() -> requests.Session:
+        session = requests.Session()
+        session.headers.update(SocialMediaEngine.PTT_HEADERS)
+        session.cookies.set("over18", "1")
+        return session
+
+    @staticmethod
+    def _get_ptt_response(url: str, session: Optional[requests.Session] = None, timeout: float = 5, max_retries: int = 3):
+        active_session = session or SocialMediaEngine._build_ptt_session()
+        for attempt in range(1, max_retries + 1):
+            try:
+                response = active_session.get(url, timeout=timeout)
+                response.raise_for_status()
+                time.sleep(random.uniform(2, 4))
+                return response
+            except (requests.ConnectionError, requests.Timeout, ConnectionResetError) as error:
+                if attempt >= max_retries:
+                    print(f"PTT Error: {error}")
+                    return None
+                time.sleep(5)
+            except requests.RequestException as error:
+                print(f"PTT Error: {error}")
+                return None
+            except Exception as error:
+                print(f"PTT Error: {error}")
+                return None
+        return None
 
     @staticmethod
     def get_content_summary(url: str) -> str:
         try:
-            res = requests.get(url, headers={"User-Agent": "Mozilla/5.0", "Cookie": "over18=1"}, timeout=1.5)
+            res = SocialMediaEngine._get_ptt_response(url, timeout=1.5)
+            if not res:
+                return ""
             if res.status_code != 200: return ""
             soup = BeautifulSoup(res.text, "html.parser")
             main_content = soup.find(id="main-content")
@@ -637,11 +684,12 @@ class SocialMediaEngine:
     def scrape_ptt() -> List[Dict]:
         results = []
         try:
-            session = requests.Session()
-            session.cookies.set('over18', '1')
+            session = SocialMediaEngine._build_ptt_session()
             url = "https://www.ptt.cc/bbs/DigiCurrency/index.html"
             for _ in range(2):
-                res = session.get(url, timeout=5)
+                res = SocialMediaEngine._get_ptt_response(url, session=session, timeout=5)
+                if not res:
+                    break
                 soup = BeautifulSoup(res.text, "html.parser")
                 divs = soup.find_all("div", class_="r-ent")
                 with ThreadPoolExecutor(max_workers=5) as executor:
