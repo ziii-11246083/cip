@@ -691,7 +691,7 @@ class SocialMediaEngine:
                 if not res:
                     break
                 soup = BeautifulSoup(res.text, "html.parser")
-                divs = soup.find_all("div", class_="r-ent")
+                divs = soup.find_all("div", class_="r-ent")[:15]
                 with ThreadPoolExecutor(max_workers=5) as executor:
                     futures = [executor.submit(SocialMediaEngine.process_single_ptt_post, div) for div in divs]
                     for future in as_completed(futures):
