@@ -1,3 +1,17 @@
+body.market-page{
+  background:
+    radial-gradient(circle at 8% 4%,rgba(253,186,116,.22),transparent 28%),
+    radial-gradient(circle at 92% 0%,rgba(249,115,22,.10),transparent 30%),
+    linear-gradient(180deg,#FFF9F2 0%,#FFFCF8 56%,#FFF8EF 100%);
+}
+
+body.market-page .hero:after{
+  background:
+    linear-gradient(90deg, rgba(255,250,244,.96) 0%, rgba(255,250,244,.88) 42%, rgba(255,250,244,.78) 68%, rgba(255,250,244,.90) 100%),
+    url("../img/hero-side-visual.jpg") center right/cover no-repeat;
+  opacity:.34;
+}
+
 .hero-card{
   backdrop-filter:blur(10px);
   background:rgba(255,255,255,.9);

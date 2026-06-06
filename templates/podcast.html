@@ -9,7 +9,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>AI Podcast | Smart Invest Crypto</title>
-  <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo.jpg') }}">
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/logo.svg') }}">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/iansui@1.0/dist/iansui.min.css">
@@ -96,7 +96,7 @@
 
           <div class="chat-scene">
             <div class="chat-person nova">
-              <div class="chat-head"><img src="{{ url_for('static', filename='images/podcast-nova.png') }}" alt=""></div>
+              <div class="chat-head"><img src="{{ url_for('static', filename='images/podcast-nova.png') }}" alt="" onerror="this.style.display='none';"></div>
               <span>Nova</span>
             </div>
             <div class="chat-window" id="chatStream">
@@ -107,7 +107,7 @@
               </div>
             </div>
             <div class="chat-person onyx">
-              <div class="chat-head"><img src="{{ url_for('static', filename='images/podcast-onyx.png') }}" alt=""></div>
+              <div class="chat-head"><img src="{{ url_for('static', filename='images/podcast-onyx.png') }}" alt="" onerror="this.style.display='none';"></div>
               <span>Onyx</span>
             </div>
           </div>
