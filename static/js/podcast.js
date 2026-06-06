@@ -66,6 +66,7 @@ let renderedLineCount = 0;
 let hasAudioSync = false;
 let latestScript = "";
 let latestAudioUrl = "";
+let browserVoiceActive = false;
 
 const player = $("player");
 
@@ -279,7 +280,7 @@ function appendChatBubble(speaker, text) {
     const isHost = normalizedSpeaker === "主持人";
     row.className = `chatRow ${isHost ? "host" : "analyst"}`;
     row.innerHTML = `
-        <div class="chatAvatar"><img src="/static/images/${isHost ? "podcast-nova.png" : "podcast-onyx.png"}" alt=""></div>
+        <div class="chatAvatar"><img src="/static/images/${isHost ? "podcast-nova.png" : "podcast-onyx.png"}" alt="" onerror="this.style.display='none';"></div>
         <div class="chatBubble">
             <div class="chatSpeaker">
                 <i class="fas ${isHost ? "fa-microphone-lines" : "fa-chart-line"}"></i>
@@ -448,6 +449,13 @@ function formatAudioError(error) {
     const message = error?.message || "";
     const lower = message.toLowerCase();
     if (
+        lower.includes("openai_api_key not set") ||
+        lower.includes("尚未設定 openai_api_key") ||
+        lower.includes("尚未設定")
+    ) {
+        return "尚未設定 OPENAI_API_KEY，無法生成雲端語音。已保留文字稿，可用播放按鈕啟動瀏覽器朗讀備援。";
+    }
+    if (
         lower.includes("authenticationerror") ||
         lower.includes("incorrect api key") ||
         lower.includes("invalid api key") ||
@@ -461,6 +469,65 @@ function formatAudioError(error) {
     return message || "請確認 OpenAI API Key、額度與 TTS 模型。";
 }
 
+function stopBrowserVoice() {
+    if ("speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+    }
+    browserVoiceActive = false;
+}
+
+function speakPodcastWithBrowser() {
+    if (!("speechSynthesis" in window)) {
+        showPodcastToast("沒有可用語音", "這個瀏覽器不支援內建朗讀，請設定 OPENAI_API_KEY 產生雲端語音。");
+        return;
+    }
+
+    const lines = podcastLines.length
+        ? podcastLines
+        : latestScript.split(/\n+/).filter(Boolean).map((text, index) => ({
+            speaker: normalizeSpeaker("", index),
+            text: text.replace(/^(主持人|分析師)[:：]\s*/, "")
+        }));
+
+    if (!lines.length) {
+        showPodcastToast("尚未有文字稿", "請先生成 Podcast。");
+        return;
+    }
+
+    stopBrowserVoice();
+    resetChatStream("正在使用瀏覽器朗讀備援，泡泡會依序出現。");
+    browserVoiceActive = true;
+    setAudioStatus("正在使用瀏覽器朗讀備援。若要生成正式音檔，請設定 OPENAI_API_KEY。");
+
+    let index = 0;
+    const speakNext = () => {
+        if (!browserVoiceActive || index >= lines.length) {
+            browserVoiceActive = false;
+            updateSpeakingState("");
+            setAudioStatus(index >= lines.length ? "瀏覽器朗讀完畢" : "瀏覽器朗讀已停止");
+            return;
+        }
+
+        const line = lines[index];
+        appendChatBubble(line.speaker, line.text);
+        const utterance = new SpeechSynthesisUtterance(line.text);
+        utterance.lang = "zh-TW";
+        utterance.rate = 1;
+        utterance.pitch = normalizeSpeaker(line.speaker, index) === "主持人" ? 1.04 : .92;
+        utterance.onend = () => {
+            index += 1;
+            speakNext();
+        };
+        utterance.onerror = () => {
+            index += 1;
+            speakNext();
+        };
+        window.speechSynthesis.speak(utterance);
+    };
+
+    speakNext();
+}
+
 function setPlayerSource(url) {
     latestAudioUrl = url || "";
     if (!player) return;
@@ -470,7 +537,7 @@ function setPlayerSource(url) {
         player.removeAttribute("src");
         player.load();
         updateProgress();
-        setAudioStatus("已生成文字稿，但後端沒有回傳語音檔。請確認 /podcast/generate 有回傳 audio_url。");
+        setAudioStatus("已生成文字稿，但尚未取得雲端語音。可按播放使用瀏覽器朗讀備援。");
         return;
     }
 
@@ -672,7 +739,12 @@ function initSpeedControl() {
 function initPlayerButtons() {
     bindClick("btnPodcastPlay", async () => {
         if (!player || !player.src) {
-            showPodcastToast("尚未有語音", "請先生成 Podcast，或確認後端有回傳 audio_url");
+            if (latestScript || podcastLines.length) {
+                speakPodcastWithBrowser();
+                showPodcastToast("使用瀏覽器朗讀", "未取得雲端音檔，已改用瀏覽器內建語音。");
+                return;
+            }
+            showPodcastToast("尚未有語音", "請先生成 Podcast。若要正式音檔，請設定 OPENAI_API_KEY。");
             return;
         }
 
@@ -688,6 +760,7 @@ function initPlayerButtons() {
 
     bindClick("btnPodcastPause", () => {
         if (player) player.pause();
+        stopBrowserVoice();
         clearInterval(bubbleTimer);
         bubbleTimer = null;
         syncBubblesToAudioTime();

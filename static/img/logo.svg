@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Smart Invest Crypto">
+  <defs>
+    <linearGradient id="bg" x1="18" y1="14" x2="110" y2="118" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff9d45"/>
+      <stop offset="1" stop-color="#f97316"/>
+    </linearGradient>
+    <linearGradient id="line" x1="28" y1="92" x2="104" y2="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff7ed"/>
+      <stop offset="1" stop-color="#fff"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="30" fill="url(#bg)"/>
+  <circle cx="64" cy="64" r="43" fill="none" stroke="#fff7ed" stroke-width="7" opacity=".48"/>
+  <path d="M31 80h17l11-25 15 36 13-30h14" fill="none" stroke="url(#line)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M83 39h19v19" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M79 62l23-23" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round"/>
+</svg>

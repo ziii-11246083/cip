@@ -25,10 +25,17 @@ import pandas as pd
 import numpy as np
 import feedparser
 import yfinance as yf
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-from wordcloud import WordCloud
+try:
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+except Exception:
+    plt = None
+
+try:
+    from wordcloud import WordCloud
+except Exception:
+    WordCloud = None
 from bs4 import BeautifulSoup
 from flask import Flask, request, jsonify, send_file, abort, render_template
 from flask_cors import CORS
@@ -832,23 +839,25 @@ class SocialMediaEngine:
             font_path = "C:/Windows/Fonts/msjh.ttc" if os.path.exists("C:/Windows/Fonts/msjh.ttc") else None
             buf = None
             try:
-                wc = WordCloud(width=1000, height=450, background_color="#f8fafc", colormap="tab20", font_path=font_path, max_words=60)
-                if word_freqs: wc.generate_from_frequencies(word_freqs)
-                else: wc.generate(text_all)
-                fig, ax = plt.subplots(figsize=(10, 4.5))
-                ax.imshow(wc, interpolation="bilinear")
-                ax.axis("off")
-                plt.tight_layout(pad=0)
-                buf = io.BytesIO()
-                fig.savefig(buf, format="png", bbox_inches="tight", transparent=True)
-                buf.seek(0)
-                wc_base64 = base64.b64encode(buf.read()).decode("utf-8")
+                if WordCloud is not None and plt is not None:
+                    wc = WordCloud(width=1000, height=450, background_color="#f8fafc", colormap="tab20", font_path=font_path, max_words=60)
+                    if word_freqs: wc.generate_from_frequencies(word_freqs)
+                    else: wc.generate(text_all)
+                    fig, ax = plt.subplots(figsize=(10, 4.5))
+                    ax.imshow(wc, interpolation="bilinear")
+                    ax.axis("off")
+                    plt.tight_layout(pad=0)
+                    buf = io.BytesIO()
+                    fig.savefig(buf, format="png", bbox_inches="tight", transparent=True)
+                    buf.seek(0)
+                    wc_base64 = base64.b64encode(buf.read()).decode("utf-8")
             except Exception:
                 pass
             finally:
                 if buf is not None:
                     buf.close()
-                plt.close("all")
+                if plt is not None:
+                    plt.close("all")
 
         top_coins_data = []
         if top_narrative:
@@ -2257,7 +2266,8 @@ def create_dialogue_wav(podcast_client: OpenAI, req: TTSRequest, model: str, out
 @app.route("/podcast/tts", methods=["POST"])
 def podcast_tts():
     podcast_client = refresh_openai_client()
-    if not podcast_client: return jsonify({"detail": "OPENAI_API_KEY not set"}), 503
+    if not podcast_client:
+        return jsonify({"detail": "尚未設定 OPENAI_API_KEY，因此無法生成雲端語音。請在專案根目錄建立 .env，加入 OPENAI_API_KEY=你的_key，然後重啟 Flask。"}), 503
     try: req = TTSRequest(**(request.get_json(silent=True) or {}))
     except ValidationError as e: return jsonify({"detail": str(e)}), 422
     if not req.lines and not req.text.strip():
