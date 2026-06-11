@@ -9,12 +9,19 @@ const DEMO_MEMBER_TOKEN = "smartinvest-demo-member-token";
 const DEMO_MEMBER_EMAIL = "test@smartinvest.local";
 const DEMO_MEMBER_PASSWORD = "Test123456";
 const AI_COACH_CONVERSATION_KEY = "smartinvest_ai_coach_conversation_id";
+const SUPABASE_STORAGE_KEY = "smartinvest_supabase_auth";
 
 const supabase = (supabaseUrl && supabaseAnonKey)
-    ? createClient(supabaseUrl, supabaseAnonKey)
+    ? createClient(supabaseUrl, supabaseAnonKey, {
+        auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true,
+            storage: window.localStorage,
+            storageKey: SUPABASE_STORAGE_KEY
+        }
+    })
     : null;
-
-localStorage.removeItem(DEMO_MEMBER_KEY);
 
 const AUTH_HASH_KEYS = new Set([
     "access_token",
@@ -60,12 +67,12 @@ function buildDemoSession() {
 }
 
 function isDemoMemberActive() {
-    return sessionStorage.getItem(DEMO_MEMBER_KEY) === "1";
+    return localStorage.getItem(DEMO_MEMBER_KEY) === "1" || sessionStorage.getItem(DEMO_MEMBER_KEY) === "1";
 }
 
 function activateDemoMember() {
-    sessionStorage.setItem(DEMO_MEMBER_KEY, "1");
-    localStorage.removeItem(DEMO_MEMBER_KEY);
+    localStorage.setItem(DEMO_MEMBER_KEY, "1");
+    sessionStorage.removeItem(DEMO_MEMBER_KEY);
     localStorage.removeItem(GUEST_MODE_KEY);
     currentSession = buildDemoSession();
     updateMembership(currentSession);
@@ -390,6 +397,10 @@ window.authManager = {
     isLoggedIn: () => isLoggedIn(),
     isReady: () => authReady,
     whenReady: () => authReadyPromise,
+    ensureReady: async () => {
+        if (!authReady) await authReadyPromise;
+        return currentSession;
+    },
     requireMember: (featureName) => {
         if (isLoggedIn()) return true;
         return notifyRequireLogin(featureName);

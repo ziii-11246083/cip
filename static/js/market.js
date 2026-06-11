@@ -485,7 +485,7 @@ async function loadMarketSfiPreview() {
   if (!tbody) return;
 
   try {
-    const res = await fetchWithTimeout(`/api/coingecko?${cacheBust()}`, 12000);
+    const res = await fetchWithTimeout(`/api/coingecko?${cacheBust()}`, 20000);
     if (!res.ok) throw new Error(await res.text());
     const payload = await res.json();
     marketSfiCache = Array.isArray(payload?.data) ? payload.data : [];

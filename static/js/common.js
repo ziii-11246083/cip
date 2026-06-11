@@ -1,6 +1,46 @@
 document.documentElement.classList.add("js-enabled");
 window.__COMMON_UI_ACTIVE__ = true;
 
+function restoreOriginalSiteIcon() {
+  const iconUrl = "/static/img/logo.jpg";
+  let icon = document.querySelector('link[rel="icon"]');
+  if (!icon) {
+    icon = document.createElement("link");
+    icon.rel = "icon";
+    document.head.appendChild(icon);
+  }
+  icon.type = "image/jpeg";
+  icon.href = iconUrl;
+}
+
+restoreOriginalSiteIcon();
+
+window.waitForSmartInvestAuth = async function waitForSmartInvestAuth(timeoutMs = 5000) {
+  if (window.authManager) {
+    await window.authManager.ensureReady?.();
+    return window.authManager;
+  }
+
+  await new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      window.clearInterval(poll);
+      resolve();
+    };
+    const timer = window.setTimeout(finish, timeoutMs);
+    const poll = window.setInterval(() => {
+      if (window.authManager) finish();
+    }, 50);
+    window.addEventListener("smartinvest:auth-ready", finish, { once: true });
+  });
+
+  await window.authManager?.ensureReady?.();
+  return window.authManager || null;
+};
+
 function markPageReady() {
   if (document.body) document.body.classList.add("page-ready");
 }
@@ -142,9 +182,9 @@ function initCommonUI() {
 
   document.querySelectorAll("[data-member-required]").forEach((link) => {
     link.addEventListener("click", async (event) => {
-      if (window.authManager?.whenReady && !window.authManager?.isReady?.()) {
+      if (!window.authManager || !window.authManager?.isReady?.()) {
         event.preventDefault();
-        await window.authManager.whenReady();
+        await window.waitForSmartInvestAuth();
         const loggedInAfterReady = Boolean(window.authManager?.isLoggedIn?.() || window.smartInvestMembership?.isMember);
         if (loggedInAfterReady) {
           window.location.href = link.href;

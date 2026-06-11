@@ -138,6 +138,7 @@
 
   async function selectConversation(conversationId) {
     if (!conversationId) return;
+    await window.waitForSmartInvestAuth?.();
     if (window.authManager && !window.authManager.isLoggedIn?.()) {
       window.authManager.requireMember?.("AI 投資教練");
       return;
@@ -278,6 +279,7 @@
   }
 
   async function sendMessage() {
+    await window.waitForSmartInvestAuth?.();
     if (window.authManager && !window.authManager.isLoggedIn?.()) {
       window.authManager.requireMember?.("AI 投資教練");
       return;

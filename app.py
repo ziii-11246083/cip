@@ -66,6 +66,8 @@ SIM_DATA_LOCK = Lock()
 class Config:
     CG_API_KEY: str = os.getenv("CG_API_KEY", "")
     CACHE_TTL: int = 300 
+    MARKET_COIN_LIMIT: int = int(os.getenv("MARKET_COIN_LIMIT", "24"))
+    SFI_COIN_LIMIT: int = int(os.getenv("SFI_COIN_LIMIT", "20"))
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "").strip().strip('"').strip("'")
     
     COIN_META = {
@@ -395,7 +397,7 @@ class DataManager:
     @staticmethod
     @ttl_cache(ttl_seconds=Config.CACHE_TTL)
     def get_all_tickers() -> List[Dict]:
-        tickers = DataManager._cg_get("/coins/markets", {"vs_currency": "usd", "order": "market_cap_desc", "per_page": 50, "page": 1, "sparkline": "true"})
+        tickers = DataManager._cg_get("/coins/markets", {"vs_currency": "usd", "order": "market_cap_desc", "per_page": Config.SFI_COIN_LIMIT, "page": 1, "sparkline": "true"})
         if not tickers: return []
         final_list = []
         if db:
@@ -417,6 +419,13 @@ class DataManager:
             for idx, t in enumerate(tickers):
                 final_list.append(DataManager._market_coin_to_entry(t, rank=idx + 1))
         return final_list
+
+    @staticmethod
+    @ttl_cache(ttl_seconds=Config.CACHE_TTL)
+    def get_market_tickers() -> List[Dict]:
+        tickers = DataManager._cg_get("/coins/markets", {"vs_currency": "usd", "order": "market_cap_desc", "per_page": Config.MARKET_COIN_LIMIT, "page": 1, "sparkline": "false"})
+        if not tickers: return []
+        return [DataManager._market_coin_to_entry(t, rank=idx + 1) for idx, t in enumerate(tickers)]
 
     @staticmethod
     def build_historical_df(crypto_list: List[Dict]) -> pd.DataFrame:
@@ -1222,7 +1231,7 @@ def live_data():
 @app.route('/api/market', methods=['GET'])
 @ttl_cache(ttl_seconds=Config.CACHE_TTL)
 def api_market():
-    crypto_list = DataManager.get_all_tickers()
+    crypto_list = DataManager.get_market_tickers()
     if not crypto_list:
         return jsonify({"timestamp": "", "data": []})
 
