@@ -1,0 +1,146 @@
+﻿<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <style>
+    html.js-enabled body{opacity:0;transition:opacity .5s ease;}
+    html.js-enabled body.page-ready{opacity:1;}
+  </style>
+  <script>document.documentElement.classList.add('js-enabled');</script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>會員中心 | Smart Invest Crypto</title>
+  <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo.jpg') }}">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/iansui@1.0/dist/iansui.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=member-overlay-20260604">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/member.css') }}?v=member-center-20260514">
+</head>
+<body>
+{% include "partials/header.html" %}
+
+<main>
+  <section class="member-page">
+    <div class="container wide-container">
+      <div class="member-hero-card" data-member-feature="會員中心">
+        <div>
+          <div class="eyebrow"><i class="fas fa-user-shield"></i> Member Center</div>
+          <h1>會員中心</h1>
+          <p>記錄資金投放、模擬下單與持倉，讓 AI Agent 可以用一句話幫你建立模擬交易。</p>
+        </div>
+        <div class="member-profile-mini">
+          <img src="{{ url_for('static', filename='images/agent-cat-happy.png') }}" alt="" onerror="this.style.display='none';">
+          <div>
+            <span>目前會員</span>
+            <strong id="memberEmail">尚未登入</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="member-lock-banner">
+        <strong><i class="fas fa-lock"></i> 登入後即可使用會員中心</strong>
+        <span>請使用測試會員或你的會員帳號登入，登入後會開啟資金與模擬交易紀錄。</span>
+        <button type="button" onclick="window.authManager?.openLogin?.()">登入會員</button>
+      </div>
+
+      <section class="member-kpi-grid" data-member-feature="會員資產紀錄">
+        <article class="member-kpi">
+          <span>累積投放資金</span>
+          <strong id="kpiCapital">TWD 0</strong>
+          <small id="kpiCapitalCount">0 筆資金紀錄</small>
+        </article>
+        <article class="member-kpi">
+          <span>模擬持倉市值</span>
+          <strong id="kpiHoldings">TWD 0</strong>
+          <small id="kpiHoldingCount">0 種資產</small>
+        </article>
+        <article class="member-kpi">
+          <span>模擬下單次數</span>
+          <strong id="kpiOrders">0</strong>
+          <small>AI Agent 與手動下單共用紀錄</small>
+        </article>
+      </section>
+
+      <div class="member-grid">
+        <section class="member-card" data-member-feature="資金投放紀錄">
+          <div class="member-card-head">
+            <div>
+              <h2>資金投放</h2>
+              <p>新增你打算投入模擬交易的資金來源與用途。</p>
+            </div>
+          </div>
+          <form class="member-form" id="capitalForm">
+            <label for="capitalAmount">金額（TWD）</label>
+            <input id="capitalAmount" type="number" min="1" step="1" placeholder="例如 10000">
+            <label for="capitalNote">備註</label>
+            <input id="capitalNote" placeholder="例如：本月定投資金">
+            <button type="submit"><i class="fas fa-plus"></i> 新增資金</button>
+          </form>
+          <div class="member-list" id="capitalList"></div>
+        </section>
+
+        <section class="member-card" data-member-feature="模擬下單">
+          <div class="member-card-head">
+            <div>
+              <h2>模擬下單</h2>
+              <p>這裡的紀錄會同步給 AI Agent 讀取與分析。</p>
+            </div>
+            <a href="/agent">去 AI Agent <i class="fas fa-arrow-right"></i></a>
+          </div>
+          <form class="member-form order-form" id="orderForm">
+            <label for="orderSide">方向</label>
+            <select id="orderSide">
+              <option value="buy">買入</option>
+              <option value="sell">賣出</option>
+            </select>
+            <label for="orderSymbol">幣種</label>
+            <select id="orderSymbol">
+              <option>BTC</option>
+              <option>ETH</option>
+              <option>SOL</option>
+              <option>XRP</option>
+              <option>BNB</option>
+              <option>DOGE</option>
+              <option>USDT</option>
+              <option>USDC</option>
+            </select>
+            <label for="orderAmount">金額（TWD）</label>
+            <input id="orderAmount" type="number" min="1" step="1" placeholder="例如 5000">
+            <button type="submit"><i class="fas fa-paper-plane"></i> 建立模擬單</button>
+          </form>
+          <div class="member-list" id="orderList"></div>
+        </section>
+      </div>
+
+      <section class="member-card holdings-card" data-member-feature="持倉紀錄">
+        <div class="member-card-head">
+          <div>
+            <h2>目前模擬持倉</h2>
+            <p>AI Agent 會根據這份持倉判斷是否過度集中。</p>
+          </div>
+          <button class="ghost-danger" id="clearMemberData" type="button"><i class="fas fa-trash"></i> 重置模擬帳戶</button>
+        </div>
+        <div class="holding-table" id="holdingTable"></div>
+      </section>
+    </div>
+  </section>
+</main>
+
+<div class="float-actions">
+  <a href="/" class="float-btn" title="回首頁"><i class="fas fa-house"></i></a>
+  <button class="float-btn" id="backToTopBtn" type="button" title="回到頂部"><i class="fas fa-arrow-up"></i></button>
+</div>
+
+{% include "partials/footer.html" %}
+
+<div class="toast" id="toast"><div class="t" id="toastT">提示</div><div class="m" id="toastM">--</div></div>
+<script>
+  window.__SUPABASE_CONFIG__ = {
+    url: '{{ supabase_url | default("https://dummy.supabase.co") }}',
+    anonKey: '{{ supabase_anon_key | default("dummy") }}'
+  };
+</script>
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=member-nav-lock-20260604"></script>
+<script src="{{ url_for('static', filename='js/common.js') }}?v=member-nav-lock-20260604"></script>
+<script src="{{ url_for('static', filename='js/member.js') }}?v=member-center-20260514"></script>
+</body>
+</html>

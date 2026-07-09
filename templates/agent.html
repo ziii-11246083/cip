@@ -1,0 +1,148 @@
+﻿<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <style>
+    html.js-enabled body{opacity:0;transition:opacity .5s ease;}
+    html.js-enabled body.page-ready{opacity:1;}
+  </style>
+  <script>document.documentElement.classList.add('js-enabled');</script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AI Agent | Smart Invest Crypto</title>
+  <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo.jpg') }}">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/iansui@1.0/dist/iansui.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=member-overlay-20260604">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/agent.css') }}?v=agent-member-20260514">
+</head>
+<body class="ai-coach-page">
+
+{% include "partials/header.html" %}
+
+<main class="coach-chat-page">
+  <div class="coach-chat-layout">
+    <aside class="coach-sidebar" aria-label="AI Agent 功能選單">
+      <a class="active" href="/agent"><i class="fas fa-comment-dots"></i><span>AI 對話</span></a>
+      <a href="/member"><i class="fas fa-user-shield"></i><span>會員中心</span></a>
+      <a href="/health"><i class="fas fa-chart-pie"></i><span>投資組合</span></a>
+      <a href="/market"><i class="fas fa-chart-line"></i><span>市場總覽</span></a>
+      <a href="/analysis/BTC"><i class="fas fa-code-branch"></i><span>價格追蹤</span></a>
+      <a href="/ai-coach"><i class="fas fa-book-open"></i><span>學習中心</span></a>
+      <a href="/register" class="side-settings"><i class="fas fa-gear"></i><span>設定</span></a>
+    </aside>
+
+    <section class="chat-panel" aria-label="AI 投資教練對話" data-member-feature="AI Agent 巡檢報告">
+      <div class="chat-panel-head">
+        <div class="coach-avatar coach-avatar-lg has-image is-idle" id="coachMainAvatar">
+          <img data-coach-avatar src="{{ url_for('static', filename='images/agent-cat-neutral.png') }}" alt="AI 投資教練" onerror="this.style.display='none';">
+        </div>
+        <div>
+          <div class="coach-title-row">
+            <h1>AI 投資教練</h1>
+            <span class="online-dot"></span>
+            <strong>線上</strong>
+          </div>
+          <p>先跟我打聲招呼，我會開始幫你整理資金、持倉與模擬下單。</p>
+        </div>
+        <div class="chat-head-lines" aria-hidden="true">
+          <span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+
+      <div class="agent-conversation-switcher">
+        <div class="agent-conversation-head">
+          <strong>對話紀錄</strong>
+          <button class="button primary agent-new-chat-btn" id="aiCoachNewChatBtn" type="button">
+            <i class="fas fa-plus"></i> New Chat
+          </button>
+        </div>
+        <div class="agent-conversation-list conversation-list" id="aiCoachConversationList"></div>
+      </div>
+
+      <div class="agent-session-hint" id="agentSessionHint">
+        <strong>聊天室待命中</strong>
+        <span>輸入「嗨」或點下方快捷指令後，AI 才會產生後續對話與分析卡片。</span>
+      </div>
+
+      <div class="chat-messages is-empty" id="coachChatMessages"></div>
+
+      <div class="coach-chip-row" aria-label="快捷指令">
+        <button type="button" data-coach-prompt="嗨，請開始今天的投資巡檢"><i class="fas fa-hand-sparkles"></i> 打招呼</button>
+        <button type="button" data-coach-prompt="幫我查看會員中心的資金與下單紀錄"><i class="fas fa-wallet"></i> 會員紀錄</button>
+        <button type="button" data-coach-prompt="幫我分析我的投資組合"><i class="fas fa-box-open"></i> 投資組合分析</button>
+        <button type="button" data-coach-prompt="用 5000 TWD 模擬買入 BTC"><i class="fas fa-paper-plane"></i> 一句話下單</button>
+      </div>
+
+      <form class="coach-input-bar" id="coachChatForm">
+        <button class="attach-btn" type="button" aria-label="附件"><i class="fas fa-paperclip"></i></button>
+        <textarea id="coachMessageInput" rows="1" placeholder="先打聲招呼，或輸入：用 5000 TWD 模擬買入 BTC"></textarea>
+        <button class="send-btn" type="submit" aria-label="送出"><i class="fas fa-paper-plane"></i></button>
+      </form>
+      <p class="coach-note">AI 內容僅供參考，投資有風險，請謹慎評估。模擬下單會同步到模擬交易帳戶。</p>
+    </section>
+
+    <aside class="portfolio-summary" aria-label="投資摘要" data-member-feature="個人化投資紀錄">
+      <article class="summary-card">
+        <div class="summary-card-head">
+          <h2>會員資產概覽</h2>
+          <i class="fas fa-eye"></i>
+        </div>
+        <span>模擬資金（TWD）</span>
+        <div class="summary-value" id="agentTotalCapital">0 <em id="agentCapitalChange">等待紀錄</em></div>
+        <div class="mini-line-chart" aria-hidden="true"><svg viewBox="0 0 260 74" role="img"><path d="M4 58 C24 54,28 45,45 50 S72 52,88 41 S115 28,132 35 S158 49,174 34 S198 24,213 30 S238 15,256 8" /></svg></div>
+      </article>
+
+      <article class="summary-card">
+        <div class="summary-card-head"><h2>模擬持倉配置</h2></div>
+        <div class="allocation-summary">
+          <div class="portfolio-donut" id="agentPortfolioDonut" aria-label="模擬持倉配置"></div>
+          <ul id="agentAllocationList">
+            <li><span style="--dot:#d8b596"></span>尚未下單 <b>0%</b></li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="summary-card">
+        <div class="summary-card-head">
+          <h2>最近模擬下單</h2>
+          <button class="period-select" type="button" onclick="location.href='/member'">會員中心 <i class="fas fa-arrow-right"></i></button>
+        </div>
+        <div class="agent-order-list" id="agentRecentOrders">
+          <div class="member-record-empty">尚未有模擬下單紀錄。</div>
+        </div>
+      </article>
+
+      <article class="summary-card patrol-card">
+        <div>
+          <h2>今日巡檢</h2>
+          <p><i class="fas fa-shield-halved"></i> 全部良好</p>
+          <span>資金、持倉與風險狀態會依會員紀錄更新。</span>
+        </div>
+        <div class="coach-avatar patrol-avatar has-image is-idle">
+          <img data-coach-avatar src="{{ url_for('static', filename='images/agent-cat-happy.png') }}" alt="" onerror="this.style.display='none';">
+        </div>
+      </article>
+    </aside>
+  </div>
+</main>
+
+<div class="float-actions">
+  <a href="/" class="float-btn" title="回首頁"><i class="fas fa-house"></i></a>
+  <button class="float-btn" id="backToTopBtn" type="button" title="回到頂部"><i class="fas fa-arrow-up"></i></button>
+</div>
+
+{% include "partials/footer.html" %}
+
+<div class="toast" id="toast"><div class="t" id="toastT">提示</div><div class="m" id="toastM">--</div></div>
+<script>
+  window.__SUPABASE_CONFIG__ = {
+    url: '{{ supabase_url | default("https://dummy.supabase.co") }}',
+    anonKey: '{{ supabase_anon_key | default("dummy") }}'
+  };
+</script>
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=member-nav-lock-20260604"></script>
+<script src="{{ url_for('static', filename='js/common.js') }}?v=member-nav-lock-20260604"></script>
+<script src="{{ url_for('static', filename='js/agent.js') }}?v=agent-member-20260514"></script>
+</body>
+</html>

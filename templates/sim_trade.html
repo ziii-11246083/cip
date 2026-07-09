@@ -1,0 +1,189 @@
+﻿<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <style>
+    html.js-enabled body{opacity:0;transition:opacity .5s ease;}
+    html.js-enabled body.page-ready{opacity:1;}
+  </style>
+  <script>document.documentElement.classList.add('js-enabled');</script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>模擬交易 | Smart Invest Crypto</title>
+  <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo.jpg') }}">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/iansui@1.0/dist/iansui.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=member-overlay-20260604">
+</head>
+<body>
+{% include "partials/header.html" %}
+
+<main>
+  <section class="hero sim-hero">
+    <div class="container hero-grid">
+      <div>
+        <div class="eyebrow"><i class="fas fa-chart-column"></i> Paper Trading</div>
+        <h1 class="hero-title">會員專屬模擬交易</h1>
+        <p class="hero-lead">使用虛擬資金練習買賣加密貨幣，觀察持倉、損益、配置比例與交易紀錄。</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container wide-container sim-shell">
+      <div class="member-gate" id="memberGate">
+        <h2>請先登入會員</h2>
+        <p>模擬交易會保存持倉與交易紀錄，因此需要會員帳號才能使用。</p>
+        <div class="member-actions">
+          <a class="button primary" href="/register">註冊 / 登入會員</a>
+          <a class="button" href="/market">查看市場總覽</a>
+        </div>
+        <div class="member-helper">登入後可使用 AI Agent 自動送單，也能手動建立買入與賣出紀錄。</div>
+      </div>
+
+      <div id="simApp" class="sim-app">
+        <section class="card sim-dashboard" data-member-feature="模擬交易帳戶總覽">
+          <h2 class="sim-title">帳戶總覽</h2>
+          <div class="sim-kpi-grid">
+            <div><span>總資產</span><strong id="kpiTotal">--</strong></div>
+            <div><span>現金</span><strong id="kpiCash">--</strong></div>
+            <div><span>未實現損益</span><strong id="kpiPnl">--</strong><small id="kpiPnlPct" class="sub">--</small></div>
+          </div>
+          <div class="chart-box"><canvas id="equityChart"></canvas></div>
+        </section>
+
+        <section class="card sim-scenario-card" data-member-feature="市場情境模擬">
+          <div class="sim-scenario-head">
+            <h2 class="sim-title">市場情境模擬</h2>
+            <span class="sim-scenario-badge" id="scenarioBadge">一般市場</span>
+          </div>
+          <p class="sim-scenario-desc">切換不同市場情境，觀察參數變化對模擬交易的潛在影響（本功能為情境展示，不影響實際下單價格）。</p>
+          <div class="sim-scenario-selector">
+            <button class="scenario-btn active" data-scenario="normal" type="button">
+              <i class="fas fa-balance-scale"></i>
+              <strong>一般市場</strong>
+              <small>實際即時價格</small>
+            </button>
+            <button class="scenario-btn" data-scenario="bull" type="button">
+              <i class="fas fa-chart-line"></i>
+              <strong>牛市</strong>
+              <small>價格 ×1.3 · 波動 ×0.8</small>
+            </button>
+            <button class="scenario-btn" data-scenario="bear" type="button">
+              <i class="fas fa-arrow-trend-down"></i>
+              <strong>熊市</strong>
+              <small>價格 ×0.7 · 波動 ×1.5</small>
+            </button>
+            <button class="scenario-btn" data-scenario="black_swan" type="button">
+              <i class="fas fa-bolt"></i>
+              <strong>黑天鵝</strong>
+              <small>價格 ×0.4 · 波動 ×3.0</small>
+            </button>
+          </div>
+          <div class="sim-scenario-info" id="scenarioInfo">
+            <div><span>價格乘數</span><strong id="scPriceMult">1.0x</strong></div>
+            <div><span>波動乘數</span><strong id="scVolMult">1.0x</strong></div>
+            <div><span>建議動作</span><strong id="scAdvice">正常操作</strong></div>
+          </div>
+        </section>
+
+        <section class="card order-panel" data-member-feature="建立模擬訂單">
+          <div class="order-workspace">
+            <div class="order-form-area">
+              <h2 class="sim-title">建立模擬訂單</h2>
+              <div class="order-grid">
+                <div>
+                  <label for="orderSymbol">幣種</label>
+                  <select id="orderSymbol"></select>
+                </div>
+                <div>
+                  <label for="orderSide">方向</label>
+                  <select id="orderSide">
+                    <option value="buy">買入 BUY</option>
+                    <option value="sell">賣出 SELL</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="orderQty">數量 quantity</label>
+                  <input id="orderQty" type="number" step="0.00000001" min="0" placeholder="例如 0.01">
+                </div>
+                <div>
+                  <label for="orderAmt">金額 amount_usd</label>
+                  <input id="orderAmt" type="number" step="0.01" min="0" placeholder="例如 200">
+                </div>
+              </div>
+              <div class="order-actions">
+                <button class="btn-main" id="btnPlaceOrder">送出模擬單</button>
+                <button class="btn-ghost" id="btnReload">重新整理</button>
+                <button class="btn-danger" id="btnReset">重置帳戶</button>
+              </div>
+              <div class="status" id="orderStatus">尚未下單</div>
+            </div>
+
+            <aside class="coin-market-panel">
+              <h2 class="sim-title">幣種漲跌</h2>
+              <div class="coin-market-head">
+                <span id="quoteSymbol">--</span>
+                <small id="quoteName">選擇幣種後顯示行情</small>
+              </div>
+              <div class="coin-market-grid">
+                <div><span>目前市價</span><strong id="quotePrice">--</strong></div>
+                <div><span>24h 漲跌</span><strong id="quoteChange">--</strong></div>
+                <div><span>總市值</span><strong id="quoteMarketCap">--</strong></div>
+                <div><span>買 1 顆</span><strong id="quoteOne">--</strong></div>
+                <div><span>買 0.1 顆</span><strong id="quotePointOne">--</strong></div>
+              </div>
+              <div class="coin-order-estimate">
+                <span>本次試算</span>
+                <strong id="quoteEstimate">請輸入數量或金額</strong>
+              </div>
+              <div class="coin-order-advice" id="quoteAdvice">等待幣種資料。</div>
+            </aside>
+          </div>
+        </section>
+
+        <section class="card positions-panel" data-member-feature="持倉配置">
+          <h2 class="sim-title">持倉配置</h2>
+          <div class="chart-box small"><canvas id="allocChart"></canvas></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>幣種</th><th>數量</th><th>均價</th><th>現價</th><th>市值</th><th>未實現損益</th></tr></thead>
+              <tbody id="positionsBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card trades-panel" data-member-feature="交易紀錄">
+          <h2 class="sim-title">交易紀錄</h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>時間</th><th>方向</th><th>幣種</th><th>價格</th><th>數量</th><th>金額</th></tr></thead>
+              <tbody id="tradesBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="float-actions">
+  <a href="/" class="float-btn" title="回首頁"><i class="fas fa-house"></i></a>
+  <button class="float-btn" id="backToTopBtn" type="button" title="回到頂部"><i class="fas fa-arrow-up"></i></button>
+</div>
+
+{% include "partials/footer.html" %}
+
+<div class="toast" id="toast"><div class="t" id="toastT">提示</div><div class="m" id="toastM">--</div></div>
+<script>
+  window.__SUPABASE_CONFIG__ = {
+    url: '{{ supabase_url | default("https://dummy.supabase.co") }}',
+    anonKey: '{{ supabase_anon_key | default("dummy") }}'
+  };
+</script>
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=member-nav-lock-20260604"></script>
+<script src="{{ url_for('static', filename='js/common.js') }}?v=member-nav-lock-20260604"></script>
+<script src="{{ url_for('static', filename='js/sim_trade.js') }}?v=sim-split-20260604"></script>
+</body>
+</html>
