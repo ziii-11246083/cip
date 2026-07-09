@@ -1,0 +1,106 @@
+<header class="site-header">
+  <div class="header-inner">
+    <a href="/" class="brand">
+      <div class="brand-mark">
+        <img src="{{ url_for('static', filename='img/logo.jpg') }}" alt="Smart Invest Logo" onerror="this.style.display='none'; this.parentElement.textContent='SI';">
+      </div>
+      <div class="brand-text">
+        <strong>Smart Invest</strong>
+        <span>加密投資風險與市場分析</span>
+      </div>
+    </a>
+
+    <div class="header-right">
+      <nav class="nav header-nav" aria-label="主要導覽">
+        <div class="nav-group primary-links">
+          <a href="/">首頁</a>
+          <a href="/market">市場</a>
+          <a href="/podcast">Podcast</a>
+          <a href="/scam-detect">防詐</a>
+        </div>
+
+        <details class="nav-more">
+          <summary>更多工具 <i class="fas fa-chevron-down"></i></summary>
+          <div class="nav-more-menu">
+            <a href="/social-sentiment"><i class="fas fa-satellite-dish"></i> 社群分析</a>
+            <a href="/narrative-radar"><i class="fas fa-brain"></i> 敘事雷達</a>
+            <a href="/analysis/BTC"><i class="fas fa-microscope"></i> BTC 分析</a>
+          </div>
+        </details>
+
+        <span class="nav-divider"></span>
+
+        <div class="nav-group member-links">
+          <a href="/health" class="member-nav" data-member-required="健康度檢查"><i class="fas fa-lock"></i> 健康度</a>
+          <a href="/ai-coach" class="member-nav" data-member-required="AI 投資教練"><i class="fas fa-lock"></i> AI 教練</a>
+          <a class="member-nav" href="/sim-trade" data-member-required="模擬交易"><i class="fas fa-lock"></i> 模擬</a>
+          <a class="member-nav" href="/member" data-member-required="會員中心"><i class="fas fa-lock"></i> 會員</a>
+        </div>
+      </nav>
+
+      <div class="auth-area">
+        <button class="auth-btn" id="loginToggle" type="button">
+          <i class="fas fa-user"></i> 登入
+        </button>
+
+        <button class="guest-btn" type="button" onclick="if(window.authManager) window.authManager.continueAsGuest()">訪客使用</button>
+
+        <div class="account-popup" id="accountPopup">
+          <button class="popup-close" id="popupClose" type="button" aria-label="關閉登入視窗">×</button>
+
+          <div class="login-head">
+            <div class="login-head-icon"><i class="fas fa-lock"></i></div>
+            <div>
+              <h3>會員登入</h3>
+              <p>登入後可使用健康度、AI 教練、模擬交易與會員中心。</p>
+            </div>
+          </div>
+
+          <div class="login-form">
+            <label for="emailInput">Email</label>
+            <input type="text" id="emailInput" placeholder="請輸入 Email">
+
+            <label for="passwordInput">密碼</label>
+            <input type="password" id="passwordInput" placeholder="請輸入密碼">
+
+            <button class="login-submit" type="button" onclick="if(window.authManager) window.authManager.loginWithEmail(document.getElementById('emailInput').value, document.getElementById('passwordInput').value)">登入會員</button>
+
+            <div class="member-helper">測試帳號：test@smartinvest.local / Test123456</div>
+
+            <div class="or-line">
+              <span></span>
+              <p>或使用 Google</p>
+              <span></span>
+            </div>
+
+            <button class="google-login" type="button" onclick="if(window.authManager) window.authManager.loginWithGoogle()">
+              <span class="google-mark">G</span> 使用 Google 登入
+            </button>
+
+            <button class="forgot-btn" type="button" id="forgotPasswordBtn">忘記密碼</button>
+
+            <div class="register-hint">
+              還沒有帳號？ <a href="/register">建立會員</a>
+            </div>
+          </div>
+        </div>
+
+        <details class="user-menu" id="user-section">
+          <summary class="user-avatar-toggle" aria-label="開啟會員選單">
+            <span class="user-avatar"><i class="fas fa-user"></i></span>
+          </summary>
+          <div class="user-menu-panel">
+            <div class="user-menu-profile">
+              <span class="user-avatar large"><i class="fas fa-user"></i></span>
+              <div>
+                <strong id="user-name">會員</strong>
+                <span id="user-email"></span>
+              </div>
+            </div>
+            <button class="user-menu-logout" type="button" onclick="if(window.authManager) window.authManager.logoutUser()">登出</button>
+          </div>
+        </details>
+      </div>
+    </div>
+  </div>
+</header>
