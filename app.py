@@ -46,11 +46,14 @@ from dotenv import load_dotenv
 # ── RAG / AI Services ──────────────────────────────────────
 try:
     from services.rag_service import get_rag
+    from services.rag_metrics_service import get_metrics as _get_rag_metrics
     _rag = get_rag()
     _rag_available = _rag.kb_loaded
+    _rag_metrics = _get_rag_metrics()
 except Exception as _rag_exc:
     _rag = None
     _rag_available = False
+    _rag_metrics = None
 
 # 載入環境變數
 load_dotenv()
@@ -78,6 +81,20 @@ class Config:
     MARKET_COIN_LIMIT: int = int(os.getenv("MARKET_COIN_LIMIT", "24"))
     SFI_COIN_LIMIT: int = int(os.getenv("SFI_COIN_LIMIT", "20"))
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "").strip().strip('"').strip("'")
+
+    # ── RAG Configuration ──
+    RAG_ENABLE_EMBEDDINGS: bool = os.getenv("RAG_ENABLE_EMBEDDINGS", "1") == "1"
+    RAG_ENABLE_VECTOR_STORE: bool = os.getenv("RAG_ENABLE_VECTOR_STORE", "1") == "1"
+    RAG_ENABLE_QUERY_REWRITE: bool = os.getenv("RAG_ENABLE_QUERY_REWRITE", "1") == "1"
+    RAG_ENABLE_RERANK: bool = os.getenv("RAG_ENABLE_RERANK", "1") == "1"
+    RAG_ROUTING_MODE: str = os.getenv("RAG_ROUTING_MODE", "auto")  # auto|fast|deep
+    RAG_TOP_K_SPARSE: int = int(os.getenv("RAG_TOP_K_SPARSE", "10"))
+    RAG_TOP_K_DENSE: int = int(os.getenv("RAG_TOP_K_DENSE", "10"))
+    RAG_TOP_K_FINAL: int = int(os.getenv("RAG_TOP_K_FINAL", "5"))
+    RAG_REWRITE_SIM_THRESHOLD: float = float(os.getenv("RAG_REWRITE_SIM_THRESHOLD", "0.6"))
+    RAG_VECTOR_DB_PATH: str = os.getenv("RAG_VECTOR_DB_PATH", str(DATA_DIR / "vector_store"))
+    RAG_EMBEDDING_MODEL: str = os.getenv("RAG_EMBEDDING_MODEL", "text-embedding-3-small")
+    RAG_DEBUG_LOGGING: bool = os.getenv("RAG_DEBUG_LOGGING", "0") == "1"
     
     COIN_META = {
         'BTC': {'cn_name': '比特幣'}, 'ETH': {'cn_name': '以太幣'}, 'BNB': {'cn_name': '幣安幣'},
@@ -2463,6 +2480,112 @@ def api_portfolio_analyze_alias():
         ],
         "allocation": allocation,
     })
+
+# ═══════════════════════════════════════════════════════════════
+# RAG Management Endpoints (Phase 2A)
+# ═══════════════════════════════════════════════════════════════
+
+@app.route("/api/rag/rebuild-index", methods=["POST"])
+def api_rag_rebuild_index():
+    """Rebuild the full RAG index (chunks → embeddings → vector store + BM25)."""
+    try:
+        from services.retrieval_service import get_retrieval
+        ret = get_retrieval()
+        count = ret.rebuild_index()
+        return jsonify({
+            "success": True,
+            "indexed_chunks": count,
+            "message": f"Index rebuilt: {count} chunks indexed",
+        })
+    except Exception as exc:
+        logger.exception("RAG index rebuild failed")
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@app.route("/api/rag/stats", methods=["GET"])
+def api_rag_stats():
+    """Get RAG pipeline statistics and health."""
+    stats: Dict[str, Any] = {
+        "kb_loaded": _rag_available,
+        "components": {},
+    }
+
+    try:
+        from services.embedding_service import get_embedding_service
+        stats["components"]["embeddings"] = get_embedding_service().available
+    except Exception:
+        stats["components"]["embeddings"] = False
+
+    try:
+        from services.vector_store_service import get_vector_store
+        stats["components"]["vector_store"] = get_vector_store().available
+    except Exception:
+        stats["components"]["vector_store"] = False
+
+    try:
+        from services.bm25_service import get_bm25
+        bm25 = get_bm25()
+        stats["components"]["bm25"] = bm25.available
+        stats["bm25_corpus_size"] = bm25.corpus_size
+    except Exception:
+        stats["components"]["bm25"] = False
+
+    try:
+        from services.reranker_service import get_reranker
+        stats["components"]["reranker"] = get_reranker().available
+    except Exception:
+        stats["components"]["reranker"] = False
+
+    if _rag_metrics and _rag_metrics.enabled:
+        stats["metrics"] = _rag_metrics.get_stats()
+    else:
+        stats["metrics"] = {"note": "RAG debug logging disabled (set RAG_DEBUG_LOGGING=1)"}
+
+    stats["config"] = {
+        "embeddings_enabled": Config.RAG_ENABLE_EMBEDDINGS,
+        "vector_store_enabled": Config.RAG_ENABLE_VECTOR_STORE,
+        "query_rewrite_enabled": Config.RAG_ENABLE_QUERY_REWRITE,
+        "rerank_enabled": Config.RAG_ENABLE_RERANK,
+        "routing_mode": Config.RAG_ROUTING_MODE,
+        "embedding_model": Config.RAG_EMBEDDING_MODEL,
+    }
+
+    return jsonify(stats)
+
+
+@app.route("/api/rag/eval", methods=["POST"])
+def api_rag_eval():
+    """Run a quick evaluation smoke test on sample queries."""
+    data = request.get_json(silent=True) or {}
+    queries = data.get("queries", [
+        "比特幣適合長期持有嗎",
+        "如何判斷一個項目是不是詐騙",
+        "什麼是DCA策略",
+        "我的配置太集中了怎麼辦",
+        "什麼是健康的投資組合配置",
+    ])
+    endpoint = data.get("endpoint", "chat")
+
+    results = []
+    try:
+        if _rag and _rag_available:
+            for q in queries:
+                pipe = _rag._retrieve_for_endpoint(q, endpoint=endpoint, max_results=3)
+                results.append({
+                    "query": q,
+                    "result_count": len(pipe["results"]),
+                    "route": pipe["route_decision"].route if pipe["route_decision"] else "unknown",
+                    "method": pipe["meta"].get("method", ""),
+                    "top_snippets": [
+                        {"topic": r.topic, "source": r.source, "score": r.score, "snippet": r.snippet[:150]}
+                        for r in pipe["results"][:3]
+                    ],
+                })
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+    return jsonify({"success": True, "eval_results": results})
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False)

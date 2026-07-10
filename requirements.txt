@@ -21,3 +21,7 @@ pydub
 websockets>=15,<16
 markdown
 weasyprint
+# ── RAG Phase 2A: Hybrid Retrieval ──
+chromadb>=0.4.0,<0.6.0
+rank-bm25>=0.2.0
+jieba>=0.42.0
