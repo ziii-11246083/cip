@@ -128,6 +128,38 @@ class KnowledgeBase:
     def list_sections(self) -> List[str]:
         return sorted(self._sections.keys())
 
+    def get_all_for_indexing(self) -> Dict[str, Any]:
+        """
+        Return all knowledge data for index rebuild.
+        Returns {md_sections: {name: text}, json_data: {name: data}}.
+        """
+        return {
+            "md_sections": dict(self._sections),
+            "json_data": dict(self._json_data),
+        }
+
+    def get_section_metadata(self, name: str) -> Dict[str, Any]:
+        """Return metadata for a section (for chunking pipeline)."""
+        text = self._sections.get(name, "")
+        return {
+            "doc_id": name,
+            "source": f"data/knowledge/{name}.md",
+            "topic": _topic_from_name(name),
+            "content": text,
+            "doc_type": "markdown",
+        }
+
+    def get_json_metadata(self, name: str) -> Dict[str, Any]:
+        """Return metadata for a JSON knowledge file."""
+        data = self._json_data.get(name, {})
+        return {
+            "doc_id": name,
+            "source": f"data/knowledge/{name}.json",
+            "topic": _topic_from_name(name),
+            "content": data,
+            "doc_type": "json",
+        }
+
     # ── coin-specific helpers ───────────────────────────────────
 
     def coin_profile(self, symbol: str) -> Optional[Dict[str, Any]]:

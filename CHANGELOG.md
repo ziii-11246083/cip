@@ -1,5 +1,58 @@
 # CHANGELOG — Smart Invest Crypto
 
+## 2026-07-09: RAG 精準化升級 Phase 2A — Hybrid Retrieval Pipeline
+
+### 從 keyword MVP → hybrid RAG
+將原本的「關鍵字匹配 RAG MVP」升級為完整的 hybrid retrieval pipeline，具備 semantic chunking、BM25 + dense dual retrieval、RRF fusion、query rewrite/expansion、strategy routing、lightweight reranker、observability 與 evaluation harness。
+
+### 新增服務（8 個檔案）
+- `services/chunking_service.py` — 語意分割服務（markdown 依 H1/H2/H3 + 段落 + 列表 + 表格 + code fence；JSON 每筆 record 一 chunk）
+- `services/embedding_service.py` — Embedding 抽象層（text-embedding-3-small，含 hash cache，無 API key 自動 fallback）
+- `services/vector_store_service.py` — ChromaDB persistent vector store（含 rebuild index / query / 自動 fallback）
+- `services/bm25_service.py` — BM25 稀疏檢索（rank-bm25 優先，fallback 內部 TF-IDF，jieba 中文分詞）
+- `services/query_rewrite_service.py` — Query expansion（alias + topic synonym + domain lexicon + embedding similarity guard）
+- `services/query_router_service.py` — 策略路由（fast path 簡單查詢 / deep path 複雜查詢含 rewrite+rerank）
+- `services/reranker_service.py` — 輕量 reranker（score fusion + metadata boost + lexical overlap，可選 cross-encoder）
+- `services/rag_metrics_service.py` — RAG observability（每筆 call 記錄 endpoint/route/latency/hits/fallback）
+
+### 重構服務（4 個檔案）
+- `services/retrieval_service.py` — 從 keyword-only 升級為 hybrid（BM25 + dense + RRF fusion + rerank + keyword fallback）
+- `services/rag_service.py` — 全面重寫：Router → Rewrite → Hybrid Retrieval → Metrics，五個 endpoint 一致化
+- `services/prompt_builder.py` — 新增 confidence notes、fallback wording、retrieval metadata、統一的 citation 處理
+- `services/knowledge_base.py` — 新增 `get_all_for_indexing()` / `get_section_metadata()` / `get_json_metadata()` 供 index rebuild 用
+
+### 新增 endpoint
+- `POST /api/rag/rebuild-index` — 重建完整 RAG index
+- `GET /api/rag/stats` — RAG pipeline 健康狀態與 metrics
+- `POST /api/rag/eval` — 快速 retrieval smoke test
+
+### 新增評估工具
+- `eval/rag_eval_cases.jsonl` — 15 題標準 eval cases（含 expected_topics / expected_sources / expected_keywords / gold_answer）
+- `scripts/eval_rag.py` — 離線評估 script（支援 P@K / Recall@K / MRR / NDCG@K / keyword overlap / latency + optional LLM faithfulness judge）
+
+### 新增文件
+- `docs/17-RAG精準化升級與評估.md` — 完整技術文件
+
+### Config 新增
+- `RAG_ENABLE_EMBEDDINGS` / `RAG_ENABLE_VECTOR_STORE` / `RAG_ENABLE_QUERY_REWRITE` / `RAG_ENABLE_RERANK`
+- `RAG_ROUTING_MODE` / `RAG_TOP_K_SPARSE` / `RAG_TOP_K_DENSE` / `RAG_TOP_K_FINAL`
+- `RAG_REWRITE_SIM_THRESHOLD` / `RAG_VECTOR_DB_PATH` / `RAG_EMBEDDING_MODEL` / `RAG_DEBUG_LOGGING`
+
+### Graceful Degradation
+所有新組件皆設計為 fallback-safe：
+- 無 OPENAI_API_KEY → embeddings/service unavailable → fallback to BM25-only or keyword
+- ChromaDB 未安裝 → dense retrieval unavailable → fallback to sparse
+- rank-bm25 未安裝 → internal TF-IDF
+- jieba 未安裝 → regex-based tokenization
+- Reranker 不可用 → 直接使用 fusion 結果
+
+### 依賴新增
+- `chromadb>=0.4.0,<0.6.0` — 本地 vector store
+- `rank-bm25>=0.2.0` — BM25 檢索
+- `jieba>=0.42.0` — 中文分詞
+
+---
+
 ## 2026-07-09: Hybrid AI Architecture & RAG MVP
 
 ### AI 架構整理
