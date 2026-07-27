@@ -5,9 +5,13 @@ const supabaseUrl = supabaseConfig.url || "";
 const supabaseAnonKey = supabaseConfig.anonKey || "";
 const GUEST_MODE_KEY = "si_guest_mode";
 const DEMO_MEMBER_KEY = "si_demo_member";
+const ADMIN_DEMO_KEY = "si_demo_admin";
 const DEMO_MEMBER_TOKEN = "smartinvest-demo-member-token";
+const ADMIN_DEMO_TOKEN = "smartinvest-demo-admin-token";
 const DEMO_MEMBER_EMAIL = "test@smartinvest.local";
 const DEMO_MEMBER_PASSWORD = "Test123456";
+const ADMIN_DEMO_EMAIL = "admin@smartinvest.local";
+const ADMIN_DEMO_PASSWORD = "Admin123456";
 const AI_COACH_CONVERSATION_KEY = "smartinvest_ai_coach_conversation_id";
 const SUPABASE_STORAGE_KEY = "smartinvest_supabase_auth";
 
@@ -66,15 +70,46 @@ function buildDemoSession() {
     };
 }
 
+function buildAdminDemoSession() {
+    return {
+        access_token: ADMIN_DEMO_TOKEN,
+        user: {
+            id: "demo-admin",
+            email: ADMIN_DEMO_EMAIL,
+            is_demo: true,
+            is_admin: true,
+            app_metadata: { role: "admin" }
+        }
+    };
+}
+
 function isDemoMemberActive() {
     return localStorage.getItem(DEMO_MEMBER_KEY) === "1" || sessionStorage.getItem(DEMO_MEMBER_KEY) === "1";
 }
 
+function isAdminDemoActive() {
+    return localStorage.getItem(ADMIN_DEMO_KEY) === "1" || sessionStorage.getItem(ADMIN_DEMO_KEY) === "1";
+}
+
 function activateDemoMember() {
     localStorage.setItem(DEMO_MEMBER_KEY, "1");
+    localStorage.removeItem(ADMIN_DEMO_KEY);
+    sessionStorage.removeItem(ADMIN_DEMO_KEY);
     sessionStorage.removeItem(DEMO_MEMBER_KEY);
     localStorage.removeItem(GUEST_MODE_KEY);
     currentSession = buildDemoSession();
+    updateMembership(currentSession);
+    setAuthUiBySession(currentSession);
+    markAuthReady();
+}
+
+function activateAdminDemo() {
+    localStorage.setItem(ADMIN_DEMO_KEY, "1");
+    localStorage.removeItem(DEMO_MEMBER_KEY);
+    sessionStorage.removeItem(DEMO_MEMBER_KEY);
+    sessionStorage.removeItem(ADMIN_DEMO_KEY);
+    localStorage.removeItem(GUEST_MODE_KEY);
+    currentSession = buildAdminDemoSession();
     updateMembership(currentSession);
     setAuthUiBySession(currentSession);
     markAuthReady();
@@ -196,14 +231,19 @@ async function applyAuthFromUrl() {
 
 function updateMembership(session) {
     const user = session?.user || null;
+    const isAdmin = Boolean(user?.is_admin || user?.app_metadata?.role === "admin" || String(user?.email || "").toLowerCase() === ADMIN_DEMO_EMAIL);
     if (user) {
         window.smartInvestMembership = {
             isMember: true,
+            isAdmin,
+            planCode: isAdmin ? "premium" : "member",
             email: user.email || "已登入"
         };
     } else {
         window.smartInvestMembership = {
             isMember: false,
+            isAdmin: false,
+            planCode: "free",
             email: ""
         };
     }
@@ -220,6 +260,7 @@ function updateMembership(session) {
     window.dispatchEvent(new CustomEvent("smartinvest:auth-state", {
         detail: {
             isMember: Boolean(user),
+            isAdmin,
             isGuest,
             email: user?.email || "",
             userId: user?.id || ""
@@ -275,6 +316,12 @@ function notifyRequireLogin(featureName) {
 }
 
 async function refreshSession() {
+    if (isAdminDemoActive()) {
+        currentSession = buildAdminDemoSession();
+        updateMembership(currentSession);
+        setAuthUiBySession(currentSession);
+        return currentSession;
+    }
     if (isDemoMemberActive()) {
         currentSession = buildDemoSession();
         updateMembership(currentSession);
@@ -313,6 +360,12 @@ window.authManager = {
         }
     },
     loginWithEmail: async (email, password) => {
+        const normalizedEmail = String(email || "").trim().toLowerCase();
+        if (normalizedEmail === ADMIN_DEMO_EMAIL && password === ADMIN_DEMO_PASSWORD) {
+            activateAdminDemo();
+            alert("已使用管理員 Demo 帳號登入");
+            return;
+        }
         if (!email || !password) return alert("請輸入信箱與密碼");
         if (email.trim().toLowerCase() === DEMO_MEMBER_EMAIL && password === DEMO_MEMBER_PASSWORD) {
             activateDemoMember();
@@ -323,6 +376,8 @@ window.authManager = {
         try {
             localStorage.removeItem(DEMO_MEMBER_KEY);
             sessionStorage.removeItem(DEMO_MEMBER_KEY);
+            localStorage.removeItem(ADMIN_DEMO_KEY);
+            sessionStorage.removeItem(ADMIN_DEMO_KEY);
             localStorage.removeItem(GUEST_MODE_KEY);
             const { error } = await supabase.auth.signInWithPassword({ email, password });
             if (error) throw error;
@@ -338,6 +393,8 @@ window.authManager = {
         try {
             localStorage.removeItem(DEMO_MEMBER_KEY);
             sessionStorage.removeItem(DEMO_MEMBER_KEY);
+            localStorage.removeItem(ADMIN_DEMO_KEY);
+            sessionStorage.removeItem(ADMIN_DEMO_KEY);
             localStorage.removeItem(GUEST_MODE_KEY);
             const safeMeta = metadata && typeof metadata === "object" ? metadata : {};
             const payload = { email, password };
@@ -356,6 +413,8 @@ window.authManager = {
         try {
             localStorage.removeItem(DEMO_MEMBER_KEY);
             sessionStorage.removeItem(DEMO_MEMBER_KEY);
+            localStorage.removeItem(ADMIN_DEMO_KEY);
+            sessionStorage.removeItem(ADMIN_DEMO_KEY);
             localStorage.removeItem(GUEST_MODE_KEY);
             localStorage.removeItem(AI_COACH_CONVERSATION_KEY);
             localStorage.removeItem("conversation_id");
@@ -385,6 +444,8 @@ window.authManager = {
     continueAsGuest: () => {
             localStorage.removeItem(DEMO_MEMBER_KEY);
             sessionStorage.removeItem(DEMO_MEMBER_KEY);
+            localStorage.removeItem(ADMIN_DEMO_KEY);
+            sessionStorage.removeItem(ADMIN_DEMO_KEY);
         localStorage.removeItem(AI_COACH_CONVERSATION_KEY);
         localStorage.removeItem("conversation_id");
         localStorage.setItem(GUEST_MODE_KEY, "1");
@@ -395,6 +456,7 @@ window.authManager = {
     },
     isGuestMode: () => localStorage.getItem(GUEST_MODE_KEY) === "1",
     isDemoMember: () => isDemoMemberActive(),
+    isAdmin: () => isAdminDemoActive() || Boolean(currentSession?.user?.is_admin || currentSession?.user?.app_metadata?.role === "admin"),
     isLoggedIn: () => isLoggedIn(),
     isReady: () => authReady,
     whenReady: () => authReadyPromise,
@@ -410,6 +472,11 @@ window.authManager = {
     getUserId: () => currentSession?.user?.id || null,
     getToken: async () => {
         if (localStorage.getItem(GUEST_MODE_KEY) === "1") return null;
+        if (isAdminDemoActive()) {
+            currentSession = buildAdminDemoSession();
+            updateMembership(currentSession);
+            return ADMIN_DEMO_TOKEN;
+        }
         if (isDemoMemberActive()) {
             currentSession = buildDemoSession();
             updateMembership(currentSession);

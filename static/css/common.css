@@ -725,14 +725,6 @@ label{
   margin:18px 0;
 }
 
-.sim-hero{
-  padding:56px 0 32px;
-}
-
-.sim-hero .hero-grid{
-  min-height:220px;
-}
-
 .sim-app{
   display:grid;
   grid-template-columns:minmax(0,1fr) minmax(360px,.8fr);
@@ -829,9 +821,16 @@ label{
   line-height:1.6;
 }
 
+.sim-scenario-body{
+  display:grid;
+  grid-template-columns:minmax(0,1.45fr) minmax(320px,.75fr);
+  gap:22px;
+  align-items:stretch;
+}
+
 .sim-scenario-selector{
   display:grid;
-  grid-template-columns:repeat(4,minmax(0,1fr));
+  grid-template-columns:repeat(3,minmax(0,1fr));
   gap:12px;
 }
 
@@ -904,38 +903,67 @@ label{
   font-weight:950;
 }
 
-.scenario-strategy-grid{
-  display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
+.scenario-impact-panel{
+  display:flex;
+  flex-direction:column;
   gap:14px;
-  margin:16px 0;
-}
-
-.scenario-strategy-card{
-  padding:16px;
-  border:1px solid var(--line);
-  border-radius:18px;
+  padding:18px;
+  border:1px solid rgba(251,106,16,.16);
+  border-radius:20px;
   background:linear-gradient(180deg,#fff,#FFF8EF);
 }
 
-.scenario-strategy-card span,
-.scenario-strategy-card small{
-  display:block;
+.scenario-impact-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+
+.scenario-impact-head span,
+.scenario-impact-grid span{
   color:var(--muted);
   font-size:12px;
   font-weight:900;
 }
 
-.scenario-strategy-card strong{
-  display:block;
-  margin:6px 0 2px;
-  color:var(--dark);
-  font-size:26px;
+.scenario-impact-head strong{
+  color:var(--brand);
+  font-size:20px;
+  font-weight:950;
+  text-align:right;
 }
 
-.scenario-strategy-table td:last-child{
-  white-space:normal;
-  min-width:220px;
+.scenario-impact-grid{
+  display:grid;
+  gap:10px;
+}
+
+.scenario-impact-grid div{
+  padding:14px;
+  border-radius:16px;
+  border:1px solid rgba(251,106,16,.14);
+  background:#fff;
+}
+
+.scenario-impact-grid strong{
+  display:block;
+  margin-top:5px;
+  color:var(--dark);
+  font-size:18px;
+  font-weight:950;
+  line-height:1.35;
+}
+
+.scenario-risk-note{
+  margin-top:auto;
+  padding:13px 14px;
+  border-radius:16px;
+  background:#FFF3E5;
+  color:#7C3D12;
+  font-size:13px;
+  font-weight:850;
+  line-height:1.6;
 }
 
 @media(max-width:760px){
@@ -943,9 +971,6 @@ label{
     grid-template-columns:repeat(2,minmax(0,1fr));
   }
   .sim-scenario-info{
-    grid-template-columns:1fr;
-  }
-  .scenario-strategy-grid{
     grid-template-columns:1fr;
   }
 }
@@ -1141,6 +1166,7 @@ label{
   }
 
   .sim-app,
+  .sim-scenario-body,
   .order-workspace{
     grid-template-columns:1fr;
   }

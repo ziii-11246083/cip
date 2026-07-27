@@ -540,6 +540,223 @@ class SupabaseDB:
             logger.exception("get_conversation_history_authed failed: %s", exc)
             return []
 
+    def list_membership_plans(self) -> List[Dict[str, Any]]:
+        try:
+            response = self._table("membership_plans")\
+                .select("*")\
+                .eq("is_active", True)\
+                .order("monthly_price_usd", desc=False)\
+                .execute()
+            return response.data or []
+        except Exception as exc:
+            logger.exception("list_membership_plans failed: %s", exc)
+            return []
+
+    def get_user_subscription(self, access_token: str, user_id: str) -> Dict[str, Any]:
+        try:
+            response = self._authed_table(access_token, "subscriptions")\
+                .select("*, membership_plans(*)")\
+                .eq("user_id", user_id)\
+                .in_("status", ["active", "trialing"])\
+                .order("created_at", desc=True)\
+                .limit(1)\
+                .execute()
+            return response.data[0] if response and response.data else {}
+        except Exception as exc:
+            logger.exception("get_user_subscription failed: %s", exc)
+            return {}
+
+    def upsert_subscription(
+        self,
+        access_token: str,
+        user_id: str,
+        plan_id: str,
+        status: str = "active",
+        auto_renew: bool = False,
+        end_date: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        payload = {
+            "user_id": user_id,
+            "plan_id": plan_id,
+            "status": status,
+            "auto_renew": bool(auto_renew),
+        }
+        if end_date:
+            payload["end_date"] = end_date
+        try:
+            response = self._authed_table(access_token, "subscriptions")\
+                .upsert(payload, on_conflict="user_id")\
+                .execute()
+            return response.data[0] if response and response.data else {}
+        except Exception as exc:
+            logger.exception("upsert_subscription failed: %s", exc)
+            return {}
+
+    def create_payment_record(
+        self,
+        access_token: str,
+        user_id: str,
+        subscription_id: Optional[str],
+        amount_usd: float,
+        payment_method: str = "demo",
+        status: str = "completed",
+        currency: str = "USD",
+        transaction_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        try:
+            payload = {
+                "user_id": user_id,
+                "subscription_id": subscription_id,
+                "amount_usd": float(amount_usd),
+                "currency": currency,
+                "payment_method": payment_method,
+                "transaction_id": transaction_id,
+                "status": status,
+                "paid_at": datetime.utcnow().isoformat() if status == "completed" else None,
+            }
+            response = self._authed_table(access_token, "payment_records").insert(payload).execute()
+            return response.data[0] if response and response.data else {}
+        except Exception as exc:
+            logger.exception("create_payment_record failed: %s", exc)
+            return {}
+
+    def save_portfolio_health_report(
+        self,
+        access_token: str,
+        user_id: str,
+        report: Dict[str, Any],
+    ) -> bool:
+        try:
+            self._authed_table(access_token, "portfolio_health_reports").insert({
+                "user_id": user_id,
+                **report,
+            }).execute()
+            return True
+        except Exception as exc:
+            logger.exception("save_portfolio_health_report failed: %s", exc)
+            return False
+
+    def list_portfolio_health_reports(self, access_token: str, limit: int = 20) -> List[Dict[str, Any]]:
+        try:
+            response = self._authed_table(access_token, "portfolio_health_reports")\
+                .select("*")\
+                .order("created_at", desc=True)\
+                .limit(limit)\
+                .execute()
+            return response.data or []
+        except Exception as exc:
+            logger.exception("list_portfolio_health_reports failed: %s", exc)
+            return []
+
+    def save_scam_scan_log(self, scan_log: Dict[str, Any]) -> bool:
+        try:
+            self._table("scam_scan_logs").insert(scan_log).execute()
+            return True
+        except Exception as exc:
+            logger.exception("save_scam_scan_log failed: %s", exc)
+            return False
+
+    def save_narrative_signal(self, signal: Dict[str, Any]) -> bool:
+        try:
+            self._table("narrative_signals").insert(signal).execute()
+            return True
+        except Exception as exc:
+            logger.exception("save_narrative_signal failed: %s", exc)
+            return False
+
+    def upsert_external_account_link(
+        self,
+        access_token: str,
+        user_id: str,
+        platform: str,
+        sync_mode: str = "manual",
+        sync_status: str = "pending",
+    ) -> Dict[str, Any]:
+        try:
+            response = self._authed_table(access_token, "external_account_links").upsert({
+                "user_id": user_id,
+                "platform": platform,
+                "sync_mode": sync_mode,
+                "sync_status": sync_status,
+            }, on_conflict="user_id,platform").execute()
+            return response.data[0] if response and response.data else {}
+        except Exception as exc:
+            logger.exception("upsert_external_account_link failed: %s", exc)
+            return {}
+
+    def list_external_account_links(self, access_token: str) -> List[Dict[str, Any]]:
+        try:
+            response = self._authed_table(access_token, "external_account_links")\
+                .select("*")\
+                .order("created_at", desc=True)\
+                .execute()
+            return response.data or []
+        except Exception as exc:
+            logger.exception("list_external_account_links failed: %s", exc)
+            return []
+
+    def save_manual_asset_sync_log(
+        self,
+        access_token: str,
+        user_id: str,
+        platform: str,
+        holdings_snapshot: Dict[str, Any],
+        total_value_usd: float,
+    ) -> bool:
+        try:
+            self._authed_table(access_token, "manual_asset_sync_logs").insert({
+                "user_id": user_id,
+                "platform": platform,
+                "holdings_snapshot": holdings_snapshot,
+                "total_value_usd": float(total_value_usd),
+            }).execute()
+            self.upsert_external_account_link(
+                access_token,
+                user_id,
+                platform,
+                sync_mode="manual",
+                sync_status="synced",
+            )
+            return True
+        except Exception as exc:
+            logger.exception("save_manual_asset_sync_log failed: %s", exc)
+            return False
+
+    def list_notifications(self, access_token: str, limit: int = 30) -> List[Dict[str, Any]]:
+        try:
+            response = self._authed_table(access_token, "notifications")\
+                .select("*")\
+                .order("created_at", desc=True)\
+                .limit(limit)\
+                .execute()
+            return response.data or []
+        except Exception as exc:
+            logger.exception("list_notifications failed: %s", exc)
+            return []
+
+    def create_notification(
+        self,
+        access_token: str,
+        user_id: str,
+        title: str,
+        message: str,
+        notification_type: str = "system",
+        action_url: Optional[str] = None,
+    ) -> bool:
+        try:
+            self._authed_table(access_token, "notifications").insert({
+                "user_id": user_id,
+                "type": notification_type,
+                "title": title,
+                "message": message,
+                "action_url": action_url,
+                "is_read": False,
+            }).execute()
+            return True
+        except Exception as exc:
+            logger.exception("create_notification failed: %s", exc)
+            return False
+
     def insert_data(self, table_name: str, data: Dict[str, Any]) -> bool:
         try:
             self._table(table_name).insert(data).execute()

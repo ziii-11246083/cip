@@ -27,16 +27,13 @@
     USDT: 1,
     USDC: 1
   };
-  const STRATEGY_PROFILES = [
-    { id: "current", name: "目前持倉", cashBuffer: 0, shockScale: 1, description: "完全沿用目前配置，最貼近現況。" },
-    { id: "balanced", name: "均衡配置", cashBuffer: 0.18, shockScale: 0.82, description: "提高現金與分散程度，降低單一幣種衝擊。" },
-    { id: "growth", name: "成長進攻", cashBuffer: -0.08, shockScale: 1.18, description: "提高風險曝險，牛市彈性較高，壓力也更大。" }
-  ];
-  const SCENARIO_SHOCKS = {
-    normal: { default: 0, stable: 0 },
-    bull: { BTC: 0.28, ETH: 0.34, SOL: 0.48, XRP: 0.30, BNB: 0.24, DOGE: 0.52, stable: 0, default: 0.26 },
-    bear: { BTC: -0.22, ETH: -0.30, SOL: -0.42, XRP: -0.34, BNB: -0.28, DOGE: -0.46, stable: 0, default: -0.32 },
-    black_swan: { BTC: -0.38, ETH: -0.46, SOL: -0.62, XRP: -0.52, BNB: -0.48, DOGE: -0.68, USDT: -0.02, USDC: -0.01, stable: -0.01, default: -0.55 }
+  const SCENARIO_UI = {
+    normal: { label: "一般市場", advice: "正常操作，適合做基本買賣練習。" },
+    sideways: { label: "盤整市場", advice: "控制交易頻率，觀察等待成本。" },
+    bull: { label: "牛市", advice: "避免追高，分批進出比較穩。" },
+    alt_rotation: { label: "山寨輪動", advice: "波動較高，留意單一幣種比例。" },
+    bear: { label: "熊市", advice: "降低部位，保留現金緩衝。" },
+    black_swan: { label: "黑天鵝", advice: "極端風險，優先檢查最大回撤。" }
   };
 
   function fmtUSD(value) {
@@ -64,9 +61,15 @@
     return fmtUSD(n);
   }
 
-  function pctText(value) {
-    const n = Number(value || 0) * 100;
-    return `${n >= 0 ? "+" : ""}${n.toFixed(1)}%`;
+  function currentScenarioQuery() {
+    return "?scenario=" + encodeURIComponent(activeScenario || "normal");
+  }
+
+  function scenarioAdjustedPrice(symbol, basePrice) {
+    const sc = scenarioData[activeScenario] || {};
+    const stable = symbol === "USDT" || symbol === "USDC";
+    const multiplier = stable ? 1 : Number(sc.price_multiplier || 1);
+    return Number(basePrice || 0) * multiplier;
   }
 
   function setStatus(message, type) {
@@ -176,10 +179,53 @@
     el.className = "coin-order-advice " + (type || "");
   }
 
+  function renderScenarioImpact() {
+    const sc = scenarioData[activeScenario] || {};
+    const label = SCENARIO_UI[activeScenario]?.label || sc.label || (activeScenario === "normal" ? "一般市場" : activeScenario);
+    const totalValue = Number(currentPortfolio?.total_value_usd || 0);
+    const cash = Number(currentPortfolio?.cash || 0);
+    const cashPct = totalValue ? cash / totalValue * 100 : 0;
+    const amount = Number($("orderAmt")?.value || 0);
+    const qty = Number($("orderQty")?.value || 0);
+    const symbol = String($("orderSymbol")?.value || "BTC").toUpperCase();
+    const coin = getSelectedCoin();
+    const basePrice = Number(coin.current_price || FALLBACK_PRICES[symbol] || 0);
+    const price = scenarioAdjustedPrice(symbol, basePrice);
+    const orderValue = amount > 0 ? amount : qty > 0 && price ? qty * price : 0;
+    const orderPct = totalValue ? orderValue / totalValue * 100 : 0;
+    const vol = Number(sc.volatility_multiplier || 1);
+    const priceMult = Number(sc.price_multiplier || 1);
+
+    if ($("scImpactLabel")) $("scImpactLabel").textContent = label;
+    if ($("scPortfolioValue")) $("scPortfolioValue").textContent = totalValue ? fmtUSD(totalValue) : "--";
+    if ($("scCashBuffer")) $("scCashBuffer").textContent = totalValue ? `${fmtUSD(cash)} (${cashPct.toFixed(1)}%)` : "--";
+    if ($("scOrderImpact")) {
+      $("scOrderImpact").textContent = orderValue > 0
+        ? `${fmtUSD(orderValue)} · ${orderPct.toFixed(1)}% 資產`
+        : "請輸入訂單";
+    }
+    if ($("scRiskNote")) {
+      if (activeScenario === "black_swan") {
+        $("scRiskNote").textContent = "黑天鵝情境會大幅壓低非穩定幣估值，適合展示極端風險與現金緩衝的重要性。";
+      } else if (activeScenario === "bear") {
+        $("scRiskNote").textContent = "熊市情境可用來檢查持倉是否過度集中，並評估是否需要降低單筆下單比例。";
+      } else if (activeScenario === "alt_rotation") {
+        $("scRiskNote").textContent = "山寨輪動情境波動較高，適合比較高風險資產上漲時的追高與回撤風險。";
+      } else if (activeScenario === "sideways") {
+        $("scRiskNote").textContent = "盤整情境價格不大幅偏移，重點放在資金使用率、交易節奏與等待成本。";
+      } else if (priceMult > 1 || vol > 1) {
+        $("scRiskNote").textContent = "此情境會放大價格或波動，送單前可先確認現金緩衝與單筆部位比例。";
+      } else {
+        $("scRiskNote").textContent = "一般市場採用即時價格，適合做正常買賣練習與基本持倉紀錄。";
+      }
+    }
+  }
+
   function updateQuotePanel() {
     const coin = getSelectedCoin();
     const symbol = String(coin.symbol || "BTC").toUpperCase();
-    const price = Number(coin.current_price || FALLBACK_PRICES[symbol] || 0);
+    const basePrice = Number(coin.current_price || FALLBACK_PRICES[symbol] || 0);
+    const price = scenarioAdjustedPrice(symbol, basePrice);
     const marketCap = Number(coin.market_cap || 0);
     const change24h = Number(coin.price_change_percentage_24h || 0);
     const side = $("orderSide")?.value || "buy";
@@ -236,6 +282,7 @@
     } else {
       setAdvice("選好幣種後，可先用 0.1 顆或小額金額試算，再決定是否下單。", "ok");
     }
+    renderScenarioImpact();
   }
 
   function updateKpis(snapshot) {
@@ -248,71 +295,6 @@
     const pnlPctEl = $("kpiPnlPct");
     pnlPctEl.textContent = (pnlPct >= 0 ? "+" : "") + pnlPct.toFixed(2) + "%";
     pnlPctEl.className = "sub " + (pnlPct >= 0 ? "ok" : "bad");
-  }
-
-  function getScenarioShock(symbol) {
-    const normalized = String(symbol || "").toUpperCase();
-    const shocks = SCENARIO_SHOCKS[activeScenario] || SCENARIO_SHOCKS.normal;
-    if (Object.prototype.hasOwnProperty.call(shocks, normalized)) return Number(shocks[normalized] || 0);
-    if (normalized === "USDT" || normalized === "USDC") return Number(shocks.stable || 0);
-    return Number(shocks.default || 0);
-  }
-
-  function buildScenarioRows(snapshot) {
-    const cash = Number(snapshot?.cash || 0);
-    const positions = Array.isArray(snapshot?.positions) ? snapshot.positions : [];
-    const currentTotal = Number(snapshot?.total_value_usd || cash || 0);
-    const riskAssetValue = positions.reduce((sum, pos) => sum + Number(pos.market_value || 0), 0);
-    const scenario = scenarioData[activeScenario] || {};
-    const volatility = Number(scenario.volatility_multiplier || 1);
-
-    return STRATEGY_PROFILES.map((strategy) => {
-      const cashShift = strategy.cashBuffer >= 0
-        ? riskAssetValue * strategy.cashBuffer
-        : -Math.min(cash, currentTotal * Math.abs(strategy.cashBuffer));
-      const adjustedCash = Math.max(0, cash + cashShift);
-      const investableScale = riskAssetValue > 0
-        ? Math.max(0, (riskAssetValue - cashShift) / riskAssetValue)
-        : 0;
-      const stressedPositions = positions.reduce((sum, pos) => {
-        const value = Number(pos.market_value || 0) * investableScale;
-        const shock = getScenarioShock(pos.symbol) * strategy.shockScale;
-        return sum + value * (1 + shock);
-      }, 0);
-      const projected = adjustedCash + stressedPositions;
-      const pnl = projected - currentTotal;
-      const pnlPct = currentTotal ? pnl / currentTotal : 0;
-      const maxStress = Math.min(0.95, Math.abs((volatility - 1) * 0.18 * strategy.shockScale) + Math.max(0, -pnlPct));
-
-      return Object.assign({}, strategy, { projected, pnl, pnlPct, maxStress });
-    });
-  }
-
-  function renderScenarioStress(snapshot) {
-    const rows = buildScenarioRows(snapshot);
-    const grid = $("scenarioStrategyGrid");
-    if (grid) {
-      grid.innerHTML = rows.map((row) => `
-        <div class="scenario-strategy-card">
-          <span>${row.name}</span>
-          <strong class="${row.pnl >= 0 ? "ok" : "bad"}">${pctText(row.pnlPct)}</strong>
-          <small>${fmtUSD(row.projected)}</small>
-        </div>
-      `).join("");
-    }
-
-    const body = $("scenarioStrategyBody");
-    if (body) {
-      body.innerHTML = rows.map((row) => `
-        <tr>
-          <td>${row.name}</td>
-          <td>${fmtUSD(row.projected)}</td>
-          <td class="${row.pnl >= 0 ? "ok" : "bad"}">${fmtUSD(row.pnl)} (${pctText(row.pnlPct)})</td>
-          <td>${pctText(-row.maxStress)}</td>
-          <td>${row.description}</td>
-        </tr>
-      `).join("");
-    }
   }
 
   function renderPositions(snapshot) {
@@ -437,13 +419,12 @@
   }
 
   async function refreshPortfolio() {
-    const data = await request("/api/sim-trade/portfolio");
+    const data = await request("/api/sim-trade/portfolio" + currentScenarioQuery());
     currentPortfolio = data.portfolio || null;
     updateKpis(data.portfolio);
     renderPositions(data.portfolio);
     drawEquity(data.portfolio);
     drawAlloc(data.portfolio);
-    renderScenarioStress(data.portfolio);
     updateQuotePanel();
   }
 
@@ -471,7 +452,8 @@
           symbol,
           side,
           quantity: quantityRaw ? Number(quantityRaw) : null,
-          amount_usd: amountRaw ? Number(amountRaw) : null
+          amount_usd: amountRaw ? Number(amountRaw) : null,
+          scenario: activeScenario
         })
       });
       $("orderQty").value = "";
@@ -550,8 +532,9 @@
 
     function applyScenario(scenarioKey) {
       activeScenario = scenarioKey;
+      const ui = SCENARIO_UI[scenarioKey] || {};
       const sc = scenarioData[scenarioKey] || { label: "一般市場", price_multiplier: 1.0, volatility_multiplier: 1.0 };
-      $("scenarioBadge") && ($("scenarioBadge").textContent = sc.label || scenarioKey);
+      $("scenarioBadge") && ($("scenarioBadge").textContent = ui.label || sc.label || scenarioKey);
       $("scPriceMult") && ($("scPriceMult").textContent = (sc.price_multiplier || 1).toFixed(1) + "x");
       $("scVolMult") && ($("scVolMult").textContent = (sc.volatility_multiplier || 1).toFixed(1) + "x");
 
@@ -566,9 +549,10 @@
       document.querySelectorAll(".scenario-btn").forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.scenario === scenarioKey);
       });
-      renderScenarioStress(currentPortfolio);
 
-      // placeholder: 展示情境資訊，不修改實際交易數據
+      if ($("scAdvice") && ui.advice) $("scAdvice").textContent = ui.advice;
+      updateQuotePanel();
+      refreshPortfolio().catch(() => {});
       console.log("[sim-trade] scenario switched to", scenarioKey, sc);
     }
 

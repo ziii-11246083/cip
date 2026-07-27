@@ -140,6 +140,8 @@ class Config:
         },
     }
     MARKET_SCENARIOS = {
+        "sideways": {"price_multiplier": 1.0, "volatility_multiplier": 0.6, "label": "盤整市場"},
+        "alt_rotation": {"price_multiplier": 1.15, "volatility_multiplier": 1.8, "label": "山寨輪動"},
         "bull": {"price_multiplier": 1.3, "volatility_multiplier": 0.8, "label": "牛市"},
         "bear": {"price_multiplier": 0.7, "volatility_multiplier": 1.5, "label": "熊市"},
         "black_swan": {"price_multiplier": 0.4, "volatility_multiplier": 3.0, "label": "黑天鵝"},
@@ -186,16 +188,27 @@ except Exception as e:
     db = None
 
 DEMO_MEMBER_TOKEN = "smartinvest-demo-member-token"
+ADMIN_DEMO_TOKEN = "smartinvest-demo-admin-token"
 DEMO_MEMBER_USER = {
     "uid": "demo-member",
     "email": "test@smartinvest.local",
     "is_guest": False,
     "is_demo": True,
+    "is_admin": False,
+}
+ADMIN_DEMO_USER = {
+    "uid": "demo-admin",
+    "email": "admin@smartinvest.local",
+    "is_guest": False,
+    "is_demo": True,
+    "is_admin": True,
 }
 
 def sim_user_key(access_token: str) -> str:
     if access_token == DEMO_MEMBER_TOKEN:
         return "demo-member"
+    if access_token == ADMIN_DEMO_TOKEN:
+        return "demo-admin"
     digest = hashlib.sha256(str(access_token).encode("utf-8")).hexdigest()
     return f"user-{digest[:24]}"
 
@@ -250,7 +263,7 @@ def get_local_sim_state(access_token: str, initial_cash: float = SIM_INITIAL_CAS
     return user_key, users[user_key], store
 
 def local_sim_preferred(access_token: str) -> bool:
-    if access_token == DEMO_MEMBER_TOKEN:
+    if access_token in {DEMO_MEMBER_TOKEN, ADMIN_DEMO_TOKEN}:
         return True
     user_key = sim_user_key(access_token)
     store = load_local_sim_store()
@@ -345,6 +358,9 @@ def token_required(f):
         if token == DEMO_MEMBER_TOKEN:
             request.user = {**DEMO_MEMBER_USER.copy(), "token": None, "is_demo": True}
             return f(*args, **kwargs)
+        if token == ADMIN_DEMO_TOKEN:
+            request.user = {**ADMIN_DEMO_USER.copy(), "token": None, "is_demo": True, "is_admin": True}
+            return f(*args, **kwargs)
         try:
             if not db: return jsonify({'error': '登入服務暫時不可用', 'code': 'auth/service-unavailable'}), 503
             user_response = db.client.auth.get_user(token)
@@ -369,6 +385,9 @@ def optional_token(f):
             return f(*args, **kwargs)
         if token == DEMO_MEMBER_TOKEN:
             request.user = {**DEMO_MEMBER_USER.copy(), "token": None, "is_demo": True}
+            return f(*args, **kwargs)
+        if token == ADMIN_DEMO_TOKEN:
+            request.user = {**ADMIN_DEMO_USER.copy(), "token": None, "is_demo": True, "is_admin": True}
             return f(*args, **kwargs)
         try:
             if not db: return jsonify({'error': '登入服務暫時不可用', 'code': 'auth/service-unavailable'}), 503
@@ -674,6 +693,8 @@ class RiskModel:
 class SocialMediaEngine:
     SIGNAL_KEYWORDS = ["ETF", "升息", "降息", "通膨", "監管", "支撐", "壓力", "均線", "鯨魚", "鏈上", "TVL", "質押", "空投", "白皮書", "核准", "通過", "上市", "減半", "現貨", "合約", "回購", "增持", "銷毀", "新高", "大漲", "突破", "趨勢", "佈局", "創新", "整合"]
     STRONG_HEADERS = ["[新聞]", "[情報]", "[翻譯]", "[數據]", "[分析]", "快訊"]
+    BULLISH_WORDS = ["看漲", "突破", "大漲", "反彈", "流入", "核准", "創高", "bullish", "surge", "rally", "inflow"]
+    BEARISH_WORDS = ["看跌", "暴跌", "下跌", "清算", "監管", "駭", "破產", "bearish", "crash", "hack", "lawsuit", "outflow"]
     PTT_HEADERS = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
@@ -690,6 +711,55 @@ class SocialMediaEngine:
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": '"Windows"',
     }
+
+    @staticmethod
+    def _clean_text(value: Any, max_len: int = 500) -> str:
+        text = re.sub(r"<[^>]+>", " ", str(value or ""))
+        text = re.sub(r"\s+", " ", text).strip()
+        return text[:max_len]
+
+    @staticmethod
+    def _normalize_post(post: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        title = SocialMediaEngine._clean_text(post.get("title"), max_len=180)
+        link = str(post.get("link") or "").strip()
+        source = SocialMediaEngine._clean_text(post.get("source"), max_len=40)
+        content = SocialMediaEngine._clean_text(post.get("content") or title, max_len=700)
+        if not title or len(title) < 4:
+            return None
+        if "本文已被刪除" in title or title.startswith("(本文已被刪除)"):
+            return None
+        if link and not re.match(r"^https?://", link):
+            return None
+        normalized = {
+            **post,
+            "source": source or "unknown",
+            "title": title,
+            "link": link,
+            "content": content,
+            "validation": {
+                "has_title": True,
+                "has_source": bool(source),
+                "has_link": bool(link),
+                "content_length": len(content),
+            },
+        }
+        normalized["verified"] = bool(source and (link or source == "PTT"))
+        return normalized
+
+    @staticmethod
+    def _dedupe_posts(posts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        seen = set()
+        cleaned: List[Dict[str, Any]] = []
+        for post in posts:
+            normalized = SocialMediaEngine._normalize_post(post)
+            if not normalized:
+                continue
+            key = normalized.get("link") or re.sub(r"\W+", "", normalized.get("title", "").lower())[:80]
+            if key in seen:
+                continue
+            seen.add(key)
+            cleaned.append(normalized)
+        return cleaned
 
     @staticmethod
     def _build_ptt_session() -> requests.Session:
@@ -747,7 +817,7 @@ class SocialMediaEngine:
             summary = SocialMediaEngine.get_content_summary(link)
             nrec = div.find("div", class_="nrec").text
             push_count = 100 if nrec == "爆" else 0 if not nrec or nrec.startswith("X") else int(nrec)
-            return {"source": "PTT", "title": title, "author": div.find("div", class_="author").text, "date": date_str, "push": push_count, "link": link, "content": summary if summary else title}
+            return SocialMediaEngine._normalize_post({"source": "PTT", "title": title, "author": div.find("div", class_="author").text, "date": date_str, "push": push_count, "link": link, "content": summary if summary else title})
         except: return None
 
     @staticmethod
@@ -770,7 +840,7 @@ class SocialMediaEngine:
                 if prev_link and "href" in prev_link.attrs: url = "https://www.ptt.cc" + prev_link["href"]
                 else: break
         except Exception as e: print("PTT Error:", e)
-        return results
+        return SocialMediaEngine._dedupe_posts(results)
 
     @staticmethod
     def scrape_cnyes() -> List[Dict]:
@@ -785,9 +855,9 @@ class SocialMediaEngine:
                 publish_at = item.get("publishAt")
                 if title and news_id:
                     date_str = datetime.fromtimestamp(publish_at).strftime("%m/%d") if publish_at else datetime.now().strftime("%m/%d")
-                    posts.append({"source": "CNYES", "title": title, "author": "鉅亨網", "date": date_str, "push": random.randint(30, 95), "link": f"https://news.cnyes.com/news/id/{news_id}", "content": item.get("summary", "鉅亨網區塊鏈新聞快訊")})
+                    posts.append({"source": "CNYES", "title": title, "author": "鉅亨網", "date": date_str, "push": 0, "link": f"https://news.cnyes.com/news/id/{news_id}", "content": item.get("summary", "")})
         except Exception as e: print("CNYES Error:", e)
-        return posts
+        return SocialMediaEngine._dedupe_posts(posts)
 
     @staticmethod
     def scrape_rss_for_signals() -> List[Dict]:
@@ -803,21 +873,21 @@ class SocialMediaEngine:
                 elif "bitcoin.com" in url: source_name = "Bitcoin.com"
                 
                 for e in feed.entries[:20]:  
-                    summary = re.sub(r"<[^>]+>", " ", getattr(e, "summary", "") or "").strip()
+                    summary = SocialMediaEngine._clean_text(getattr(e, "summary", "") or "", max_len=700)
                     if hasattr(e, 'published_parsed') and e.published_parsed:
                         date_str = time.strftime("%m/%d", e.published_parsed)
                     else:
                         date_str = datetime.now().strftime("%m/%d")
-                    posts.append({"source": source_name, "title": getattr(e, "title", ""), "author": source_name, "date": date_str, "push": random.randint(40, 99), "link": getattr(e, "link", ""), "content": summary})
+                    posts.append({"source": source_name, "title": getattr(e, "title", ""), "author": source_name, "date": date_str, "push": 0, "link": getattr(e, "link", ""), "content": summary})
             except Exception as e: print("RSS Error:", e)
-        return posts
+        return SocialMediaEngine._dedupe_posts(posts)
 
     @staticmethod
     def analyze_posts(posts: List[Dict]) -> Dict:
         signals = []
         keyword_counts = {"BTC": 0, "ETH": 0, "SOL": 0, "BNB": 0, "AI": 0, "ETF": 0, "看漲": 0, "突破": 0, "大跌": 0}
         
-        valid_posts = [p for p in posts if p.get('title')]
+        valid_posts = SocialMediaEngine._dedupe_posts([p for p in posts if p.get('title')])
         
         for post in valid_posts:
             score = 50 if post.get('source') in ['CNYES', 'CoinDesk', 'Cointelegraph', 'Decrypt', 'CryptoPotato', 'Bitcoin.com'] else 0
@@ -834,9 +904,13 @@ class SocialMediaEngine:
             push_count = post.get('push') or 0
             if push_count > 20: score += 10
             
+            lower_text = full_text.lower()
+            bullish_hits = sum(1 for kw in SocialMediaEngine.BULLISH_WORDS if kw.lower() in lower_text)
+            bearish_hits = sum(1 for kw in SocialMediaEngine.BEARISH_WORDS if kw.lower() in lower_text)
             post['quality_score'] = score
-            post['sentiment'] = random.choice(['BULLISH', 'BEARISH', 'NEUTRAL']) if score >= 40 else 'NEUTRAL'
+            post['sentiment'] = 'BULLISH' if bullish_hits > bearish_hits else 'BEARISH' if bearish_hits > bullish_hits else 'NEUTRAL'
             post['type'] = 'signal'
+            post['validation_status'] = 'verified' if post.get('verified') else 'needs_review'
             signals.append(post)
 
         signals.sort(key=lambda x: (x.get('date', ''), x.get('quality_score', 0)), reverse=True)
@@ -1208,6 +1282,42 @@ def calculate_portfolio_risk_health(req: RiskHealthRequest) -> Dict[str, float]:
         "herfindahl": round(herfindahl, 6),
     }
 
+
+def health_risk_level(metrics: Dict[str, float]) -> str:
+    top1 = float(metrics.get("top1_weight") or 0)
+    annual_vol = float(metrics.get("annual_vol") or 0)
+    max_drawdown = abs(float(metrics.get("max_drawdown") or 0))
+    if top1 >= 0.55 or annual_vol >= 1.2 or max_drawdown >= 0.45:
+        return "critical"
+    if top1 >= 0.35 or annual_vol >= 0.8 or max_drawdown >= 0.30:
+        return "high"
+    if top1 >= 0.20 or annual_vol >= 0.45 or max_drawdown >= 0.18:
+        return "medium"
+    return "low"
+
+
+def persist_health_report(req: RiskHealthRequest, metrics: Dict[str, float], ai_report: str = "") -> None:
+    if not db or request.user.get("is_demo"):
+        return
+    access_token = request.user.get("token")
+    user_id = request.user.get("id")
+    if not access_token or not user_id:
+        return
+    payload = request.get_json(silent=True) or {}
+    holdings_json = [{"ticker": h.ticker, "weight": float(h.weight)} for h in req.holdings]
+    db.save_portfolio_health_report(access_token, user_id, {
+        "total_capital": float(payload.get("total_capital") or 1.0),
+        "currency": req.base_currency,
+        "risk_profile": str(payload.get("risk_profile") or "未設定"),
+        "holdings_json": holdings_json,
+        "concentration_score": round(float(metrics.get("herfindahl") or 0) * 100, 2),
+        "volatility_annual": float(metrics.get("annual_vol") or 0),
+        "max_drawdown": float(metrics.get("max_drawdown") or 0),
+        "risk_level": health_risk_level(metrics),
+        "ai_report": ai_report,
+        "analysis_period_days": int(req.days or 90),
+    })
+
 # ==========================================
 # 🚦 4. Flask Routes & APIs
 # ==========================================
@@ -1319,7 +1429,20 @@ def api_market():
 
 @app.route('/api/narratives')
 def get_narratives():
-    return jsonify(SocialMediaEngine.fetch_narratives_full())
+    payload = SocialMediaEngine.fetch_narratives_full()
+    if db and payload.get("top_narrative"):
+        try:
+            db.save_narrative_signal({
+                "narrative_tag": payload.get("top_narrative"),
+                "signal_strength": float(payload.get("top_score") or 0),
+                "source_count": len(payload.get("related_news") or []),
+                "top_headlines": payload.get("related_news") or [],
+                "trending_coins": payload.get("top_coins") or [],
+                "analyzed_at": datetime.utcnow().isoformat(),
+            })
+        except Exception:
+            app.logger.exception("save narrative signal failed")
+    return jsonify(payload)
 
 @app.route('/api/social-data')
 @ttl_cache(ttl_seconds=60) 
@@ -1749,7 +1872,17 @@ def get_coin_price_usd(symbol: str) -> float:
     return float(fallback.get(symbol, 10))
 
 
+def scenario_adjusted_price(symbol: str, scenario_key: str = "normal") -> float:
+    base_price = get_coin_price_usd(symbol)
+    scenario = Config.MARKET_SCENARIOS.get(str(scenario_key or "normal"))
+    if not scenario or symbol.upper() in Config.STABLE_COINS:
+        return base_price
+    return round(base_price * float(scenario.get("price_multiplier") or 1.0), 8)
+
+
 def require_sim_trade_token() -> Tuple[Optional[str], Optional[Tuple[Any, int]]]:
+    if request.user.get("is_admin"):
+        return ADMIN_DEMO_TOKEN, None
     if request.user.get("is_demo"):
         return DEMO_MEMBER_TOKEN, None
     if not db:
@@ -1780,6 +1913,7 @@ def estimate_total_value_after_order(
     side: str,
     quantity: float,
     amount_usd: float,
+    scenario_key: str = "normal",
 ) -> float:
     cash = float(portfolio.get("cash_balance", 0))
     positions: Dict[str, Dict[str, float]] = {}
@@ -1821,12 +1955,12 @@ def estimate_total_value_after_order(
         qty = float(pos.get("quantity", 0))
         if qty <= 0:
             continue
-        current_price = get_coin_price_usd(sym)
+        current_price = scenario_adjusted_price(sym, scenario_key)
         total_value += qty * current_price
     return total_value
 
 
-def sim_snapshot(access_token: str) -> Dict[str, Any]:
+def sim_snapshot(access_token: str, scenario_key: str = "normal") -> Dict[str, Any]:
     use_local = local_sim_preferred(access_token)
     capital_records: List[Dict[str, Any]] = []
     portfolio = {} if use_local else (db.sim_get_or_create_portfolio(access_token, SIM_INITIAL_CASH) if db else {})
@@ -1852,7 +1986,7 @@ def sim_snapshot(access_token: str) -> Dict[str, Any]:
         qty = float(row.get("quantity", 0))
         if not symbol or qty <= 0:
             continue
-        current_price = get_coin_price_usd(symbol)
+        current_price = scenario_adjusted_price(symbol, scenario_key)
         avg_price = float(row.get("avg_price") or current_price)
         market_value = qty * current_price
         total_value += market_value
@@ -1906,6 +2040,7 @@ def sim_snapshot(access_token: str) -> Dict[str, Any]:
         "pnl_pct": pnl_pct,
         "equity_curve": equity_curve,
         "capital_records": capital_records,
+        "scenario": scenario_key,
     }
 
 
@@ -1915,10 +2050,11 @@ def execute_sim_order(
     side: str,
     quantity: Optional[float] = None,
     amount_usd: Optional[float] = None,
+    scenario_key: str = "normal",
 ) -> Dict[str, Any]:
     symbol = symbol.upper()
     side = side.lower()
-    price = get_coin_price_usd(symbol)
+    price = scenario_adjusted_price(symbol, scenario_key)
     if amount_usd and not quantity:
         quantity = float(amount_usd) / price
     quantity = float(quantity or 0)
@@ -1941,7 +2077,7 @@ def execute_sim_order(
         position_rows = db.sim_list_positions(access_token) if db else []
     if not portfolio:
         raise ValueError("無法取得模擬投資組合。")
-    total_value = estimate_total_value_after_order(portfolio, position_rows, symbol, side, quantity, amount)
+    total_value = estimate_total_value_after_order(portfolio, position_rows, symbol, side, quantity, amount, scenario_key)
 
     if use_local:
         return local_execute_sim_order(access_token, symbol, side, price, quantity, amount)
@@ -1969,7 +2105,8 @@ def api_sim_trade_portfolio():
     access_token, error = require_sim_trade_token()
     if error:
         return error
-    return jsonify({"portfolio": sim_snapshot(access_token)})
+    scenario_key = str(request.args.get("scenario") or "normal")
+    return jsonify({"portfolio": sim_snapshot(access_token, scenario_key=scenario_key)})
 
 
 @app.route("/api/sim-trade/history", methods=["GET"])
@@ -2004,8 +2141,10 @@ def api_sim_trade_order():
             req.get("side", "buy"),
             req.get("quantity"),
             req.get("amount_usd"),
+            req.get("scenario", "normal"),
         )
-        return jsonify({"success": True, "trade": trade, "portfolio": sim_snapshot(access_token)})
+        scenario_key = str(req.get("scenario") or "normal")
+        return jsonify({"success": True, "trade": trade, "portfolio": sim_snapshot(access_token, scenario_key=scenario_key)})
     except Exception as exc:
         return jsonify({"error": str(exc)}), 400
 
@@ -2100,6 +2239,138 @@ def api_sim_trade_delete_capital(record_id: str):
         return jsonify({"success": True, "portfolio": sim_snapshot(access_token), "capital_records": records})
     except Exception as exc:
         return jsonify({"error": str(exc)}), 400
+
+
+@app.route("/api/membership/plans", methods=["GET"])
+def api_membership_plans():
+    fallback_plans = [
+        {"plan_code": "free", "plan_name": "免費版", "monthly_price_usd": 0, "features_json": {"ai_chat_daily_limit": 5}},
+        {"plan_code": "pro", "plan_name": "進階版", "monthly_price_usd": 9.99, "features_json": {"ai_chat_daily_limit": 20}},
+        {"plan_code": "premium", "plan_name": "專業版", "monthly_price_usd": 24.99, "features_json": {"ai_chat_daily_limit": None}},
+    ]
+    if not db:
+        return jsonify({"plans": fallback_plans, "source": "fallback"})
+    plans = db.list_membership_plans()
+    return jsonify({"plans": plans or fallback_plans, "source": "database" if plans else "fallback"})
+
+
+@app.route("/api/membership/subscription", methods=["GET"])
+@token_required
+def api_membership_subscription():
+    if request.user.get("is_admin"):
+        return jsonify({
+            "subscription": {
+                "status": "active",
+                "plan": {"plan_code": "premium", "plan_name": "專業版"},
+                "source": "admin-demo",
+                "role": "admin",
+            }
+        })
+    if request.user.get("is_demo") or not db:
+        return jsonify({
+            "subscription": {
+                "status": "active",
+                "plan": {"plan_code": "premium", "plan_name": "Demo Premium"},
+                "source": "demo",
+            }
+        })
+    access_token = request.user.get("token")
+    user_id = request.user.get("id")
+    subscription = db.get_user_subscription(access_token, user_id) if access_token and user_id else {}
+    return jsonify({"subscription": subscription or {"status": "free", "source": "default"}})
+
+
+@app.route("/api/membership/mock-checkout", methods=["POST"])
+@token_required
+def api_membership_mock_checkout():
+    req = request.get_json(silent=True) or {}
+    plan_code = str(req.get("plan_code") or "pro").lower()
+    if request.user.get("is_demo") or not db:
+        return jsonify({
+            "success": True,
+            "mode": "demo",
+            "subscription": {"status": "active", "plan_code": plan_code},
+            "payment": {"status": "completed", "payment_method": "demo"},
+        })
+
+    access_token = request.user.get("token")
+    user_id = request.user.get("id")
+    plans = db.list_membership_plans()
+    plan = next((p for p in plans if str(p.get("plan_code")).lower() == plan_code), None)
+    if not plan:
+        return jsonify({"error": "找不到指定會員方案。"}), 404
+
+    subscription = db.upsert_subscription(access_token, user_id, str(plan.get("id")), status="active")
+    payment = db.create_payment_record(
+        access_token,
+        user_id,
+        subscription.get("id"),
+        amount_usd=float(plan.get("monthly_price_usd") or 0),
+        payment_method="demo_checkout",
+        transaction_id=f"demo-{uuid.uuid4()}",
+    )
+    db.create_notification(
+        access_token,
+        user_id,
+        "會員方案已更新",
+        f"已切換為 {plan.get('plan_name') or plan_code}，此筆為展示用 mock checkout。",
+        notification_type="system",
+        action_url="/member",
+    )
+    return jsonify({"success": True, "mode": "mock", "subscription": subscription, "payment": payment})
+
+
+@app.route("/api/external-sync/manual", methods=["POST"])
+@token_required
+def api_external_sync_manual():
+    req = request.get_json(silent=True) or {}
+    platform = str(req.get("platform") or "manual").strip().lower()[:30]
+    holdings = req.get("holdings") if isinstance(req.get("holdings"), list) else []
+    total_value = float(req.get("total_value_usd") or 0)
+    if total_value <= 0:
+        total_value = sum(float(item.get("amount_usd") or 0) for item in holdings if isinstance(item, dict))
+    if request.user.get("is_demo") or not db:
+        return jsonify({
+            "success": True,
+            "mode": "local-demo",
+            "sync": {"platform": platform, "holdings_snapshot": holdings, "total_value_usd": total_value},
+        })
+    access_token = request.user.get("token")
+    user_id = request.user.get("id")
+    ok = db.save_manual_asset_sync_log(
+        access_token,
+        user_id,
+        platform,
+        {"holdings": holdings, "source": "manual_mvp"},
+        total_value,
+    )
+    return jsonify({"success": bool(ok), "sync_mode": "manual", "platform": platform, "total_value_usd": total_value})
+
+
+@app.route("/api/external-sync/accounts", methods=["GET"])
+@token_required
+def api_external_sync_accounts():
+    if request.user.get("is_demo") or not db:
+        return jsonify({"accounts": [{"platform": "demo", "sync_mode": "manual", "sync_status": "synced"}]})
+    access_token = request.user.get("token")
+    return jsonify({"accounts": db.list_external_account_links(access_token)})
+
+
+@app.route("/api/notifications", methods=["GET"])
+@token_required
+def api_notifications():
+    if request.user.get("is_demo") or not db:
+        return jsonify({"notifications": []})
+    return jsonify({"notifications": db.list_notifications(request.user.get("token"))})
+
+
+@app.route("/api/health/reports", methods=["GET"])
+@token_required
+def api_health_reports():
+    if request.user.get("is_demo") or not db:
+        return jsonify({"reports": []})
+    limit = int(request.args.get("limit", 20))
+    return jsonify({"reports": db.list_portfolio_health_reports(request.user.get("token"), limit=limit)})
 
 
 @app.route('/api/agent-plan', methods=['POST'])
@@ -2282,6 +2553,19 @@ def api_scam_scan():
         parsed = completion.choices[0].message.parsed
         risk_level = parsed.risk_level if parsed and parsed.risk_level in {"high", "medium", "low"} else "unknown"
         report = parsed.report if parsed and parsed.report else "目前沒有取得分析報告。"
+        if db:
+            try:
+                db.save_scam_scan_log({
+                    "target_address": text[:100],
+                    "scan_type": "url" if re.search(r"https?://", text) else "contract" if re.search(r"0x[a-fA-F0-9]{20,}", text) else "text",
+                    "risk_level": risk_level,
+                    "risk_score": {"high": 85, "medium": 55, "low": 20}.get(risk_level, 0),
+                    "reasons": {"report": report[:1200], "rag_used": bool(rag_supplement)},
+                    "community_signals": {"source": "ai_rag_supplement"},
+                    "scanned_at": datetime.utcnow().isoformat(),
+                })
+            except Exception:
+                app.logger.exception("save scam scan log failed")
         return jsonify({"risk_level": risk_level, "report": report})
     except Exception as e:
         return jsonify({"risk_level": "unknown", "report": f"系統錯誤: {str(e)}"})
@@ -2438,7 +2722,10 @@ def analyze_portfolio_llm():
     try: req = RiskHealthRequest(**(request.get_json(silent=True) or {}))
     except ValidationError as e: return jsonify({"detail": str(e)}), 422
     rh_dict = calculate_portfolio_risk_health(req)
-    if client is None: return jsonify({"risk_health": rh_dict, "narrative": "未設定金鑰，改用規則摘要。請注意波動風險。", "highlights": ["提醒：無 AI 金鑰"]})
+    if client is None:
+        narrative = "未設定金鑰，改用規則摘要。請注意波動風險。"
+        persist_health_report(req, rh_dict, narrative)
+        return jsonify({"risk_health": rh_dict, "narrative": narrative, "highlights": ["提醒：無 AI 金鑰"]})
     holdings_text = ", ".join([f"{h.ticker}({h.weight:.2f})" for h in req.holdings])
     # ── RAG: health education supplement ──
     rag_context = ""
@@ -2458,8 +2745,12 @@ def analyze_portfolio_llm():
             response_format=PortfolioLLMOut
         )
         out = completion.choices[0].message.parsed
+        persist_health_report(req, rh_dict, out.narrative if out else "")
         return jsonify({"risk_health": rh_dict, "narrative": out.narrative, "highlights": out.highlights or []})
-    except Exception as e: return jsonify({"risk_health": rh_dict, "narrative": "LLM 分析連線失敗，請檢查金鑰。", "highlights": ["連線異常"]})
+    except Exception as e:
+        narrative = "LLM 分析連線失敗，請檢查金鑰。"
+        persist_health_report(req, rh_dict, narrative)
+        return jsonify({"risk_health": rh_dict, "narrative": narrative, "highlights": ["連線異常"]})
 
 @app.route("/api/portfolio/analyze", methods=["POST"])
 @token_required

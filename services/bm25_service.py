@@ -49,6 +49,15 @@ _STOP_EN = {
 }
 
 
+def _cjk_ngrams(text: str) -> List[str]:
+    """Generate overlapping CJK n-grams so Chinese retrieval works without jieba."""
+    chars = re.findall(r"[\u4e00-\u9fff]", text)
+    grams: List[str] = []
+    for n in (2, 3):
+        grams.extend("".join(chars[i:i + n]) for i in range(0, max(0, len(chars) - n + 1)))
+    return grams
+
+
 def tokenize(text: str) -> List[str]:
     """Tokenize mixed Chinese/English text."""
     if not text:
@@ -72,14 +81,25 @@ def tokenize(text: str) -> List[str]:
                 if w not in _STOP_ZH and len(w) > 0:
                     tokens.append(w)
     else:
-        # Regex-based fallback
-        raw = re.findall(r"[\w一-鿿]+", text.lower())
+        # Regex-based fallback. A whole Chinese sentence is not useful as one
+        # token, so add CJK bi/tri-grams for dependency-light matching.
+        raw = re.findall(r"[a-z0-9_-]+|[\u4e00-\u9fff]+", text.lower())
         for t in raw:
             if t in _STOP_EN or t in _STOP_ZH or len(t) <= 1:
                 continue
             tokens.append(t)
+            if re.fullmatch(r"[\u4e00-\u9fff]+", t):
+                tokens.extend(_cjk_ngrams(t))
 
-    return tokens
+    # Deduplicate while preserving order; repeated n-grams make long Chinese
+    # chunks dominate too easily in the internal TF-IDF fallback.
+    seen = set()
+    deduped = []
+    for token in tokens:
+        if token not in seen:
+            seen.add(token)
+            deduped.append(token)
+    return deduped
 
 
 class BM25Service:
