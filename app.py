@@ -43,6 +43,18 @@ from pydantic import BaseModel, Field, ValidationError
 from openai import OpenAI
 from dotenv import load_dotenv
 
+# ── RAG / AI Services ──────────────────────────────────────
+try:
+    from services.rag_service import get_rag
+    from services.rag_metrics_service import get_metrics as _get_rag_metrics
+    _rag = get_rag()
+    _rag_available = _rag.kb_loaded
+    _rag_metrics = _get_rag_metrics()
+except Exception as _rag_exc:
+    _rag = None
+    _rag_available = False
+    _rag_metrics = None
+
 # 載入環境變數
 load_dotenv()
 
@@ -69,6 +81,20 @@ class Config:
     MARKET_COIN_LIMIT: int = int(os.getenv("MARKET_COIN_LIMIT", "24"))
     SFI_COIN_LIMIT: int = int(os.getenv("SFI_COIN_LIMIT", "20"))
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "").strip().strip('"').strip("'")
+
+    # ── RAG Configuration ──
+    RAG_ENABLE_EMBEDDINGS: bool = os.getenv("RAG_ENABLE_EMBEDDINGS", "1") == "1"
+    RAG_ENABLE_VECTOR_STORE: bool = os.getenv("RAG_ENABLE_VECTOR_STORE", "1") == "1"
+    RAG_ENABLE_QUERY_REWRITE: bool = os.getenv("RAG_ENABLE_QUERY_REWRITE", "1") == "1"
+    RAG_ENABLE_RERANK: bool = os.getenv("RAG_ENABLE_RERANK", "1") == "1"
+    RAG_ROUTING_MODE: str = os.getenv("RAG_ROUTING_MODE", "auto")  # auto|fast|deep
+    RAG_TOP_K_SPARSE: int = int(os.getenv("RAG_TOP_K_SPARSE", "10"))
+    RAG_TOP_K_DENSE: int = int(os.getenv("RAG_TOP_K_DENSE", "10"))
+    RAG_TOP_K_FINAL: int = int(os.getenv("RAG_TOP_K_FINAL", "5"))
+    RAG_REWRITE_SIM_THRESHOLD: float = float(os.getenv("RAG_REWRITE_SIM_THRESHOLD", "0.6"))
+    RAG_VECTOR_DB_PATH: str = os.getenv("RAG_VECTOR_DB_PATH", str(DATA_DIR / "vector_store"))
+    RAG_EMBEDDING_MODEL: str = os.getenv("RAG_EMBEDDING_MODEL", "text-embedding-3-small")
+    RAG_DEBUG_LOGGING: bool = os.getenv("RAG_DEBUG_LOGGING", "0") == "1"
     
     COIN_META = {
         'BTC': {'cn_name': '比特幣'}, 'ETH': {'cn_name': '以太幣'}, 'BNB': {'cn_name': '幣安幣'},
@@ -90,6 +116,34 @@ class Config:
         "https://cryptopotato.com/feed/",
         "https://news.bitcoin.com/feed/"
     ]
+    SIM_STRATEGY_PRESETS = {
+        "conservative": {
+            "label": "保守型",
+            "btc_eth_min_pct": 0.70,
+            "single_coin_max_pct": 0.10,
+            "stable_min_pct": 0.30,
+            "max_drawdown_warn": 0.10,
+        },
+        "balanced": {
+            "label": "穩健型",
+            "btc_eth_min_pct": 0.50,
+            "single_coin_max_pct": 0.20,
+            "stable_min_pct": 0.15,
+            "max_drawdown_warn": 0.20,
+        },
+        "aggressive": {
+            "label": "積極型",
+            "btc_eth_min_pct": 0.30,
+            "single_coin_max_pct": 0.35,
+            "stable_min_pct": 0.05,
+            "max_drawdown_warn": 0.35,
+        },
+    }
+    MARKET_SCENARIOS = {
+        "bull": {"price_multiplier": 1.3, "volatility_multiplier": 0.8, "label": "牛市"},
+        "bear": {"price_multiplier": 0.7, "volatility_multiplier": 1.5, "label": "熊市"},
+        "black_swan": {"price_multiplier": 0.4, "volatility_multiplier": 3.0, "label": "黑天鵝"},
+    }
 
 CG_ID_MAP = {
     "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana", "XRP": "ripple",
@@ -1215,6 +1269,16 @@ def version():
     commit = (os.getenv('RENDER_GIT_COMMIT') or '').strip()
     return jsonify({"version": commit or "本地開發中"})
 
+@app.route('/api/market-scenarios', methods=['GET'])
+def market_scenarios():
+    return jsonify({
+        "scenarios": {
+            "normal": {"label": "一般市場", "price_multiplier": 1.0, "volatility_multiplier": 1.0, "advice": "按照策略正常操作"},
+            **{k: {"label": v["label"], "price_multiplier": v["price_multiplier"], "volatility_multiplier": v["volatility_multiplier"]} for k, v in Config.MARKET_SCENARIOS.items()}
+        },
+        "active": "normal"
+    })
+
 @app.route('/api/coingecko')
 @ttl_cache(ttl_seconds=Config.CACHE_TTL)
 def live_data():
@@ -1480,7 +1544,17 @@ def api_ai_chat():
 
     try:
         system_prompt = build_ai_system_prompt(risk_profile)
-        messages: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}]
+        # ── RAG injection ──
+        rag_context = ""
+        try:
+            if _rag and _rag_available:
+                rag = _rag.augment_chat(user_msg, risk_profile)
+                ctx = "\n".join(rag.get("context", []))
+                if ctx:
+                    rag_context = f"\n\n【參考知識】\n{ctx}"
+        except Exception:
+            pass  # RAG failure → silent fallback
+        messages: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt + rag_context}]
 
         if history_rows:
             messages.extend(map_history_rows(history_rows))
@@ -2060,9 +2134,21 @@ def api_agent_plan():
     if not client:
         return jsonify(fallback)
 
+    # ── RAG injection ──
+    rag_context = ""
+    try:
+        if _rag and _rag_available:
+            rag = _rag.augment_agent(goal, profile, str(budget))
+            ctx = "\n".join(rag.get("context", []))
+            if ctx:
+                rag_context = f"\n\n參考知識：\n{ctx}"
+    except Exception:
+        pass
+
     try:
         prompt = f"""
 你是 Smart Invest 的加密資產 AI Agent。請把使用者任務拆成新手也看得懂、可以今天執行的行動計畫。
+{rag_context}
 
 使用者任務：{goal}
 投資風格：{profile}
@@ -2166,13 +2252,25 @@ def api_scam_scan():
         return jsonify({"risk_level": "unknown", "report": "API Key 未設定，無法連線 AI。"})
     if not text:
         return jsonify({"risk_level": "unknown", "report": "請提供要檢測的內容。"})
+    # ── RAG: scam pattern knowledge supplement ──
+    rag_supplement = ""
+    try:
+        if _rag and _rag_available:
+            rag = _rag.augment_scam(text)
+            snippets = rag.get("rag_snippets", [])
+            if snippets:
+                rag_supplement = "\n參考詐騙模式知識：\n" + "\n".join(snippets[:2])
+    except Exception:
+        pass
+
     try:
         system_prompt = (
             "你是金融反詐騙專家。請只輸出 JSON，格式為 "
             "{\"risk_level\": \"high|medium|low\", \"report\": \"...\"}。"
             "risk_level 必須是 high、medium 或 low。report 請用中文整理："
             "1.風險等級 2.疑點解析 3.防範建議。"
-        )
+            "不要用模糊語句降低風險警示，若有不確定處請明確標示。"
+        ) + rag_supplement
         completion = scam_client.beta.chat.completions.parse(
             model=os.getenv("OPENAI_MODEL", "gpt-5.4"),
             messages=[
@@ -2196,12 +2294,23 @@ def generate_podcast():
     if req.market == "PERSONAL" and req.portfolio_summary:
         personal_summary = f"\n會員模擬資產摘要={json.dumps(req.portfolio_summary, ensure_ascii=False)[:1800]}\n請在開場自然唸出會員目前總資產、現金與已投入的幣種市值摘要。"
     prompt = f"市場={req.market}\n風險={req.profile.risk_level}\n關注清單={req.watchlist}\n事件={req.events}{personal_summary}\n請用口語播報市場與配置重點。"
+    # ── RAG injection ──
+    rag_context = ""
+    try:
+        if _rag and _rag_available:
+            rag = _rag.augment_podcast(req.market, market_context=f"市場={req.market} 風險={req.profile.risk_level}")
+            ctx = "\n".join(rag.get("context", []))
+            if ctx:
+                rag_context = f"\n風格參考：\n{ctx}"
+    except Exception:
+        pass
+    system_msg = "你是加密貨幣晨報 Podcast 主持人與分析師。請遵循 Podcast 風格指南，開場含日期與市場概覽，結尾含投資提醒。輸出 JSON。" + rag_context
     try:
         podcast_client = refresh_openai_client()
         if not podcast_client: return jsonify(build_fallback_podcast(req))
         completion = podcast_client.beta.chat.completions.parse(
-            model=os.getenv("OPENAI_MODEL", "gpt-5.4"), 
-            messages=[{"role": "system", "content": "你是加密貨幣晨報 Podcast 主持人與分析師。輸出 JSON。"}, {"role": "user", "content": prompt}],
+            model=os.getenv("OPENAI_MODEL", "gpt-5.4"),
+            messages=[{"role": "system", "content": system_msg}, {"role": "user", "content": prompt}],
             response_format=PodcastLLMOut
         )
         out = completion.choices[0].message.parsed
@@ -2314,6 +2423,7 @@ def api_podcast_tts_alias():
 
 
 @app.route("/portfolio/risk-health", methods=["POST"])
+@token_required
 def portfolio_risk_health():
     try:
         req = RiskHealthRequest(**(request.get_json(silent=True) or {}))
@@ -2323,17 +2433,28 @@ def portfolio_risk_health():
     return jsonify({"risk_health": calculate_portfolio_risk_health(req)})
 
 @app.route("/portfolio/analyze-llm", methods=["POST"])
+@token_required
 def analyze_portfolio_llm():
     try: req = RiskHealthRequest(**(request.get_json(silent=True) or {}))
     except ValidationError as e: return jsonify({"detail": str(e)}), 422
     rh_dict = calculate_portfolio_risk_health(req)
     if client is None: return jsonify({"risk_health": rh_dict, "narrative": "未設定金鑰，改用規則摘要。請注意波動風險。", "highlights": ["提醒：無 AI 金鑰"]})
     holdings_text = ", ".join([f"{h.ticker}({h.weight:.2f})" for h in req.holdings])
+    # ── RAG: health education supplement ──
+    rag_context = ""
+    try:
+        if _rag and _rag_available:
+            rag = _rag.augment_health(rh_dict, holdings_text)
+            ctx = "\n".join(rag.get("context", []))
+            if ctx:
+                rag_context = f"\n參考配置原則：\n{ctx}"
+    except Exception:
+        pass
     prompt = f"請用非常白話的中文分析配置：\n【持幣】{holdings_text}\n【指標】Top1={rh_dict['top1_weight']:.2f}, 年化波動={rh_dict['annual_vol']:.2f}, 最大回撤={rh_dict['max_drawdown']:.2f}"
     try:
         completion = client.beta.chat.completions.parse(
             model=os.getenv("OPENAI_MODEL_PORTFOLIO", "gpt-5.4"),
-            messages=[{"role": "system", "content": "你是專業的加密貨幣財富管理顧問。"}, {"role": "user", "content": prompt}],
+            messages=[{"role": "system", "content": "你是專業的加密貨幣財富管理顧問。請根據配置原則給出分析。" + rag_context}, {"role": "user", "content": prompt}],
             response_format=PortfolioLLMOut
         )
         out = completion.choices[0].message.parsed
@@ -2341,6 +2462,7 @@ def analyze_portfolio_llm():
     except Exception as e: return jsonify({"risk_health": rh_dict, "narrative": "LLM 分析連線失敗，請檢查金鑰。", "highlights": ["連線異常"]})
 
 @app.route("/api/portfolio/analyze", methods=["POST"])
+@token_required
 def api_portfolio_analyze_alias():
     req = request.get_json(silent=True) or {}
     amount = parse_budget_amount(req.get("amount"), 10000.0)
@@ -2358,6 +2480,112 @@ def api_portfolio_analyze_alias():
         ],
         "allocation": allocation,
     })
+
+# ═══════════════════════════════════════════════════════════════
+# RAG Management Endpoints (Phase 2A)
+# ═══════════════════════════════════════════════════════════════
+
+@app.route("/api/rag/rebuild-index", methods=["POST"])
+def api_rag_rebuild_index():
+    """Rebuild the full RAG index (chunks → embeddings → vector store + BM25)."""
+    try:
+        from services.retrieval_service import get_retrieval
+        ret = get_retrieval()
+        count = ret.rebuild_index()
+        return jsonify({
+            "success": True,
+            "indexed_chunks": count,
+            "message": f"Index rebuilt: {count} chunks indexed",
+        })
+    except Exception as exc:
+        logger.exception("RAG index rebuild failed")
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@app.route("/api/rag/stats", methods=["GET"])
+def api_rag_stats():
+    """Get RAG pipeline statistics and health."""
+    stats: Dict[str, Any] = {
+        "kb_loaded": _rag_available,
+        "components": {},
+    }
+
+    try:
+        from services.embedding_service import get_embedding_service
+        stats["components"]["embeddings"] = get_embedding_service().available
+    except Exception:
+        stats["components"]["embeddings"] = False
+
+    try:
+        from services.vector_store_service import get_vector_store
+        stats["components"]["vector_store"] = get_vector_store().available
+    except Exception:
+        stats["components"]["vector_store"] = False
+
+    try:
+        from services.bm25_service import get_bm25
+        bm25 = get_bm25()
+        stats["components"]["bm25"] = bm25.available
+        stats["bm25_corpus_size"] = bm25.corpus_size
+    except Exception:
+        stats["components"]["bm25"] = False
+
+    try:
+        from services.reranker_service import get_reranker
+        stats["components"]["reranker"] = get_reranker().available
+    except Exception:
+        stats["components"]["reranker"] = False
+
+    if _rag_metrics and _rag_metrics.enabled:
+        stats["metrics"] = _rag_metrics.get_stats()
+    else:
+        stats["metrics"] = {"note": "RAG debug logging disabled (set RAG_DEBUG_LOGGING=1)"}
+
+    stats["config"] = {
+        "embeddings_enabled": Config.RAG_ENABLE_EMBEDDINGS,
+        "vector_store_enabled": Config.RAG_ENABLE_VECTOR_STORE,
+        "query_rewrite_enabled": Config.RAG_ENABLE_QUERY_REWRITE,
+        "rerank_enabled": Config.RAG_ENABLE_RERANK,
+        "routing_mode": Config.RAG_ROUTING_MODE,
+        "embedding_model": Config.RAG_EMBEDDING_MODEL,
+    }
+
+    return jsonify(stats)
+
+
+@app.route("/api/rag/eval", methods=["POST"])
+def api_rag_eval():
+    """Run a quick evaluation smoke test on sample queries."""
+    data = request.get_json(silent=True) or {}
+    queries = data.get("queries", [
+        "比特幣適合長期持有嗎",
+        "如何判斷一個項目是不是詐騙",
+        "什麼是DCA策略",
+        "我的配置太集中了怎麼辦",
+        "什麼是健康的投資組合配置",
+    ])
+    endpoint = data.get("endpoint", "chat")
+
+    results = []
+    try:
+        if _rag and _rag_available:
+            for q in queries:
+                pipe = _rag._retrieve_for_endpoint(q, endpoint=endpoint, max_results=3)
+                results.append({
+                    "query": q,
+                    "result_count": len(pipe["results"]),
+                    "route": pipe["route_decision"].route if pipe["route_decision"] else "unknown",
+                    "method": pipe["meta"].get("method", ""),
+                    "top_snippets": [
+                        {"topic": r.topic, "source": r.source, "score": r.score, "snippet": r.snippet[:150]}
+                        for r in pipe["results"][:3]
+                    ],
+                })
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+    return jsonify({"success": True, "eval_results": results})
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False)

@@ -1,0 +1,98 @@
+{
+  "BTC": {
+    "symbol": "BTC",
+    "full_name": "Bitcoin",
+    "chinese_name": "比特幣",
+    "category": "Layer1",
+    "consensus": "PoW",
+    "typical_risks": ["監管不確定性", "能源消耗爭議", "Layer2 競爭"],
+    "narrative_tags": ["Store of Value", "數位黃金", "Layer1"],
+    "use_cases": ["價值儲存", "支付", "避險資產"],
+    "volatility_level": "medium",
+    "market_position": "基準資產"
+  },
+  "ETH": {
+    "symbol": "ETH",
+    "full_name": "Ethereum",
+    "chinese_name": "以太幣",
+    "category": "Layer1",
+    "consensus": "PoS",
+    "typical_risks": ["Gas fee 波動", "L2 生態稀釋", "競爭鏈挑戰"],
+    "narrative_tags": ["Smart Contract", "DeFi", "Layer1", "Staking"],
+    "use_cases": ["智能合約平台", "DeFi", "NFT", "Staking"],
+    "volatility_level": "medium",
+    "market_position": "第二大加密資產"
+  },
+  "SOL": {
+    "symbol": "SOL",
+    "full_name": "Solana",
+    "chinese_name": "索拉納",
+    "category": "Layer1",
+    "consensus": "PoH+PoS",
+    "typical_risks": ["網路中斷歷史", "VC 持幣集中", "MEV 問題"],
+    "narrative_tags": ["High Performance", "Layer1", "DePIN"],
+    "use_cases": ["高頻交易", "DePIN", "Meme 幣平台"],
+    "volatility_level": "high",
+    "market_position": "高性能 Layer1"
+  },
+  "XRP": {
+    "symbol": "XRP",
+    "full_name": "XRP",
+    "chinese_name": "瑞波幣",
+    "category": "Payment",
+    "consensus": "RPCA",
+    "typical_risks": ["監管訴訟風險", "銀行採用速度", "中心化爭議"],
+    "narrative_tags": ["Payment", "跨境支付", "機構採用"],
+    "use_cases": ["跨境匯款", "銀行結算", "流動性橋樑"],
+    "volatility_level": "medium",
+    "market_position": "支付領域龍頭"
+  },
+  "BNB": {
+    "symbol": "BNB",
+    "full_name": "BNB",
+    "chinese_name": "幣安幣",
+    "category": "Exchange Token",
+    "consensus": "PoSA",
+    "typical_risks": ["幣安監管風險", "交易所集中風險", "生態依賴"],
+    "narrative_tags": ["Exchange", "BSC生態", "Launchpad"],
+    "use_cases": ["交易手續費折扣", "BSC Gas", "Launchpad"],
+    "volatility_level": "medium",
+    "market_position": "最大交易所代幣"
+  },
+  "DOGE": {
+    "symbol": "DOGE",
+    "full_name": "Dogecoin",
+    "chinese_name": "狗狗幣",
+    "category": "Meme",
+    "consensus": "PoW (Scrypt)",
+    "typical_risks": ["無基本面支撐", "社群情緒驅動", "無限增發"],
+    "narrative_tags": ["Meme", "社群幣", "支付"],
+    "use_cases": ["小費", "社群文化", "支付實驗"],
+    "volatility_level": "very_high",
+    "market_position": "最大 Meme 幣"
+  },
+  "USDT": {
+    "symbol": "USDT",
+    "full_name": "Tether",
+    "chinese_name": "泰達幣",
+    "category": "Stablecoin",
+    "consensus": "Centralized",
+    "typical_risks": ["儲備透明度", "監管風險", "脫鉤風險"],
+    "narrative_tags": ["Stablecoin", "交易對"],
+    "use_cases": ["交易媒介", "價值儲存", "避險"],
+    "volatility_level": "stable",
+    "market_position": "最大穩定幣"
+  },
+  "USDC": {
+    "symbol": "USDC",
+    "full_name": "USD Coin",
+    "chinese_name": "USD Coin",
+    "category": "Stablecoin",
+    "consensus": "Centralized",
+    "typical_risks": ["監管合規", "發行商風險"],
+    "narrative_tags": ["Stablecoin", "合規"],
+    "use_cases": ["交易媒介", "DeFi", "合規支付"],
+    "volatility_level": "stable",
+    "market_position": "第二大穩定幣"
+  }
+}

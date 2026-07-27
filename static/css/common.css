@@ -258,7 +258,16 @@ label{display:block;margin-bottom:8px;color:var(--dark);font-size:14px;font-weig
 .float-btn:hover{transform:translateY(-4px);background:var(--brand);color:#fff;border-color:transparent}
 
 .footer{padding:36px 0;margin-top:70px;background:var(--dark);color:#EED7BE}
-.footer-inner{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;font-size:14px;font-weight:760}
+.footer-inner{display:flex;flex-direction:column;gap:14px;font-size:14px;font-weight:760}
+.footer-main{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;width:100%}
+.footer-brand strong{display:block;color:#fff;font-size:16px;font-weight:950}
+.footer-brand span{color:#C49A6C;font-size:12px}
+.footer-links{display:flex;gap:16px}
+.footer-links a{color:#EED7BE;text-decoration:none;font-size:13px}
+.footer-links a:hover{color:#fff}
+.footer-disclaimer{margin:4px 0;padding-top:12px;border-top:1px solid rgba(255,255,255,.12);width:100%}
+.footer-disclaimer p{color:#A68B6F;font-size:11px;line-height:1.65;margin:0}
+.footer-bottom{display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;color:#A68B6F;font-size:11px}
 
 .toast{position:fixed;right:26px;bottom:26px;min-width:280px;background:var(--dark);color:#fff;padding:16px 20px;border-radius:18px;display:none;z-index:9999;box-shadow:0 26px 60px rgba(43,33,24,.22)}
 .toast .t{font-weight:950;margin-bottom:5px}.toast .m{color:#EED7BE;font-size:13px;line-height:1.55}
@@ -716,6 +725,14 @@ label{
   margin:18px 0;
 }
 
+.sim-hero{
+  padding:56px 0 32px;
+}
+
+.sim-hero .hero-grid{
+  min-height:220px;
+}
+
 .sim-app{
   display:grid;
   grid-template-columns:minmax(0,1fr) minmax(360px,.8fr);
@@ -777,6 +794,160 @@ label{
 
 .chart-box.small{
   height:240px;
+}
+
+.sim-scenario-card{
+  grid-column:1 / -1;
+  padding:28px;
+}
+
+.sim-scenario-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  flex-wrap:wrap;
+}
+
+.sim-scenario-badge{
+  display:inline-flex;
+  align-items:center;
+  min-height:32px;
+  padding:0 14px;
+  border-radius:999px;
+  background:#FFF7ED;
+  border:1px solid var(--brand-2);
+  color:var(--brand);
+  font-size:13px;
+  font-weight:950;
+}
+
+.sim-scenario-desc{
+  margin:8px 0 16px;
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.6;
+}
+
+.sim-scenario-selector{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:12px;
+}
+
+.scenario-btn{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:6px;
+  padding:16px 10px;
+  border:1px solid var(--line);
+  border-radius:18px;
+  background:#fff;
+  cursor:pointer;
+  text-align:center;
+  transition:.2s ease;
+}
+
+.scenario-btn i{
+  font-size:22px;
+  color:var(--brand);
+}
+
+.scenario-btn strong{
+  color:var(--dark);
+  font-size:15px;
+}
+
+.scenario-btn small{
+  color:var(--muted);
+  font-size:11px;
+}
+
+.scenario-btn:hover{
+  transform:translateY(-2px);
+  border-color:var(--brand-2);
+  box-shadow:0 10px 24px rgba(60,38,18,.08);
+}
+
+.scenario-btn.active{
+  background:#FFF7ED;
+  border-color:var(--brand-2);
+  box-shadow:0 12px 28px rgba(154,91,37,.12);
+}
+
+.sim-scenario-info{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:12px;
+  margin-top:18px;
+  padding-top:16px;
+  border-top:1px solid var(--line);
+}
+
+.sim-scenario-info div{
+  text-align:center;
+}
+
+.sim-scenario-info span{
+  display:block;
+  color:var(--muted);
+  font-size:12px;
+  font-weight:800;
+}
+
+.sim-scenario-info strong{
+  display:block;
+  margin-top:6px;
+  color:var(--dark);
+  font-size:20px;
+  font-weight:950;
+}
+
+.scenario-strategy-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:14px;
+  margin:16px 0;
+}
+
+.scenario-strategy-card{
+  padding:16px;
+  border:1px solid var(--line);
+  border-radius:18px;
+  background:linear-gradient(180deg,#fff,#FFF8EF);
+}
+
+.scenario-strategy-card span,
+.scenario-strategy-card small{
+  display:block;
+  color:var(--muted);
+  font-size:12px;
+  font-weight:900;
+}
+
+.scenario-strategy-card strong{
+  display:block;
+  margin:6px 0 2px;
+  color:var(--dark);
+  font-size:26px;
+}
+
+.scenario-strategy-table td:last-child{
+  white-space:normal;
+  min-width:220px;
+}
+
+@media(max-width:760px){
+  .sim-scenario-selector{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .sim-scenario-info{
+    grid-template-columns:1fr;
+  }
+  .scenario-strategy-grid{
+    grid-template-columns:1fr;
+  }
 }
 
 .order-grid{
