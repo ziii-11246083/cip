@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/iansui@1.0/dist/iansui.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=utf8fix">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=avatar-center-absolute-20260727">
 </head>
 <body>
 {% include "partials/header.html" %}
@@ -114,8 +114,8 @@
   };
   window.__ANALYSIS_SYMBOL__ = {{ symbol | tojson }};
 </script>
-<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=member-nav-lock-20260604"></script>
-<script src="{{ url_for('static', filename='js/common.js') }}?v=member-nav-lock-20260604"></script>
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=avatar-center-absolute-20260727"></script>
+<script src="{{ url_for('static', filename='js/common.js') }}?v=avatar-center-absolute-20260727"></script>
 <script src="{{ url_for('static', filename='js/analysis.js') }}?v=20260606-analysis-charts"></script>
 </body>
 </html>

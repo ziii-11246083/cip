@@ -22,6 +22,21 @@
       features_json: { ai_chat_daily_limit: null }
     }
   ];
+  let authRefreshTimer = null;
+  let membershipRefreshInFlight = null;
+  let dataRefreshInFlight = null;
+
+  async function fetchJson(url, options = {}, timeoutMs = 2500) {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, Object.assign({}, options, { signal: controller.signal }));
+      const data = await res.json().catch(() => ({}));
+      return { res, data };
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }
 
   function fmtTwdFromUsd(valueUsd) {
     const value = Number(valueUsd || 0) * USD_TO_TWD;
@@ -148,8 +163,7 @@
       const token = await getAuthToken();
       if (token) headers.Authorization = `Bearer ${token}`;
     }
-    const res = await fetch(url, Object.assign({}, options, { headers }));
-    const data = await res.json().catch(() => ({}));
+    const { res, data } = await fetchJson(url, Object.assign({}, options, { headers }), 2800);
     if (res.status === 401) {
       throw new Error(data.error || "請先登入會員。");
     }
@@ -277,8 +291,10 @@
   }
 
   async function refreshMembershipBilling() {
-    const plansData = await fetch("/api/membership/plans")
-      .then((res) => res.ok ? res.json() : { plans: DEFAULT_MEMBERSHIP_PLANS })
+    if (membershipRefreshInFlight) return membershipRefreshInFlight;
+    membershipRefreshInFlight = (async () => {
+    const plansData = await fetchJson("/api/membership/plans", {}, 1800)
+      .then(({ res, data }) => res.ok ? data : { plans: DEFAULT_MEMBERSHIP_PLANS })
       .catch(() => ({ plans: DEFAULT_MEMBERSHIP_PLANS }));
     const plans = Array.isArray(plansData.plans) && plansData.plans.length
       ? plansData.plans
@@ -298,21 +314,44 @@
     }
     renderSubscription(subscription);
     renderMembershipPlans(plans, subscription);
+    })().finally(() => {
+      membershipRefreshInFlight = null;
+    });
+    return membershipRefreshInFlight;
   }
 
   async function refreshData() {
+    if (dataRefreshInFlight) return dataRefreshInFlight;
+    dataRefreshInFlight = (async () => {
     const token = await waitForAuthToken();
     if (!token) return;
     const headers = { Authorization: `Bearer ${token}` };
-    const [portfolioData, tradeData] = await Promise.all([
+    const [portfolioData, tradeData] = await Promise.allSettled([
       request("/api/sim-trade/portfolio", { headers }),
       request("/api/sim-trade/history?limit=50", { headers })
     ]);
-    renderPortfolio(portfolioData.portfolio);
-    renderTrades(tradeData.trades || []);
+    if (portfolioData.status === "fulfilled") renderPortfolio(portfolioData.value.portfolio);
+    if (tradeData.status === "fulfilled") renderTrades(tradeData.value.trades || []);
+    })().finally(() => {
+      dataRefreshInFlight = null;
+    });
+    return dataRefreshInFlight;
+  }
+
+  function scheduleAuthRefresh() {
+    window.clearTimeout(authRefreshTimer);
+    authRefreshTimer = window.setTimeout(() => {
+      refreshMembershipBilling().catch(() => {});
+      refreshData().catch(() => {});
+    }, 180);
   }
 
   document.addEventListener("DOMContentLoaded", () => {
+    renderSubscription({ status: "free", source: "loading" });
+    renderMembershipPlans(DEFAULT_MEMBERSHIP_PLANS, { status: "free" });
+    renderPortfolio({ cash: 100000, total_value_usd: 100000, positions: [], equity_curve: [], capital_records: [] });
+    renderTrades([]);
+
     refreshMembershipBilling().catch(() => {
       renderSubscription({ status: "free", source: "fallback" });
     });
@@ -419,7 +458,6 @@
   });
 
   window.addEventListener("smartinvest:auth-state", () => {
-    refreshMembershipBilling().catch(() => {});
-    refreshData().catch(() => {});
+    scheduleAuthRefresh();
   });
 })();

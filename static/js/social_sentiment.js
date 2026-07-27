@@ -35,9 +35,19 @@ function renderPosts(containerId, posts, className){
   }).join("");
 }
 
+async function fetchWithTimeout(url, options = {}, timeoutMs = 3200){
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try{
+    return await fetch(url, Object.assign({}, options, { signal: controller.signal }));
+  }finally{
+    window.clearTimeout(timer);
+  }
+}
+
 async function loadSocialSentiment(){
   try{
-    const res = await fetch("/api/social-data");
+    const res = await fetchWithTimeout("/api/social-data", {}, 3200);
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const score = Number(data.sentiment_score || 0);
@@ -66,5 +76,5 @@ async function loadSocialSentiment(){
 
 document.addEventListener("DOMContentLoaded", () => {
   loadSocialSentiment();
-  setInterval(loadSocialSentiment, 15000);
+  setInterval(loadSocialSentiment, 45000);
 });

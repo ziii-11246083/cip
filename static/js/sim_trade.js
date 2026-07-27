@@ -4,9 +4,17 @@
   let allocChart = null;
   let coinOptions = [];
   let currentPortfolio = null;
+  let basePortfolio = null;
   let isLocked = false;
   let activeScenario = "normal";
-  let scenarioData = {};
+  let initStarted = false;
+  const DEFAULT_TIMEOUT_MS = 2600;
+  const CACHE_TTL_MS = 5 * 60 * 1000;
+  const CACHE_KEYS = {
+    portfolio: "si_sim_trade_portfolio_cache_v1",
+    trades: "si_sim_trade_trades_cache_v1",
+    coins: "si_sim_trade_coins_cache_v1"
+  };
   const DEFAULT_COINS = [
     { symbol: "BTC", name: "Bitcoin" },
     { symbol: "ETH", name: "Ethereum" },
@@ -35,6 +43,48 @@
     bear: { label: "熊市", advice: "降低部位，保留現金緩衝。" },
     black_swan: { label: "黑天鵝", advice: "極端風險，優先檢查最大回撤。" }
   };
+  const FALLBACK_SCENARIOS = {
+    normal: { label: "一般市場", price_multiplier: 1, volatility_multiplier: 1 },
+    sideways: { label: "盤整市場", price_multiplier: 1, volatility_multiplier: 0.6 },
+    bull: { label: "牛市", price_multiplier: 1.3, volatility_multiplier: 0.8 },
+    alt_rotation: { label: "山寨輪動", price_multiplier: 1.15, volatility_multiplier: 1.8 },
+    bear: { label: "熊市", price_multiplier: 0.7, volatility_multiplier: 1.5 },
+    black_swan: { label: "黑天鵝", price_multiplier: 0.4, volatility_multiplier: 3 }
+  };
+  let scenarioData = Object.assign({}, FALLBACK_SCENARIOS);
+
+  function defaultPortfolio() {
+    return {
+      cash: 100000,
+      positions: [],
+      total_value_usd: 100000,
+      unrealized_pnl: 0,
+      pnl_pct: 0,
+      equity_curve: [{ timestamp: new Date().toISOString(), total_value_usd: 100000 }],
+      capital_records: [],
+      scenario: activeScenario
+    };
+  }
+
+  function readCache(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      const cached = JSON.parse(raw);
+      if (!cached?.ts || Date.now() - cached.ts > CACHE_TTL_MS) return null;
+      return cached.value || null;
+    } catch {
+      return null;
+    }
+  }
+
+  function writeCache(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify({ ts: Date.now(), value }));
+    } catch {
+      // localStorage can be unavailable in private browsing; the page should still work.
+    }
+  }
 
   function fmtUSD(value) {
     const n = Number(value || 0);
@@ -66,7 +116,7 @@
   }
 
   function scenarioAdjustedPrice(symbol, basePrice) {
-    const sc = scenarioData[activeScenario] || {};
+    const sc = scenarioData[activeScenario] || FALLBACK_SCENARIOS[activeScenario] || {};
     const stable = symbol === "USDT" || symbol === "USDC";
     const multiplier = stable ? 1 : Number(sc.price_multiplier || 1);
     return Number(basePrice || 0) * multiplier;
@@ -87,13 +137,32 @@
     if (app) app.classList.toggle("sim-locked", locked);
   }
 
+  async function fetchJson(url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, Object.assign({}, options, { signal: controller.signal }));
+      const data = await res.json().catch(() => ({}));
+      return { res, data };
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }
+
   async function request(url, options) {
     const headers = Object.assign({ "Content-Type": "application/json" }, options?.headers || {});
     const token = window.authManager ? await window.authManager.getToken().catch(() => null) : null;
     if (token) headers.Authorization = `Bearer ${token}`;
-
-    const res = await fetch(url, Object.assign({}, options, { headers }));
-    const data = await res.json().catch(() => ({}));
+    let payload;
+    try {
+      payload = await fetchJson(url, Object.assign({}, options, { headers }));
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        throw new Error("模擬交易資料載入逾時，請稍後再試或重新整理。");
+      }
+      throw error;
+    }
+    const { res, data } = payload;
     if (res.status === 401) {
       setLockedState(true);
       throw new Error(data.error || "請先登入會員。");
@@ -134,10 +203,12 @@
   }
 
   async function loadCoins() {
-    const bySymbol = new Map(DEFAULT_COINS.map((coin) => [coin.symbol, coin]));
+    const cachedCoins = readCache(CACHE_KEYS.coins);
+    const seedCoins = Array.isArray(cachedCoins) && cachedCoins.length ? cachedCoins : DEFAULT_COINS;
+    const bySymbol = new Map(seedCoins.map((coin) => [String(coin.symbol || "").toUpperCase(), coin]));
     try {
-      const res = await fetch("/crypto/popular?vs_currency=usd&per_page=20");
-      const data = await res.json();
+      const { res, data } = await fetchJson("/crypto/popular?vs_currency=usd&per_page=20", {}, 1800);
+      if (!res.ok) throw new Error("coin list failed");
       const apiCoins = Array.isArray(data) ? data : [];
       apiCoins.forEach((coin) => {
         const symbol = String(coin.symbol || "").toUpperCase();
@@ -145,9 +216,10 @@
         bySymbol.set(symbol, Object.assign({}, coin, { symbol }));
       });
     } catch {
-      // Keep default coins when market API is unavailable.
+      setStatus("行情更新較慢，已先使用快取或內建幣種。", "warn");
     }
     coinOptions = Array.from(bySymbol.values());
+    writeCache(CACHE_KEYS.coins, coinOptions);
 
     const select = $("orderSymbol");
     if (!select) return;
@@ -418,19 +490,89 @@
     });
   }
 
-  async function refreshPortfolio() {
-    const data = await request("/api/sim-trade/portfolio" + currentScenarioQuery());
-    currentPortfolio = data.portfolio || null;
-    updateKpis(data.portfolio);
-    renderPositions(data.portfolio);
-    drawEquity(data.portfolio);
-    drawAlloc(data.portfolio);
+  function scenarioMultiplierFor(symbol) {
+    const sc = scenarioData[activeScenario] || FALLBACK_SCENARIOS[activeScenario] || FALLBACK_SCENARIOS.normal;
+    const stable = symbol === "USDT" || symbol === "USDC";
+    return stable ? 1 : Number(sc.price_multiplier || 1);
+  }
+
+  function applyScenarioToPortfolio(snapshot) {
+    const source = snapshot || defaultPortfolio();
+    const copy = JSON.parse(JSON.stringify(source));
+    const cash = Number(copy.cash || 0);
+    let total = cash;
+    copy.positions = (Array.isArray(copy.positions) ? copy.positions : []).map((pos) => {
+      const symbol = String(pos.symbol || "").toUpperCase();
+      const qty = Number(pos.quantity || 0);
+      const basePrice = Number(pos.base_price || pos.current_price || pos.avg_price || FALLBACK_PRICES[symbol] || 0);
+      const currentPrice = basePrice * scenarioMultiplierFor(symbol);
+      const marketValue = qty * currentPrice;
+      total += marketValue;
+      return Object.assign({}, pos, {
+        symbol,
+        base_price: basePrice,
+        current_price: currentPrice,
+        market_value: marketValue,
+        unrealized_pnl: (currentPrice - Number(pos.avg_price || currentPrice)) * qty
+      });
+    });
+
+    const initial = Math.max(1, total - Number(copy.unrealized_pnl || 0));
+    copy.total_value_usd = total;
+    copy.unrealized_pnl = total - (Number(source.total_value_usd || total) - Number(source.unrealized_pnl || 0));
+    copy.pnl_pct = copy.unrealized_pnl / initial * 100;
+    copy.scenario = activeScenario;
+    return copy;
+  }
+
+  function renderPortfolio(snapshot) {
+    currentPortfolio = applyScenarioToPortfolio(snapshot || basePortfolio || defaultPortfolio());
+    updateKpis(currentPortfolio);
+    renderPositions(currentPortfolio);
+    drawEquity(currentPortfolio);
+    drawAlloc(currentPortfolio);
     updateQuotePanel();
   }
 
-  async function refreshTrades() {
+  function renderInstantState() {
+    coinOptions = readCache(CACHE_KEYS.coins) || DEFAULT_COINS;
+    const cachedPortfolio = readCache(CACHE_KEYS.portfolio) || defaultPortfolio();
+    const cachedTrades = readCache(CACHE_KEYS.trades) || [];
+    basePortfolio = cachedPortfolio;
+    renderCoinSelect();
+    renderPortfolio(cachedPortfolio);
+    renderTrades(cachedTrades);
+  }
+
+  function renderCoinSelect() {
+    const select = $("orderSymbol");
+    if (!select) return;
+    const selected = select.value || "BTC";
+    select.innerHTML = "";
+    coinOptions.forEach((coin) => {
+      const symbol = String(coin.symbol || "").toUpperCase();
+      if (!symbol) return;
+      select.add(new Option(`${symbol} | ${coin.name || symbol}`, symbol));
+    });
+    if ([...select.options].some((opt) => opt.value === selected)) {
+      select.value = selected;
+    }
+  }
+
+  async function refreshPortfolio({ background = false } = {}) {
+    if (!background) setStatus("正在更新帳戶資料...", "");
+    const data = await request("/api/sim-trade/portfolio?scenario=normal");
+    basePortfolio = data.portfolio || defaultPortfolio();
+    writeCache(CACHE_KEYS.portfolio, basePortfolio);
+    renderPortfolio(basePortfolio);
+  }
+
+  async function refreshTrades({ background = false } = {}) {
     const data = await request("/api/sim-trade/history?limit=50", { headers: {} });
-    renderTrades(data.trades);
+    const trades = Array.isArray(data.trades) ? data.trades : [];
+    writeCache(CACHE_KEYS.trades, trades);
+    renderTrades(trades);
+    if (!background) setStatus("交易紀錄已更新。", "ok");
   }
 
   async function placeOrder() {
@@ -459,7 +601,7 @@
       $("orderQty").value = "";
       $("orderAmt").value = "";
       setStatus("委託成功，已更新持倉。", "ok");
-      await Promise.all([refreshPortfolio(), refreshTrades()]);
+      await Promise.allSettled([refreshPortfolio(), refreshTrades({ background: true })]);
     } catch (error) {
       setStatus(error.message || "下單失敗", "bad");
     }
@@ -473,27 +615,31 @@
         body: JSON.stringify({})
       });
       setStatus("模擬帳戶已重置。", "ok");
-      await Promise.all([refreshPortfolio(), refreshTrades()]);
+      await Promise.allSettled([refreshPortfolio(), refreshTrades({ background: true })]);
     } catch (error) {
       setStatus(error.message || "重置失敗", "bad");
     }
   }
 
   document.addEventListener("DOMContentLoaded", async function () {
-    const token = await waitForAuthToken();
-    if (!token) {
-      setLockedState(true);
-      setStatus("目前是訪客模式，請先登入會員。", "bad");
-      return;
-    }
+    if (initStarted) return;
+    initStarted = true;
+    renderInstantState();
+    setStatus("已載入 Demo 交易介面，資料背景更新中...", "ok");
 
-    try {
-      await loadCoins();
-      await Promise.all([refreshPortfolio(), refreshTrades()]);
-      setLockedState(false);
-    } catch (error) {
-      setStatus(error.message || "請先登入會員。", "bad");
-    }
+    $("btnDemoAccess")?.addEventListener("click", async function () {
+      try {
+        if (window.authManager?.loginWithEmail) {
+          await window.authManager.loginWithEmail("test@smartinvest.local", "Test123456", { silent: true });
+          setLockedState(false);
+          setStatus("已切換為 Demo 會員，可立即操作。", "ok");
+          refreshPortfolio({ background: true }).catch(() => {});
+          refreshTrades({ background: true }).catch(() => {});
+        }
+      } catch (error) {
+        setStatus(error?.message || "Demo 登入失敗，請稍後再試。", "bad");
+      }
+    });
 
     $("btnPlaceOrder")?.addEventListener("click", function () {
       if (isLocked) return;
@@ -503,8 +649,13 @@
     $("btnReload")?.addEventListener("click", async function () {
       if (isLocked) return;
       setStatus("正在重新整理...", "");
-      await Promise.all([refreshPortfolio(), refreshTrades()]);
-      setStatus("資料已更新。", "ok");
+      const results = await Promise.allSettled([
+        loadCoins(),
+        refreshPortfolio(),
+        refreshTrades({ background: true })
+      ]);
+      const failed = results.some((item) => item.status === "rejected");
+      setStatus(failed ? "部分資料更新較慢，已保留目前可用資料。" : "資料已更新。", failed ? "warn" : "ok");
     });
 
     $("btnReset")?.addEventListener("click", function () {
@@ -520,13 +671,12 @@
     // —— Market Scenario Switcher ——
     async function loadScenarios() {
       try {
-        const res = await fetch("/api/market-scenarios");
+        const { res, data } = await fetchJson("/api/market-scenarios", {}, 3000);
         if (!res.ok) return;
-        const data = await res.json();
-        scenarioData = data.scenarios || {};
+        scenarioData = Object.assign({}, FALLBACK_SCENARIOS, data.scenarios || {});
       } catch (e) {
         console.warn("Failed to load market scenarios", e);
-        scenarioData = {};
+        scenarioData = Object.assign({}, FALLBACK_SCENARIOS);
       }
     }
 
@@ -551,8 +701,7 @@
       });
 
       if ($("scAdvice") && ui.advice) $("scAdvice").textContent = ui.advice;
-      updateQuotePanel();
-      refreshPortfolio().catch(() => {});
+      renderPortfolio(basePortfolio || currentPortfolio || defaultPortfolio());
       console.log("[sim-trade] scenario switched to", scenarioKey, sc);
     }
 
@@ -562,5 +711,38 @@
 
     loadScenarios().then(() => applyScenario("normal"));
     // —— End Scenario Switcher ——
+
+    const wantsDemo = new URLSearchParams(window.location.search).get("demo") === "1";
+    if (wantsDemo && window.authManager?.loginWithEmail) {
+      await window.authManager.loginWithEmail("test@smartinvest.local", "Test123456", { silent: true }).catch(() => null);
+    } else {
+      await waitForAuthToken(900).catch(() => null);
+    }
+
+    const effectiveToken = await getAuthToken();
+    if (!effectiveToken) {
+      setLockedState(true);
+      setStatus("目前是訪客模式，請按上方 Demo 會員體驗即可開始。", "bad");
+      return;
+    }
+
+    setLockedState(false);
+    Promise.allSettled([
+      loadCoins(),
+      refreshPortfolio({ background: true }),
+      refreshTrades({ background: true })
+    ]).then((results) => {
+      const failed = results.some((item) => item.status === "rejected");
+      setStatus(failed ? "部分外部資料較慢，模擬交易仍可使用。" : "模擬交易已就緒。", failed ? "warn" : "ok");
+    });
+  });
+
+  window.addEventListener("smartinvest:auth-state", (event) => {
+    const loggedIn = Boolean(event.detail?.isMember || window.authManager?.isLoggedIn?.() || window.smartInvestMembership?.isMember);
+    setLockedState(!loggedIn);
+    if (loggedIn) {
+      refreshPortfolio({ background: true }).catch(() => {});
+      refreshTrades({ background: true }).catch(() => {});
+    }
   });
 })();

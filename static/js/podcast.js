@@ -70,6 +70,16 @@ let browserVoiceActive = false;
 
 const player = $("player");
 
+async function fetchWithTimeout(url, options = {}, timeoutMs = 3000) {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        return await fetch(url, Object.assign({}, options, { signal: controller.signal }));
+    } finally {
+        window.clearTimeout(timer);
+    }
+}
+
 async function hasMemberSession() {
     try {
         const token = await window.authManager?.getToken?.();
@@ -100,9 +110,9 @@ async function fetchPersonalPortfolioSummary() {
     if (!token) return null;
 
     try {
-        const res = await fetch("/api/sim-trade/portfolio", {
+        const res = await fetchWithTimeout("/api/sim-trade/portfolio", {
             headers: { Authorization: `Bearer ${token}` }
-        });
+        }, 2200);
         if (!res.ok) return null;
         const snapshot = (await res.json()).portfolio || null;
         if (!snapshot) return null;
@@ -121,12 +131,25 @@ async function fetchPersonalPortfolioSummary() {
     }
 }
 
-function updatePodcastAccessState() {
+function updatePodcastAccessState(eventOrState = {}) {
     const gate = $("podcastGuestGate");
     const btn = $("btnEnablePodcastGuest");
-    const isGuest = Boolean(window.authManager?.isGuestMode?.());
-    if (gate) gate.classList.toggle("is-active", isGuest);
+    const state = eventOrState?.detail || eventOrState || {};
+    const isMember = Boolean(
+        state.isMember ||
+        window.authManager?.isLoggedIn?.() ||
+        window.smartInvestMembership?.isMember ||
+        document.body?.classList.contains("is-logged-in")
+    );
+    const isGuest = !isMember && Boolean(state.isGuest || window.authManager?.isGuestMode?.());
+
+    if (gate) {
+        gate.hidden = isMember;
+        gate.setAttribute("aria-hidden", isMember ? "true" : "false");
+        gate.classList.toggle("is-active", isGuest);
+    }
     if (btn) {
+        btn.hidden = isMember;
         btn.innerHTML = isGuest
             ? '<i class="fas fa-circle-check"></i> 已啟用訪客模式'
             : '<i class="fas fa-user-check"></i> 啟用訪客模式';
@@ -153,7 +176,7 @@ function normalizeCoinList(raw) {
 
 async function fetchPopularCoins(perPage = 18) {
     try {
-        const res = await fetch(`/crypto/popular?vs_currency=usd&per_page=${perPage}`);
+        const res = await fetchWithTimeout(`/crypto/popular?vs_currency=usd&per_page=${perPage}`, {}, 2200);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return normalizeCoinList(await res.json());
     } catch (e) {

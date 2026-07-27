@@ -163,7 +163,10 @@ async function loadPopularCoins(){
   popularCoinsCache = DEFAULT_COINS;
 
   try{
-    const res = await fetch("/crypto/popular?vs_currency=usd&per_page=24");
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 2200);
+    const res = await fetch("/crypto/popular?vs_currency=usd&per_page=24", { signal: controller.signal })
+      .finally(() => window.clearTimeout(timer));
     if(res.ok){
       const data = await res.json();
 

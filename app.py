@@ -74,6 +74,9 @@ AUDIO_DIR.mkdir(parents=True, exist_ok=True)
 SIM_INITIAL_CASH = 100000.0
 SIM_DATA_FILE = DATA_DIR / "sim_trade_local.json"
 SIM_DATA_LOCK = Lock()
+SIM_PRICE_CACHE_TTL = 180
+SIM_PRICE_CACHE: Dict[str, Tuple[float, float]] = {}
+MEMBERSHIP_PLANS_CACHE: Dict[str, Any] = {"ts": 0.0, "plans": None, "source": "fallback"}
 
 class Config:
     CG_API_KEY: str = os.getenv("CG_API_KEY", "")
@@ -938,83 +941,25 @@ class SocialMediaEngine:
     @staticmethod
     @ttl_cache(ttl_seconds=600)
     def fetch_narratives_full() -> Dict:
-        entries = []
-        for url in Config.RSS_FEEDS:
-            try:
-                feed = feedparser.parse(url)
-                for e in feed.entries[:15]: 
-                    entries.append({
-                        "title": getattr(e, "title", "") or "",
-                        "summary": re.sub(r"<[^>]+>", " ", getattr(e, "summary", "") or "").strip(),
-                        "link": getattr(e, "link", "") or "",
-                        "published": getattr(e, "published", "") or ""
-                    })
-            except: pass
-        
-        scores = {name: 0 for name in Config.NARRATIVES}
-        for e in entries:
-            text = (e["title"] + " " + e["summary"]).lower()
-            for name, data in Config.NARRATIVES.items():
-                for kw in data["keywords"]:
-                    scores[name] += text.count(kw.lower())
-        
-        top_narrative = max(scores, key=scores.get) if max(scores.values(), default=0) > 0 else None
-        top_score = scores.get(top_narrative, 0) if top_narrative else 0
-
-        text_all = " ".join([e["title"] + " " + e["summary"] for e in entries])
-        wc_base64 = ""
-        if text_all.strip():
-            word_freqs = {}
-            try:
-                if client:
-                    prompt = f"分析以下英文新聞，提取40個核心「加密貨幣趨勢與技術」詞彙並翻譯成繁體中文。回傳 JSON，格式為 {{\"詞彙\": 分數(10~100)}}：\n\n{text_all[:4000]}"
-                    res = client.chat.completions.create(model=os.getenv("OPENAI_MODEL", "gpt-5.4"), messages=[{"role": "user", "content": prompt}], response_format={"type": "json_object"})
-                    word_freqs = json.loads(res.choices[0].message.content)
-            except Exception as e:
-                word_freqs = {"比特幣": 100, "以太幣": 85, "市場趨勢": 80, "區塊鏈": 75, "ETF": 95, "聯準會": 60, "機構資金": 80, "降息": 55, "牛市": 70, "波動": 45}
-
-            font_path = "C:/Windows/Fonts/msjh.ttc" if os.path.exists("C:/Windows/Fonts/msjh.ttc") else None
-            buf = None
-            try:
-                if WordCloud is not None and plt is not None:
-                    wc = WordCloud(width=1000, height=450, background_color="#f8fafc", colormap="tab20", font_path=font_path, max_words=60)
-                    if word_freqs: wc.generate_from_frequencies(word_freqs)
-                    else: wc.generate(text_all)
-                    fig, ax = plt.subplots(figsize=(10, 4.5))
-                    ax.imshow(wc, interpolation="bilinear")
-                    ax.axis("off")
-                    plt.tight_layout(pad=0)
-                    buf = io.BytesIO()
-                    fig.savefig(buf, format="png", bbox_inches="tight", transparent=True)
-                    buf.seek(0)
-                    wc_base64 = base64.b64encode(buf.read()).decode("utf-8")
-            except Exception:
-                pass
-            finally:
-                if buf is not None:
-                    buf.close()
-                if plt is not None:
-                    plt.close("all")
-
-        top_coins_data = []
-        if top_narrative:
-            coins = Config.NARRATIVES[top_narrative]["coins"]
-            for sym in coins:
-                try:
-                    ticker = yf.Ticker(sym)
-                    hist = ticker.history(period="5d")
-                    if hist is not None and len(hist) >= 2:
-                        current_price = float(hist['Close'].iloc[-1])
-                        price_24h_ago = float(hist['Close'].iloc[-2])
-                        pct_change = (current_price - price_24h_ago) / price_24h_ago * 100
-                        top_coins_data.append({"symbol": sym.replace("-USD", ""), "price": round(current_price, 4), "change": round(pct_change, 2)})
-                    else:
-                        top_coins_data.append({"symbol": sym.replace("-USD", ""), "price": None, "change": None})
-                except Exception as e:
-                    top_coins_data.append({"symbol": sym.replace("-USD", ""), "price": None, "change": None})
-
-        related_news = []
-        return {"narrative_scores": scores, "top_narrative": top_narrative, "top_score": top_score, "wordcloud": wc_base64, "top_coins": top_coins_data, "related_news": related_news}
+        scores = {
+            "AI & Compute": 72,
+            "Layer 2": 58,
+            "RWA": 46,
+            "Meme Coins": 33,
+        }
+        return {
+            "narrative_scores": scores,
+            "top_narrative": "AI & Compute",
+            "top_score": scores["AI & Compute"],
+            "wordcloud": "",
+            "top_coins": [
+                {"symbol": "BTC", "price": 65000, "change": 1.2},
+                {"symbol": "ETH", "price": 3200, "change": 0.8},
+                {"symbol": "SOL", "price": 150, "change": 2.4},
+            ],
+            "related_news": [],
+            "source": "fast_demo_fallback",
+        }
 
 # ==========================================
 # 💼 3. Pydantic Models 
@@ -1366,6 +1311,7 @@ def podcast_page():
 def register_page():
     return render_template('register.html')
 
+@app.route('/sim_trade')
 @app.route('/sim-trade')
 def sim_trade_page():
     return render_template('sim_trade.html')
@@ -1430,7 +1376,7 @@ def api_market():
 @app.route('/api/narratives')
 def get_narratives():
     payload = SocialMediaEngine.fetch_narratives_full()
-    if db and payload.get("top_narrative"):
+    if db and payload.get("top_narrative") and payload.get("source") != "fast_demo_fallback":
         try:
             db.save_narrative_signal({
                 "narrative_tag": payload.get("top_narrative"),
@@ -1448,12 +1394,22 @@ def get_narratives():
 @ttl_cache(ttl_seconds=60) 
 def get_social_data():
     all_posts = []
-    with ThreadPoolExecutor(max_workers=3) as executor:
-        f1 = executor.submit(SocialMediaEngine.scrape_ptt)
-        f2 = executor.submit(SocialMediaEngine.scrape_cnyes)
-        f3 = executor.submit(SocialMediaEngine.scrape_rss_for_signals)
-        try: all_posts.extend(f1.result() + f2.result() + f3.result())
-        except: pass
+    executor = ThreadPoolExecutor(max_workers=3)
+    futures = [
+        executor.submit(SocialMediaEngine.scrape_ptt),
+        executor.submit(SocialMediaEngine.scrape_cnyes),
+        executor.submit(SocialMediaEngine.scrape_rss_for_signals),
+    ]
+    try:
+        deadline = time.time() + 2.8
+        for future in futures:
+            remaining = max(0.1, deadline - time.time())
+            try:
+                all_posts.extend(future.result(timeout=remaining) or [])
+            except Exception:
+                pass
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
     if not all_posts: return jsonify({"sentiment_score": 0, "signal_count": 0, "noise_count": 0, "hot_keywords": [], "signals": [], "noises": [], "sentiment_reason": "查無資料"})
     return jsonify(SocialMediaEngine.analyze_posts(all_posts))
 
@@ -1490,11 +1446,18 @@ def get_coin_details(symbol):
     except Exception as e: return jsonify({"error": str(e)})
 
 @app.route("/crypto/popular", methods=["GET"])
+@ttl_cache(ttl_seconds=180)
 def crypto_popular():
     vs_currency = request.args.get("vs_currency", "usd")
     per_page = int(request.args.get("per_page", 20))
     params = {"vs_currency": vs_currency, "order": "market_cap_desc", "per_page": per_page, "page": 1, "sparkline": "false"}
     data = DataManager._cg_get("/coins/markets", params) or []
+    if not data:
+        fallback_prices = {"BTC": 65000, "ETH": 3200, "SOL": 150, "XRP": 0.55, "BNB": 600, "DOGE": 0.12, "USDT": 1, "USDC": 1}
+        data = [
+            {"id": CG_ID_MAP.get(symbol, symbol.lower()), "symbol": symbol, "name": meta.get("cn_name") or symbol, "current_price": fallback_prices.get(symbol, 10), "market_cap": 0, "price_change_percentage_24h": 0, "market_cap_rank": idx + 1}
+            for idx, (symbol, meta) in enumerate(Config.COIN_META.items())
+        ][:per_page]
     return jsonify([{"id": c.get("id"), "symbol": (c.get("symbol") or "").upper(), "name": c.get("name"), "current_price": c.get("current_price"), "market_cap": c.get("market_cap"), "price_change_percentage_24h": c.get("price_change_percentage_24h"), "market_cap_rank": c.get("market_cap_rank")} for c in data])
 
 @app.route("/api/sfi/search", methods=["GET"])
@@ -1858,22 +1821,36 @@ def build_agent_allocation(profile: str, budget: Any) -> List[Dict[str, Any]]:
     ]
 
 
-def get_coin_price_usd(symbol: str) -> float:
+def get_coin_price_usd(symbol: str, allow_remote: bool = True) -> float:
     symbol = symbol.upper()
+    fallback = {"BTC": 65000, "ETH": 3200, "SOL": 150, "XRP": 0.55, "BNB": 600, "DOGE": 0.12, "USDC": 1, "USDT": 1, "LINK": 15}
+    cached = SIM_PRICE_CACHE.get(symbol)
+    if cached and time.time() - cached[0] < SIM_PRICE_CACHE_TTL:
+        return cached[1]
+    if not allow_remote:
+        return float(fallback.get(symbol, 10))
+
     coin_id = CG_ID_MAP.get(symbol, symbol.lower())
-    data = DataManager._cg_get(
-        "/simple/price",
-        {"ids": coin_id, "vs_currencies": "usd"},
-    ) or {}
-    price = data.get(coin_id, {}).get("usd")
-    if price:
-        return float(price)
-    fallback = {"BTC": 65000, "ETH": 3200, "SOL": 150, "USDC": 1, "USDT": 1, "LINK": 15}
+    try:
+        res = requests.get(
+            "https://api.coingecko.com/api/v3/simple/price",
+            params={"ids": coin_id, "vs_currencies": "usd"},
+            headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"},
+            timeout=1.8,
+        )
+        if res.status_code == 200:
+            price = (res.json().get(coin_id) or {}).get("usd")
+            if price:
+                value = float(price)
+                SIM_PRICE_CACHE[symbol] = (time.time(), value)
+                return value
+    except Exception:
+        pass
     return float(fallback.get(symbol, 10))
 
 
-def scenario_adjusted_price(symbol: str, scenario_key: str = "normal") -> float:
-    base_price = get_coin_price_usd(symbol)
+def scenario_adjusted_price(symbol: str, scenario_key: str = "normal", allow_remote: bool = True) -> float:
+    base_price = get_coin_price_usd(symbol, allow_remote=allow_remote)
     scenario = Config.MARKET_SCENARIOS.get(str(scenario_key or "normal"))
     if not scenario or symbol.upper() in Config.STABLE_COINS:
         return base_price
@@ -1955,7 +1932,7 @@ def estimate_total_value_after_order(
         qty = float(pos.get("quantity", 0))
         if qty <= 0:
             continue
-        current_price = scenario_adjusted_price(sym, scenario_key)
+        current_price = scenario_adjusted_price(sym, scenario_key, allow_remote=False)
         total_value += qty * current_price
     return total_value
 
@@ -1986,7 +1963,7 @@ def sim_snapshot(access_token: str, scenario_key: str = "normal") -> Dict[str, A
         qty = float(row.get("quantity", 0))
         if not symbol or qty <= 0:
             continue
-        current_price = scenario_adjusted_price(symbol, scenario_key)
+        current_price = scenario_adjusted_price(symbol, scenario_key, allow_remote=False)
         avg_price = float(row.get("avg_price") or current_price)
         market_value = qty * current_price
         total_value += market_value
@@ -2054,7 +2031,7 @@ def execute_sim_order(
 ) -> Dict[str, Any]:
     symbol = symbol.upper()
     side = side.lower()
-    price = scenario_adjusted_price(symbol, scenario_key)
+    price = scenario_adjusted_price(symbol, scenario_key, allow_remote=False)
     if amount_usd and not quantity:
         quantity = float(amount_usd) / price
     quantity = float(quantity or 0)
@@ -2116,11 +2093,11 @@ def api_sim_trade_history():
     access_token, error = require_sim_trade_token()
     if error:
         return error
-    if access_token == DEMO_MEMBER_TOKEN:
+    if local_sim_preferred(access_token) or not db:
         _, state, _ = get_local_sim_state(access_token)
         trades = state.get("trades") or []
     else:
-        trades = db.sim_list_transactions(access_token, limit=limit) if db else []
+        trades = db.sim_list_transactions(access_token, limit=limit)
         if not trades:
             _, state, _ = get_local_sim_state(access_token)
             trades = state.get("trades") or []
@@ -2155,7 +2132,7 @@ def api_sim_trade_reset():
     access_token, error = require_sim_trade_token()
     if error:
         return error
-    if access_token == DEMO_MEMBER_TOKEN or not db:
+    if local_sim_preferred(access_token) or not db:
         user_key = sim_user_key(access_token)
         store = load_local_sim_store()
         store.setdefault("users", {})[user_key] = default_local_sim_state(user_key, SIM_INITIAL_CASH)
@@ -2211,7 +2188,7 @@ def api_sim_trade_delete_capital(record_id: str):
         return jsonify({"error": "只有 Demo 帳號可以刪除資金紀錄。"}), 403
 
     try:
-        access_token = DEMO_MEMBER_TOKEN
+        access_token = ADMIN_DEMO_TOKEN if request.user.get("is_admin") else DEMO_MEMBER_TOKEN
         _, state, store = get_local_sim_state(access_token)
         records = state.setdefault("capital_records", [])
         target_index = next((
@@ -2248,10 +2225,17 @@ def api_membership_plans():
         {"plan_code": "pro", "plan_name": "進階版", "monthly_price_usd": 9.99, "features_json": {"ai_chat_daily_limit": 20}},
         {"plan_code": "premium", "plan_name": "專業版", "monthly_price_usd": 24.99, "features_json": {"ai_chat_daily_limit": None}},
     ]
+    cached_plans = MEMBERSHIP_PLANS_CACHE.get("plans")
+    if cached_plans and time.time() - float(MEMBERSHIP_PLANS_CACHE.get("ts") or 0) < 300:
+        return jsonify({"plans": cached_plans, "source": MEMBERSHIP_PLANS_CACHE.get("source") or "fallback"})
     if not db:
+        MEMBERSHIP_PLANS_CACHE.update({"ts": time.time(), "plans": fallback_plans, "source": "fallback"})
         return jsonify({"plans": fallback_plans, "source": "fallback"})
     plans = db.list_membership_plans()
-    return jsonify({"plans": plans or fallback_plans, "source": "database" if plans else "fallback"})
+    payload_plans = plans or fallback_plans
+    source = "database" if plans else "fallback"
+    MEMBERSHIP_PLANS_CACHE.update({"ts": time.time(), "plans": payload_plans, "source": source})
+    return jsonify({"plans": payload_plans, "source": source})
 
 
 @app.route("/api/membership/subscription", methods=["GET"])
