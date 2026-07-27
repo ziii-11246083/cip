@@ -12,7 +12,7 @@
   <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo.jpg') }}">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/iansui@1.0/dist/iansui.min.css">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=member-overlay-20260604">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=avatar-center-absolute-20260727">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/member.css') }}?v=member-billing-20260727">
 </head>
 <body>
@@ -178,8 +178,8 @@
     anonKey: '{{ supabase_anon_key | default("dummy") }}'
   };
 </script>
-<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=member-nav-lock-20260604"></script>
-<script src="{{ url_for('static', filename='js/common.js') }}?v=member-nav-lock-20260604"></script>
-<script src="{{ url_for('static', filename='js/member.js') }}?v=member-plans-fallback-20260727"></script>
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=avatar-center-absolute-20260727"></script>
+<script src="{{ url_for('static', filename='js/common.js') }}?v=avatar-center-absolute-20260727"></script>
+<script src="{{ url_for('static', filename='js/member.js') }}?v=avatar-center-absolute-20260727"></script>
 </body>
 </html>

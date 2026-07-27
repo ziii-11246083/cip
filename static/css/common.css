@@ -2048,17 +2048,42 @@ body{
 .user-avatar{
   width:32px;
   height:32px;
-  display:grid;
-  place-items:center;
+  display:block;
+  position:relative;
   border-radius:50%;
-  background:linear-gradient(135deg,#e2e2e2,#bdbdbd);
+  background:linear-gradient(135deg,#f97316,#f6b46a);
   color:#fff;
+  overflow:hidden;
+  font-family:inherit;
+}
+
+.user-avatar::before{
+  content:attr(data-user-initial);
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%, -50%);
+  font-weight:950;
+  font-size:14px;
+  line-height:1;
+  text-align:center;
+}
+
+.user-avatar i{
+  display:block;
+  width:1em;
+  height:1em;
+  line-height:1;
+  text-align:center;
 }
 
 .user-avatar.large{
   width:48px;
   height:48px;
   flex:0 0 auto;
+}
+
+.user-avatar.large::before{
   font-size:20px;
 }
 

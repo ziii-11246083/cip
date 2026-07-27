@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/iansui@1.0/dist/iansui.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=member-overlay-20260604">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=avatar-center-absolute-20260727">
 </head>
 <body>
 {% include "partials/header.html" %}
@@ -37,6 +37,7 @@
         <p>模擬交易會保存持倉與交易紀錄，因此需要會員帳號才能使用。</p>
         <div class="member-actions">
           <a class="button primary" href="/register">註冊 / 登入會員</a>
+          <button class="button" id="btnDemoAccess" type="button">使用 Demo 會員體驗</button>
           <a class="button" href="/market">查看市場總覽</a>
         </div>
         <div class="member-helper">登入後可使用 AI Agent 自動送單，也能手動建立買入與賣出紀錄。</div>
@@ -208,8 +209,8 @@
     anonKey: '{{ supabase_anon_key | default("dummy") }}'
   };
 </script>
-<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=member-nav-lock-20260604"></script>
-<script src="{{ url_for('static', filename='js/common.js') }}?v=member-nav-lock-20260604"></script>
-<script src="{{ url_for('static', filename='js/sim_trade.js') }}?v=sim-scenario-panel-20260727"></script>
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=avatar-center-absolute-20260727"></script>
+<script src="{{ url_for('static', filename='js/common.js') }}?v=avatar-center-absolute-20260727"></script>
+<script src="{{ url_for('static', filename='js/sim_trade.js') }}?v=avatar-center-absolute-20260727"></script>
 </body>
 </html>

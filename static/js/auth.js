@@ -41,6 +41,7 @@ const AUTH_HASH_KEYS = new Set([
 let currentSession = null;
 let authReady = false;
 let resolveAuthReady;
+let lastAuthStateSignature = "";
 const authReadyPromise = new Promise((resolve) => {
     resolveAuthReady = resolve;
 });
@@ -131,6 +132,12 @@ function getUserLabel(user) {
     const metadata = user?.user_metadata || {};
     const email = String(user?.email || "").trim();
     return metadata.display_name || metadata.full_name || metadata.name || email.split("@")[0] || "Smart Invest 會員";
+}
+
+function getUserInitial(user) {
+    const label = getUserLabel(user);
+    const email = String(user?.email || "").trim();
+    return String(label || email || "U").trim().slice(0, 1).toUpperCase();
 }
 
 function getCleanRedirectUrl() {
@@ -229,14 +236,27 @@ async function applyAuthFromUrl() {
     return { handled, session };
 }
 
-function updateMembership(session) {
+function buildAuthState(session) {
     const user = session?.user || null;
     const isAdmin = Boolean(user?.is_admin || user?.app_metadata?.role === "admin" || String(user?.email || "").toLowerCase() === ADMIN_DEMO_EMAIL);
+    const isGuest = localStorage.getItem(GUEST_MODE_KEY) === "1";
+    return {
+        isMember: Boolean(user),
+        isAdmin,
+        isGuest,
+        email: user?.email || "",
+        userId: user?.id || ""
+    };
+}
+
+function updateMembership(session, options = {}) {
+    const user = session?.user || null;
+    const state = buildAuthState(session);
     if (user) {
         window.smartInvestMembership = {
             isMember: true,
-            isAdmin,
-            planCode: isAdmin ? "premium" : "member",
+            isAdmin: state.isAdmin,
+            planCode: state.isAdmin ? "premium" : "member",
             email: user.email || "已登入"
         };
     } else {
@@ -248,24 +268,19 @@ function updateMembership(session) {
         };
     }
 
-    const isGuest = localStorage.getItem(GUEST_MODE_KEY) === "1";
     document.body?.classList.toggle("is-logged-in", Boolean(user));
     document.body?.classList.toggle("is-guest", !user);
-    document.body?.classList.toggle("is-guest-mode", !user && isGuest);
+    document.body?.classList.toggle("is-guest-mode", !user && state.isGuest);
     document.body?.classList.toggle("is-member-locked", !Boolean(user));
     document.querySelectorAll(".member-nav i").forEach((icon) => {
         icon.classList.toggle("fa-lock", !user);
         icon.classList.toggle("fa-unlock", Boolean(user));
     });
-    window.dispatchEvent(new CustomEvent("smartinvest:auth-state", {
-        detail: {
-            isMember: Boolean(user),
-            isAdmin,
-            isGuest,
-            email: user?.email || "",
-            userId: user?.id || ""
-        }
-    }));
+    const signature = JSON.stringify(state);
+    if (options.force || signature !== lastAuthStateSignature) {
+        lastAuthStateSignature = signature;
+        window.dispatchEvent(new CustomEvent("smartinvest:auth-state", { detail: state }));
+    }
 }
 
 function setAuthUiBySession(session) {
@@ -276,8 +291,10 @@ function setAuthUiBySession(session) {
     const userEmail = document.getElementById("user-email");
     const userName = document.getElementById("user-name");
     const isGuest = localStorage.getItem(GUEST_MODE_KEY) === "1";
+    const avatarEls = document.querySelectorAll(".user-avatar[data-user-initial]");
 
     if (session && session.user) {
+        const initial = getUserInitial(session.user);
         localStorage.removeItem(GUEST_MODE_KEY);
         if (loginToggle) loginToggle.style.display = "none";
         if (guestButton) guestButton.style.display = "none";
@@ -285,12 +302,20 @@ function setAuthUiBySession(session) {
         if (userSection) userSection.style.display = "block";
         if (userName) userName.innerText = getUserLabel(session.user);
         if (userEmail) userEmail.innerText = session.user.email || "已登入";
+        avatarEls.forEach((el) => {
+            el.textContent = "";
+            el.dataset.userInitial = initial;
+        });
     } else if (isGuest) {
         if (loginToggle) loginToggle.style.display = "inline-flex";
         if (guestButton) guestButton.style.display = "none";
         if (userSection) userSection.style.display = "block";
         if (userName) userName.innerText = "訪客模式";
         if (userEmail) userEmail.innerText = "訪客模式";
+        avatarEls.forEach((el) => {
+            el.textContent = "";
+            el.dataset.userInitial = "G";
+        });
     } else {
         if (loginToggle) loginToggle.style.display = "inline-flex";
         if (guestButton) guestButton.style.display = "inline-flex";
@@ -359,17 +384,21 @@ window.authManager = {
             alert(`Google 登入失敗: ${error.message}`);
         }
     },
-    loginWithEmail: async (email, password) => {
+    loginWithEmail: async (email, password, options = {}) => {
+        const silent = Boolean(options?.silent);
         const normalizedEmail = String(email || "").trim().toLowerCase();
         if (normalizedEmail === ADMIN_DEMO_EMAIL && password === ADMIN_DEMO_PASSWORD) {
             activateAdminDemo();
-            alert("已使用管理員 Demo 帳號登入");
+            if (!silent) alert("已使用管理員 Demo 帳號登入");
             return;
         }
-        if (!email || !password) return alert("請輸入信箱與密碼");
+        if (!email || !password) {
+            if (!silent) alert("請輸入信箱與密碼");
+            return;
+        }
         if (email.trim().toLowerCase() === DEMO_MEMBER_EMAIL && password === DEMO_MEMBER_PASSWORD) {
             activateDemoMember();
-            alert("已使用 Demo 會員登入");
+            if (!silent) alert("已使用 Demo 會員登入");
             return;
         }
         if (!requireSupabase()) return;
@@ -379,10 +408,12 @@ window.authManager = {
             localStorage.removeItem(ADMIN_DEMO_KEY);
             sessionStorage.removeItem(ADMIN_DEMO_KEY);
             localStorage.removeItem(GUEST_MODE_KEY);
-            const { error } = await supabase.auth.signInWithPassword({ email, password });
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
             if (error) throw error;
-            alert("登入成功！");
-            window.location.reload();
+            currentSession = data?.session || currentSession;
+            updateMembership(currentSession, { force: true });
+            setAuthUiBySession(currentSession);
+            if (!silent) alert("登入成功！");
         } catch (error) {
             alert(`登入失敗: ${error.message}`);
         }
@@ -473,13 +504,17 @@ window.authManager = {
     getToken: async () => {
         if (localStorage.getItem(GUEST_MODE_KEY) === "1") return null;
         if (isAdminDemoActive()) {
-            currentSession = buildAdminDemoSession();
-            updateMembership(currentSession);
+            if (currentSession?.access_token !== ADMIN_DEMO_TOKEN) {
+                currentSession = buildAdminDemoSession();
+                updateMembership(currentSession);
+            }
             return ADMIN_DEMO_TOKEN;
         }
         if (isDemoMemberActive()) {
-            currentSession = buildDemoSession();
-            updateMembership(currentSession);
+            if (currentSession?.access_token !== DEMO_MEMBER_TOKEN) {
+                currentSession = buildDemoSession();
+                updateMembership(currentSession);
+            }
             return DEMO_MEMBER_TOKEN;
         }
         if (!supabase) return null;
@@ -488,8 +523,10 @@ window.authManager = {
             if (error) throw error;
             const session = data?.session;
             if (session?.access_token) {
-                currentSession = session;
-                updateMembership(session);
+                if (currentSession?.access_token !== session.access_token) {
+                    currentSession = session;
+                    updateMembership(session);
+                }
                 return session.access_token;
             }
         } catch (error) {
@@ -506,6 +543,18 @@ if (supabase) {
             await applyAuthFromUrl();
             await refreshSession();
             supabase.auth.onAuthStateChange((_event, session) => {
+                if (!session && _event !== "SIGNED_OUT") {
+                    if (isAdminDemoActive()) {
+                        currentSession = buildAdminDemoSession();
+                        updateMembership(currentSession);
+                        setAuthUiBySession(currentSession);
+                    } else if (isDemoMemberActive()) {
+                        currentSession = buildDemoSession();
+                        updateMembership(currentSession);
+                        setAuthUiBySession(currentSession);
+                    }
+                    return;
+                }
                 currentSession = session || null;
                 updateMembership(session || null);
                 setAuthUiBySession(session || null);

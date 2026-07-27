@@ -16,8 +16,13 @@ function restoreOriginalSiteIcon() {
 restoreOriginalSiteIcon();
 
 window.waitForSmartInvestAuth = async function waitForSmartInvestAuth(timeoutMs = 5000) {
+  const withTimeout = (promise, ms) => Promise.race([
+    Promise.resolve(promise),
+    new Promise((resolve) => window.setTimeout(resolve, ms))
+  ]);
+
   if (window.authManager) {
-    await window.authManager.ensureReady?.();
+    await withTimeout(window.authManager.ensureReady?.(), timeoutMs);
     return window.authManager;
   }
 
@@ -37,7 +42,7 @@ window.waitForSmartInvestAuth = async function waitForSmartInvestAuth(timeoutMs 
     window.addEventListener("smartinvest:auth-ready", finish, { once: true });
   });
 
-  await window.authManager?.ensureReady?.();
+  await withTimeout(window.authManager?.ensureReady?.(), Math.max(250, timeoutMs / 2));
   return window.authManager || null;
 };
 
@@ -76,6 +81,57 @@ function toast(title, msg) {
   el._timer = setTimeout(() => {
     el.style.display = "none";
   }, 3400);
+}
+
+function syncHeaderAuthUi(detail = {}) {
+  const isMember = Boolean(detail.isMember || window.authManager?.isLoggedIn?.() || window.smartInvestMembership?.isMember);
+  const isGuest = Boolean(detail.isGuest || window.authManager?.isGuestMode?.());
+  const email = detail.email || window.smartInvestMembership?.email || "";
+  const loginToggle = document.getElementById("loginToggle");
+  const guestButton = document.querySelector(".auth-area > .guest-btn");
+  const accountPopup = document.getElementById("accountPopup");
+  const userSection = document.getElementById("user-section");
+  const userEmail = document.getElementById("user-email");
+  const userName = document.getElementById("user-name");
+  const avatarEls = document.querySelectorAll(".user-avatar[data-user-initial]");
+
+  document.body?.classList.toggle("is-logged-in", isMember);
+  document.body?.classList.toggle("is-guest", !isMember);
+  document.body?.classList.toggle("is-guest-mode", !isMember && isGuest);
+  document.body?.classList.toggle("is-member-locked", !isMember);
+
+  document.querySelectorAll(".member-nav i").forEach((icon) => {
+    icon.classList.toggle("fa-lock", !isMember);
+    icon.classList.toggle("fa-unlock", isMember);
+  });
+
+  if (isMember) {
+    if (loginToggle) loginToggle.style.display = "none";
+    if (guestButton) guestButton.style.display = "none";
+    if (accountPopup) accountPopup.classList.remove("show");
+    if (userSection) userSection.style.display = "block";
+    if (userName) userName.textContent = email ? email.split("@")[0] : "Smart Invest 會員";
+    if (userEmail) userEmail.textContent = email || "已登入";
+    const initial = String(email || "U").trim().slice(0, 1).toUpperCase();
+    avatarEls.forEach((el) => {
+      el.textContent = "";
+      el.dataset.userInitial = initial;
+    });
+  } else if (isGuest) {
+    if (loginToggle) loginToggle.style.display = "inline-flex";
+    if (guestButton) guestButton.style.display = "none";
+    if (userSection) userSection.style.display = "block";
+    if (userName) userName.textContent = "訪客模式";
+    if (userEmail) userEmail.textContent = "訪客模式";
+    avatarEls.forEach((el) => {
+      el.textContent = "";
+      el.dataset.userInitial = "G";
+    });
+  } else {
+    if (loginToggle) loginToggle.style.display = "inline-flex";
+    if (guestButton) guestButton.style.display = "inline-flex";
+    if (userSection) userSection.style.display = "none";
+  }
 }
 
 function initCommonUI() {
@@ -248,6 +304,13 @@ function applyMemberFeatureGating() {
 
   document.addEventListener("DOMContentLoaded", () => {
     initCommonUI();
-    window.waitForSmartInvestAuth?.().then(applyMemberFeatureGating);
-    window.addEventListener("smartinvest:auth-state", applyMemberFeatureGating);
+    syncHeaderAuthUi();
+    window.waitForSmartInvestAuth?.(1800).then(() => {
+      syncHeaderAuthUi();
+      applyMemberFeatureGating();
+    });
+    window.addEventListener("smartinvest:auth-state", (event) => {
+      syncHeaderAuthUi(event.detail || {});
+      applyMemberFeatureGating();
+    });
   });

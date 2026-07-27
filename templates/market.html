@@ -14,7 +14,7 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/iansui@1.0/dist/iansui.min.css">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=shared-site-density">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=avatar-center-absolute-20260727">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/market.css') }}?v=shared-market-bg">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -100,27 +100,27 @@
 
   <section class="section">
     <div class="container">
-      <a class="radar-feature reveal" href="/narrative-radar">
-        <div class="radar-feature-copy">
+      <a class="narrative-feature reveal" href="/narrative-radar">
+        <div class="narrative-feature-copy">
           <div class="eyebrow"><i class="fas fa-brain"></i> Featured Insight</div>
           <h2>AI 敘事雷達</h2>
           <p>把熱門敘事、SFI 風險排名與單幣深度分析入口拉到市場頁第一層，先看市場現在在講什麼，再決定往哪個幣種繼續研究。</p>
-          <div class="radar-feature-points">
+          <div class="narrative-feature-points">
             <span><i class="fas fa-signal"></i> 熱門敘事熱度</span>
             <span><i class="fas fa-shield-heart"></i> SFI 風險觀察</span>
             <span><i class="fas fa-arrow-right"></i> 直通深度分析</span>
           </div>
         </div>
-        <div class="radar-feature-side">
-          <div class="radar-chip">
+        <div class="narrative-feature-side">
+          <div class="narrative-chip">
             <small>重點用途</small>
             <strong>先抓市場主線</strong>
           </div>
-          <div class="radar-chip">
+          <div class="narrative-chip">
             <small>適合搭配</small>
             <strong>熱門市場 + 價格比較</strong>
           </div>
-          <div class="radar-feature-cta">
+          <div class="narrative-feature-cta">
             <span>前往 AI 敘事雷達</span>
             <i class="fas fa-arrow-right"></i>
           </div>
@@ -329,8 +329,8 @@
   };
 </script>
 
-<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=member-nav-lock-20260604"></script>
-<script src="{{ url_for('static', filename='js/common.js') }}?v=member-nav-lock-20260604"></script>
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=avatar-center-absolute-20260727"></script>
+<script src="{{ url_for('static', filename='js/common.js') }}?v=avatar-center-absolute-20260727"></script>
 <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
 <script src="{{ url_for('static', filename='js/market.js') }}?v=20260508-market-textfix"></script>
 </body>

@@ -11,15 +11,40 @@
       "trades": [],
       "equity_curve": [
         {
-          "ts": "2026-07-27T02:42:03.817957",
+          "ts": "2026-07-27T10:59:14.796056",
           "total_value_usd": 100000.0,
           "cash_balance": 100000.0
         }
       ],
       "capital_records": [
         {
-          "id": "79989cc5-fb15-414b-834f-f123142084eb",
-          "timestamp": "2026-07-27T02:42:03.817957",
+          "id": "8fa4a317-64ee-471e-953f-26ae816f7e80",
+          "timestamp": "2026-07-27T10:59:14.796056",
+          "amount_usd": 100000.0,
+          "note": "Demo 初始資金"
+        }
+      ]
+    },
+    "demo-admin": {
+      "portfolio": {
+        "id": "local-demo-admin",
+        "user_id": "demo-admin",
+        "cash_balance": 100000.0,
+        "initial_cash": 100000.0
+      },
+      "positions": {},
+      "trades": [],
+      "equity_curve": [
+        {
+          "ts": "2026-07-27T10:43:42.519378",
+          "total_value_usd": 100000.0,
+          "cash_balance": 100000.0
+        }
+      ],
+      "capital_records": [
+        {
+          "id": "51a8c88c-d9a9-4977-8d9a-d3313327176a",
+          "timestamp": "2026-07-27T10:43:42.519378",
           "amount_usd": 100000.0,
           "note": "Demo 初始資金"
         }

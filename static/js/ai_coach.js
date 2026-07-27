@@ -383,18 +383,25 @@
     });
   }
 
-  document.addEventListener("DOMContentLoaded", async () => {
-    await window.waitForSmartInvestAuth?.();
-    const loggedIn = Boolean(window.authManager?.isLoggedIn?.() || window.smartInvestMembership?.isMember);
-    if (!loggedIn) {
-      setLockedState(true);
-    } else {
-      setLockedState(false);
-    }
+  document.addEventListener("DOMContentLoaded", () => {
     initPageMotion();
     initRiskCards();
     initQuickAsk();
     initChatEvents();
+    setLockedState(!Boolean(window.authManager?.isLoggedIn?.() || window.smartInvestMembership?.isMember));
+    window.waitForSmartInvestAuth?.(1200).then(() => {
+      const loggedIn = Boolean(window.authManager?.isLoggedIn?.() || window.smartInvestMembership?.isMember);
+      setLockedState(!loggedIn);
+      if (loggedIn) {
+        loadConversations();
+        loadHistory();
+      }
+    });
+  });
+
+  window.addEventListener("smartinvest:auth-state", (event) => {
+    const loggedIn = Boolean(event.detail?.isMember || window.authManager?.isLoggedIn?.() || window.smartInvestMembership?.isMember);
+    setLockedState(!loggedIn);
     if (loggedIn) {
       loadConversations();
       loadHistory();

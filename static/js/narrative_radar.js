@@ -4,6 +4,16 @@ function radarScoreColor(score) {
   return "var(--good)";
 }
 
+async function fetchWithTimeout(url, options = {}, timeoutMs = 3000) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, Object.assign({}, options, { signal: controller.signal }));
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 async function loadNarratives() {
   const list = document.getElementById("narrativeList");
   const topNarrative = document.getElementById("topNarrative");
@@ -11,7 +21,7 @@ async function loadNarratives() {
   if (!list) return;
 
   try {
-    const res = await fetch("/api/narratives");
+    const res = await fetchWithTimeout("/api/narratives", {}, 3000);
     const data = await res.json();
     const scores = data.narrative_scores || {};
     const rows = Object.entries(scores)
@@ -48,7 +58,7 @@ async function loadRiskRows() {
   if (!body) return;
 
   try {
-    const res = await fetch("/api/coingecko");
+    const res = await fetchWithTimeout("/api/coingecko", {}, 3000);
     const data = await res.json();
     const rows = (data.data || []).slice(0, 12);
 
