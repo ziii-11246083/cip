@@ -58,40 +58,59 @@
             <h2 class="sim-title">市場情境模擬</h2>
             <span class="sim-scenario-badge" id="scenarioBadge">一般市場</span>
           </div>
-          <p class="sim-scenario-desc">切換不同市場情境，觀察參數變化對模擬交易的潛在影響（本功能為情境展示，不影響實際下單價格）。</p>
-          <div class="sim-scenario-selector">
-            <button class="scenario-btn active" data-scenario="normal" type="button">
-              <i class="fas fa-balance-scale"></i>
-              <strong>一般市場</strong>
-              <small>實際即時價格</small>
-            </button>
-            <button class="scenario-btn" data-scenario="bull" type="button">
-              <i class="fas fa-chart-line"></i>
-              <strong>牛市</strong>
-              <small>價格 ×1.3 · 波動 ×0.8</small>
-            </button>
-            <button class="scenario-btn" data-scenario="bear" type="button">
-              <i class="fas fa-arrow-trend-down"></i>
-              <strong>熊市</strong>
-              <small>價格 ×0.7 · 波動 ×1.5</small>
-            </button>
-            <button class="scenario-btn" data-scenario="black_swan" type="button">
-              <i class="fas fa-bolt"></i>
-              <strong>黑天鵝</strong>
-              <small>價格 ×0.4 · 波動 ×3.0</small>
-            </button>
-          </div>
-          <div class="sim-scenario-info" id="scenarioInfo">
-            <div><span>價格乘數</span><strong id="scPriceMult">1.0x</strong></div>
-            <div><span>波動乘數</span><strong id="scVolMult">1.0x</strong></div>
-            <div><span>建議動作</span><strong id="scAdvice">正常操作</strong></div>
-          </div>
-          <div class="scenario-strategy-grid" id="scenarioStrategyGrid"></div>
-          <div class="table-wrap scenario-strategy-table">
-            <table>
-              <thead><tr><th>策略</th><th>情境後總資產</th><th>預估損益</th><th>最大壓力</th><th>說明</th></tr></thead>
-              <tbody id="scenarioStrategyBody"></tbody>
-            </table>
+          <div class="sim-scenario-body">
+            <div>
+              <p class="sim-scenario-desc">切換不同市場情境，系統會以情境價格重估持倉，並將該情境套用到本次模擬下單價格。</p>
+              <div class="sim-scenario-selector">
+                <button class="scenario-btn active" data-scenario="normal" type="button">
+                  <i class="fas fa-balance-scale"></i>
+                  <strong>一般市場</strong>
+                  <small>實際即時價格</small>
+                </button>
+                <button class="scenario-btn" data-scenario="sideways" type="button">
+                  <i class="fas fa-wave-square"></i>
+                  <strong>盤整市場</strong>
+                  <small>價格 ×1.0 · 波動 ×0.6</small>
+                </button>
+                <button class="scenario-btn" data-scenario="bull" type="button">
+                  <i class="fas fa-chart-line"></i>
+                  <strong>牛市</strong>
+                  <small>價格 ×1.3 · 波動 ×0.8</small>
+                </button>
+                <button class="scenario-btn" data-scenario="alt_rotation" type="button">
+                  <i class="fas fa-fire-flame-curved"></i>
+                  <strong>山寨輪動</strong>
+                  <small>價格 ×1.15 · 波動 ×1.8</small>
+                </button>
+                <button class="scenario-btn" data-scenario="bear" type="button">
+                  <i class="fas fa-arrow-trend-down"></i>
+                  <strong>熊市</strong>
+                  <small>價格 ×0.7 · 波動 ×1.5</small>
+                </button>
+                <button class="scenario-btn" data-scenario="black_swan" type="button">
+                  <i class="fas fa-bolt"></i>
+                  <strong>黑天鵝</strong>
+                  <small>價格 ×0.4 · 波動 ×3.0</small>
+                </button>
+              </div>
+              <div class="sim-scenario-info" id="scenarioInfo">
+                <div><span>價格乘數</span><strong id="scPriceMult">1.0x</strong></div>
+                <div><span>波動乘數</span><strong id="scVolMult">1.0x</strong></div>
+                <div><span>建議動作</span><strong id="scAdvice">正常操作</strong></div>
+              </div>
+            </div>
+            <aside class="scenario-impact-panel">
+              <div class="scenario-impact-head">
+                <span>壓力測試摘要</span>
+                <strong id="scImpactLabel">一般市場</strong>
+              </div>
+              <div class="scenario-impact-grid">
+                <div><span>情境總資產</span><strong id="scPortfolioValue">--</strong></div>
+                <div><span>現金緩衝</span><strong id="scCashBuffer">--</strong></div>
+                <div><span>本次下單影響</span><strong id="scOrderImpact">請輸入訂單</strong></div>
+              </div>
+              <div class="scenario-risk-note" id="scRiskNote">切換情境後會同步更新持倉估值、圖表與右側下單試算。</div>
+            </aside>
           </div>
         </section>
 
@@ -191,6 +210,6 @@
 </script>
 <script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=member-nav-lock-20260604"></script>
 <script src="{{ url_for('static', filename='js/common.js') }}?v=member-nav-lock-20260604"></script>
-<script src="{{ url_for('static', filename='js/sim_trade.js') }}?v=sim-split-20260604"></script>
+<script src="{{ url_for('static', filename='js/sim_trade.js') }}?v=sim-scenario-panel-20260727"></script>
 </body>
 </html>

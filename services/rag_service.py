@@ -7,6 +7,7 @@ Full graceful degradation: falls back to keyword-only when components unavailabl
 
 import logging
 import os
+import re
 import time
 from typing import Any, Callable, Dict, List, Optional
 
@@ -19,6 +20,14 @@ logger = logging.getLogger(__name__)
 
 _ENABLE_REWRITE = os.getenv("RAG_ENABLE_QUERY_REWRITE", "1") == "1"
 _ENABLE_ROUTING = os.getenv("RAG_ENABLE_ROUTING", "1") == "1"
+
+_ENDPOINT_TOPIC_PRIORS: Dict[str, List[str]] = {
+    "chat": ["投資原則", "市場情境", "市場敘事", "健康度檢查", "幣種檔案"],
+    "agent": ["投資原則", "市場情境", "健康度檢查", "市場敘事", "幣種檔案"],
+    "podcast": ["Podcast風格", "市場敘事", "市場情境"],
+    "scam": ["詐騙模式"],
+    "health": ["健康度檢查", "投資原則", "市場情境", "幣種檔案"],
+}
 
 
 class RAGService:
@@ -63,6 +72,10 @@ class RAGService:
         rewrite_result = None
         retrieval_meta: Dict[str, Any] = {}
         fallback_reason = ""
+        if topics is None:
+            topics = _ENDPOINT_TOPIC_PRIORS.get(endpoint)
+        if re.search(r"(穩定幣|USDT|USDC|DAI|stablecoin)", query, re.IGNORECASE):
+            topics = ["市場敘事", "幣種檔案", "投資原則"]
 
         # Step 1: Route
         if _ENABLE_ROUTING:

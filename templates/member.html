@@ -13,7 +13,7 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/iansui@1.0/dist/iansui.min.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=member-overlay-20260604">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/member.css') }}?v=member-center-20260514">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/member.css') }}?v=member-billing-20260727">
 </head>
 <body>
 {% include "partials/header.html" %}
@@ -42,6 +42,45 @@
         <button type="button" onclick="window.authManager?.openLogin?.()">登入會員</button>
       </div>
 
+      <section class="member-subscription-layout" data-member-feature="會員方案與訂閱狀態">
+        <article class="member-card subscription-card">
+          <div class="member-card-head">
+            <div>
+              <h2>目前訂閱狀態</h2>
+              <p>這裡用來展示會員制、訂閱狀態與付款紀錄的 MVP 流程。</p>
+            </div>
+            <span class="subscription-badge" id="subscriptionStatusBadge">讀取中</span>
+          </div>
+          <div class="subscription-summary">
+            <div>
+              <span>目前方案</span>
+              <strong id="subscriptionPlanName">讀取中...</strong>
+            </div>
+            <div>
+              <span>付款模式</span>
+              <strong id="subscriptionMode">Mock checkout</strong>
+            </div>
+            <div>
+              <span>資料來源</span>
+              <strong id="subscriptionSource">--</strong>
+            </div>
+          </div>
+          <p class="subscription-note" id="subscriptionNote">正式金流與發票流程列為 Phase 2；目前先展示可記錄、可擴充的付款資料流程。</p>
+        </article>
+
+        <section class="member-card plan-section">
+          <div class="member-card-head">
+            <div>
+              <h2>會員方案</h2>
+              <p>評審提到成本與收益流後，這裡補上免費與付費方案的展示入口。</p>
+            </div>
+          </div>
+          <div class="membership-plan-grid" id="membershipPlans">
+            <div class="member-record-empty">會員方案載入中...</div>
+          </div>
+        </section>
+      </section>
+
       <section class="member-kpi-grid" data-member-feature="會員資產紀錄">
         <article class="member-kpi">
           <span>累積投放資金</span>
@@ -58,22 +97,6 @@
           <strong id="kpiOrders">0</strong>
           <small>AI Agent 與手動下單共用紀錄</small>
         </article>
-      </section>
-
-      <section class="member-card sync-card" data-member-feature="付費會員資產同步">
-        <div class="member-card-head">
-          <div>
-            <h2>資產自動同步</h2>
-            <p>付費會員可評估串接區塊鏈錢包或交易所 API，減少每次手動更新總資產的操作。</p>
-          </div>
-          <span class="sync-plan-badge">付費會員</span>
-        </div>
-        <div class="sync-options">
-          <button type="button" class="sync-option active" data-sync-source="wallet"><i class="fas fa-wallet"></i><span>區塊鏈錢包</span><small>讀取地址資產與鏈上餘額</small></button>
-          <button type="button" class="sync-option" data-sync-source="exchange"><i class="fas fa-key"></i><span>交易所 API</span><small>以唯讀 API Key 同步持倉</small></button>
-          <button type="button" class="sync-option" data-sync-source="manual"><i class="fas fa-pen-to-square"></i><span>手動模式</span><small>保留目前資金投放流程</small></button>
-        </div>
-        <div class="sync-status" id="syncStatus">目前使用手動紀錄。你可以先選擇欲評估的同步來源。</div>
       </section>
 
       <div class="member-grid">
@@ -157,6 +180,6 @@
 </script>
 <script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=member-nav-lock-20260604"></script>
 <script src="{{ url_for('static', filename='js/common.js') }}?v=member-nav-lock-20260604"></script>
-<script src="{{ url_for('static', filename='js/member.js') }}?v=member-center-20260514"></script>
+<script src="{{ url_for('static', filename='js/member.js') }}?v=member-plans-fallback-20260727"></script>
 </body>
 </html>

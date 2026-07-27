@@ -67,6 +67,7 @@ class QueryRouterService:
     ENTITY_PATTERNS = [
         r'\b(BTC|ETH|SOL|XRP|BNB|DOGE|USDT|USDC|ADA|TRX|AVAX)\b',
         r'(比特幣|以太幣|以太坊|索拉納|瑞波幣|幣安幣|狗狗幣|泰達幣)',
+        r'(穩定幣|USDT|USDC|DAI|stablecoin)',
         r'(AI|RWA|DeFi|L2|NFT|Meme|Layer\s*[12])',
         r'(牛市|熊市|黑天鵝|bull|bear|black.?swan)',
     ]
@@ -111,6 +112,15 @@ class QueryRouterService:
                 route="deep",
                 reason=f"High complexity ({complexity:.2f}), {intent_count} intents",
                 complexity=complexity,
+                intent_count=intent_count,
+                entity_count=entity_count,
+            )
+
+        if entity_count >= 1 and re.search(r"(用途|用處|風險|建議|如何|怎麼|應該)", query, re.IGNORECASE):
+            return RouteDecision(
+                route="deep",
+                reason="Entity-specific analytical question",
+                complexity=max(complexity, 0.4),
                 intent_count=intent_count,
                 entity_count=entity_count,
             )
@@ -168,7 +178,7 @@ class QueryRouterService:
         complex_markers = [
             r'(為什麼|原因|因素|影響|後果|效果)',
             r'(how|why|explain|analyze|compare)',
-            r'(建議|推薦|應該|怎麼|如何|怎樣)',
+            r'(建議|推薦|應該|怎麼|如何|怎樣|用途|用處)',
             r'(策略|規劃|計畫|方案)',
         ]
         for marker in complex_markers:
