@@ -212,6 +212,7 @@ function updateMembership(session) {
     document.body?.classList.toggle("is-logged-in", Boolean(user));
     document.body?.classList.toggle("is-guest", !user);
     document.body?.classList.toggle("is-guest-mode", !user && isGuest);
+    document.body?.classList.toggle("is-member-locked", !Boolean(user));
     document.querySelectorAll(".member-nav i").forEach((icon) => {
         icon.classList.toggle("fa-lock", !user);
         icon.classList.toggle("fa-unlock", Boolean(user));

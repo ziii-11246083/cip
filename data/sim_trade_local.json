@@ -1,0 +1,29 @@
+{
+  "users": {
+    "demo-member": {
+      "portfolio": {
+        "id": "local-demo-member",
+        "user_id": "demo-member",
+        "cash_balance": 100000.0,
+        "initial_cash": 100000.0
+      },
+      "positions": {},
+      "trades": [],
+      "equity_curve": [
+        {
+          "ts": "2026-07-27T02:42:03.817957",
+          "total_value_usd": 100000.0,
+          "cash_balance": 100000.0
+        }
+      ],
+      "capital_records": [
+        {
+          "id": "79989cc5-fb15-414b-834f-f123142084eb",
+          "timestamp": "2026-07-27T02:42:03.817957",
+          "amount_usd": 100000.0,
+          "note": "Demo 初始資金"
+        }
+      ]
+    }
+  }
+}

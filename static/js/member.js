@@ -66,6 +66,18 @@
     return false;
   }
 
+  function setSyncSource(source) {
+    document.querySelectorAll(".sync-option").forEach((button) => {
+      button.classList.toggle("active", button.dataset.syncSource === source);
+    });
+    const messages = {
+      wallet: "錢包同步適合 DeFi 與鏈上資產，建議先採唯讀地址或 WalletConnect 授權評估。",
+      exchange: "交易所 API 適合集中化交易所持倉，建議只接受唯讀權限並明確停用交易與提領權限。",
+      manual: "手動模式會保留目前資金投放與模擬下單流程，適合作為同步失敗時的備援。"
+    };
+    if ($("syncStatus")) $("syncStatus").textContent = messages[source] || messages.manual;
+  }
+
   async function request(url, options) {
     const headers = Object.assign({ "Content-Type": "application/json" }, options?.headers || {});
     if (!headers.Authorization) {
@@ -238,6 +250,13 @@
       } catch (error) {
         alert(error.message || "重置失敗");
       }
+    });
+
+    document.querySelectorAll(".sync-option").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (!requireMember()) return;
+        setSyncSource(button.dataset.syncSource || "manual");
+      });
     });
   });
 

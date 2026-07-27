@@ -1,5 +1,9 @@
 .coach-hero{
-  padding-bottom:28px;
+  padding:56px 0 34px;
+}
+
+.coach-hero .hero-grid{
+  min-height:220px;
 }
 
 /* Compatibility for compact AI coach template class names. */
@@ -130,6 +134,14 @@
 }
 
 .coach-layout{
+  display:grid;
+  grid-template-columns:360px minmax(0,1fr);
+  gap:28px;
+  align-items:start;
+}
+
+.ai-coach-app{
+  grid-column:1 / -1;
   display:grid;
   grid-template-columns:360px minmax(0,1fr);
   gap:28px;
@@ -575,8 +587,14 @@
   40%{transform:translateY(-4px);opacity:1}
 }
 
+/* Member gate: hide app when locked */
+.ai-coach-locked {
+  display: none !important;
+}
+
 @media(max-width:1120px){
-  .coach-layout{
+  .coach-layout,
+  .ai-coach-app{
     grid-template-columns:1fr;
   }
 }

@@ -5,6 +5,8 @@
   let coinOptions = [];
   let currentPortfolio = null;
   let isLocked = false;
+  let activeScenario = "normal";
+  let scenarioData = {};
   const DEFAULT_COINS = [
     { symbol: "BTC", name: "Bitcoin" },
     { symbol: "ETH", name: "Ethereum" },
@@ -24,6 +26,17 @@
     DOGE: 0.12,
     USDT: 1,
     USDC: 1
+  };
+  const STRATEGY_PROFILES = [
+    { id: "current", name: "目前持倉", cashBuffer: 0, shockScale: 1, description: "完全沿用目前配置，最貼近現況。" },
+    { id: "balanced", name: "均衡配置", cashBuffer: 0.18, shockScale: 0.82, description: "提高現金與分散程度，降低單一幣種衝擊。" },
+    { id: "growth", name: "成長進攻", cashBuffer: -0.08, shockScale: 1.18, description: "提高風險曝險，牛市彈性較高，壓力也更大。" }
+  ];
+  const SCENARIO_SHOCKS = {
+    normal: { default: 0, stable: 0 },
+    bull: { BTC: 0.28, ETH: 0.34, SOL: 0.48, XRP: 0.30, BNB: 0.24, DOGE: 0.52, stable: 0, default: 0.26 },
+    bear: { BTC: -0.22, ETH: -0.30, SOL: -0.42, XRP: -0.34, BNB: -0.28, DOGE: -0.46, stable: 0, default: -0.32 },
+    black_swan: { BTC: -0.38, ETH: -0.46, SOL: -0.62, XRP: -0.52, BNB: -0.48, DOGE: -0.68, USDT: -0.02, USDC: -0.01, stable: -0.01, default: -0.55 }
   };
 
   function fmtUSD(value) {
@@ -49,6 +62,11 @@
     if (n >= 1_000_000_000) return "$" + (n / 1_000_000_000).toFixed(2) + "B";
     if (n >= 1_000_000) return "$" + (n / 1_000_000).toFixed(2) + "M";
     return fmtUSD(n);
+  }
+
+  function pctText(value) {
+    const n = Number(value || 0) * 100;
+    return `${n >= 0 ? "+" : ""}${n.toFixed(1)}%`;
   }
 
   function setStatus(message, type) {
@@ -232,6 +250,71 @@
     pnlPctEl.className = "sub " + (pnlPct >= 0 ? "ok" : "bad");
   }
 
+  function getScenarioShock(symbol) {
+    const normalized = String(symbol || "").toUpperCase();
+    const shocks = SCENARIO_SHOCKS[activeScenario] || SCENARIO_SHOCKS.normal;
+    if (Object.prototype.hasOwnProperty.call(shocks, normalized)) return Number(shocks[normalized] || 0);
+    if (normalized === "USDT" || normalized === "USDC") return Number(shocks.stable || 0);
+    return Number(shocks.default || 0);
+  }
+
+  function buildScenarioRows(snapshot) {
+    const cash = Number(snapshot?.cash || 0);
+    const positions = Array.isArray(snapshot?.positions) ? snapshot.positions : [];
+    const currentTotal = Number(snapshot?.total_value_usd || cash || 0);
+    const riskAssetValue = positions.reduce((sum, pos) => sum + Number(pos.market_value || 0), 0);
+    const scenario = scenarioData[activeScenario] || {};
+    const volatility = Number(scenario.volatility_multiplier || 1);
+
+    return STRATEGY_PROFILES.map((strategy) => {
+      const cashShift = strategy.cashBuffer >= 0
+        ? riskAssetValue * strategy.cashBuffer
+        : -Math.min(cash, currentTotal * Math.abs(strategy.cashBuffer));
+      const adjustedCash = Math.max(0, cash + cashShift);
+      const investableScale = riskAssetValue > 0
+        ? Math.max(0, (riskAssetValue - cashShift) / riskAssetValue)
+        : 0;
+      const stressedPositions = positions.reduce((sum, pos) => {
+        const value = Number(pos.market_value || 0) * investableScale;
+        const shock = getScenarioShock(pos.symbol) * strategy.shockScale;
+        return sum + value * (1 + shock);
+      }, 0);
+      const projected = adjustedCash + stressedPositions;
+      const pnl = projected - currentTotal;
+      const pnlPct = currentTotal ? pnl / currentTotal : 0;
+      const maxStress = Math.min(0.95, Math.abs((volatility - 1) * 0.18 * strategy.shockScale) + Math.max(0, -pnlPct));
+
+      return Object.assign({}, strategy, { projected, pnl, pnlPct, maxStress });
+    });
+  }
+
+  function renderScenarioStress(snapshot) {
+    const rows = buildScenarioRows(snapshot);
+    const grid = $("scenarioStrategyGrid");
+    if (grid) {
+      grid.innerHTML = rows.map((row) => `
+        <div class="scenario-strategy-card">
+          <span>${row.name}</span>
+          <strong class="${row.pnl >= 0 ? "ok" : "bad"}">${pctText(row.pnlPct)}</strong>
+          <small>${fmtUSD(row.projected)}</small>
+        </div>
+      `).join("");
+    }
+
+    const body = $("scenarioStrategyBody");
+    if (body) {
+      body.innerHTML = rows.map((row) => `
+        <tr>
+          <td>${row.name}</td>
+          <td>${fmtUSD(row.projected)}</td>
+          <td class="${row.pnl >= 0 ? "ok" : "bad"}">${fmtUSD(row.pnl)} (${pctText(row.pnlPct)})</td>
+          <td>${pctText(-row.maxStress)}</td>
+          <td>${row.description}</td>
+        </tr>
+      `).join("");
+    }
+  }
+
   function renderPositions(snapshot) {
     const body = $("positionsBody");
     if (!body) return;
@@ -360,6 +443,7 @@
     renderPositions(data.portfolio);
     drawEquity(data.portfolio);
     drawAlloc(data.portfolio);
+    renderScenarioStress(data.portfolio);
     updateQuotePanel();
   }
 
@@ -450,5 +534,49 @@
       $(id)?.addEventListener("input", updateQuotePanel);
       $(id)?.addEventListener("change", updateQuotePanel);
     });
+
+    // —— Market Scenario Switcher ——
+    async function loadScenarios() {
+      try {
+        const res = await fetch("/api/market-scenarios");
+        if (!res.ok) return;
+        const data = await res.json();
+        scenarioData = data.scenarios || {};
+      } catch (e) {
+        console.warn("Failed to load market scenarios", e);
+        scenarioData = {};
+      }
+    }
+
+    function applyScenario(scenarioKey) {
+      activeScenario = scenarioKey;
+      const sc = scenarioData[scenarioKey] || { label: "一般市場", price_multiplier: 1.0, volatility_multiplier: 1.0 };
+      $("scenarioBadge") && ($("scenarioBadge").textContent = sc.label || scenarioKey);
+      $("scPriceMult") && ($("scPriceMult").textContent = (sc.price_multiplier || 1).toFixed(1) + "x");
+      $("scVolMult") && ($("scVolMult").textContent = (sc.volatility_multiplier || 1).toFixed(1) + "x");
+
+      const adviceMap = {
+        normal: "按照策略正常操作",
+        bull: "可提高風險資產佔比，定期獲利了結",
+        bear: "提高穩定幣佔比，嚴格執行止損",
+        black_swan: "極端風險規避，建議全倉現金為主"
+      };
+      $("scAdvice") && ($("scAdvice").textContent = adviceMap[scenarioKey] || "正常操作");
+
+      document.querySelectorAll(".scenario-btn").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.scenario === scenarioKey);
+      });
+      renderScenarioStress(currentPortfolio);
+
+      // placeholder: 展示情境資訊，不修改實際交易數據
+      console.log("[sim-trade] scenario switched to", scenarioKey, sc);
+    }
+
+    document.querySelectorAll(".scenario-btn").forEach((btn) => {
+      btn.addEventListener("click", () => applyScenario(btn.dataset.scenario));
+    });
+
+    loadScenarios().then(() => applyScenario("normal"));
+    // —— End Scenario Switcher ——
   });
 })();

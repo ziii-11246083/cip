@@ -581,6 +581,12 @@
   box-shadow:0 14px 30px rgba(249,115,22,.18);
 }
 
+.tool-directory-item .text-icon{
+  font-size:28px;
+  font-weight:950;
+  line-height:1;
+}
+
 .tool-directory-item strong{
   display:block;
   color:var(--dark);
@@ -658,6 +664,23 @@
   color:var(--dark);
   font-size:23px;
   font-weight:950;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.member-tag{
+  display:inline-block;
+  font-style:normal;
+  font-size:10px;
+  font-weight:950;
+  color:var(--brand);
+  background:#FFF7ED;
+  border:1px solid var(--brand-2);
+  border-radius:999px;
+  padding:3px 10px;
+  letter-spacing:.5px;
 }
 
 .feature-card p{

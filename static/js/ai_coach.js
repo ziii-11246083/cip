@@ -4,6 +4,15 @@
   const messageHistory = [];
   const newChatBtn = $("aiCoachNewChatBtn");
   let conversationCache = [];
+  let isLocked = false;
+
+  function setLockedState(locked) {
+    isLocked = locked;
+    $("memberGate")?.classList.toggle("show", locked);
+    $("memberGate")?.classList.toggle("locked", locked);
+    const app = $("aiCoachApp");
+    if (app) app.classList.toggle("ai-coach-locked", locked);
+  }
 
   function escapeHTML(value) {
     return String(value ?? "")
@@ -138,6 +147,10 @@
 
   async function selectConversation(conversationId) {
     if (!conversationId) return;
+    if (isLocked) {
+      window.authManager?.requireMember?.("AI 投資教練");
+      return;
+    }
     await window.waitForSmartInvestAuth?.();
     if (window.authManager && !window.authManager.isLoggedIn?.()) {
       window.authManager.requireMember?.("AI 投資教練");
@@ -279,6 +292,10 @@
   }
 
   async function sendMessage() {
+    if (isLocked) {
+      window.authManager?.requireMember?.("AI 投資教練");
+      return;
+    }
     await window.waitForSmartInvestAuth?.();
     if (window.authManager && !window.authManager.isLoggedIn?.()) {
       window.authManager.requireMember?.("AI 投資教練");
@@ -356,18 +373,31 @@
       sendMessage();
     });
     newChatBtn?.addEventListener("click", () => {
+      if (isLocked) {
+        window.authManager?.requireMember?.("AI 投資教練");
+        return;
+      }
       localStorage.removeItem(CONVERSATION_KEY);
       resetChat(true);
       loadConversations();
     });
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
+  document.addEventListener("DOMContentLoaded", async () => {
+    await window.waitForSmartInvestAuth?.();
+    const loggedIn = Boolean(window.authManager?.isLoggedIn?.() || window.smartInvestMembership?.isMember);
+    if (!loggedIn) {
+      setLockedState(true);
+    } else {
+      setLockedState(false);
+    }
     initPageMotion();
     initRiskCards();
     initQuickAsk();
     initChatEvents();
-    loadConversations();
-    loadHistory();
+    if (loggedIn) {
+      loadConversations();
+      loadHistory();
+    }
   });
 })();
