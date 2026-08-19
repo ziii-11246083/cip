@@ -1245,7 +1245,7 @@ def persist_health_report(req: RiskHealthRequest, metrics: Dict[str, float], ai_
     if not db or request.user.get("is_demo"):
         return
     access_token = request.user.get("token")
-    user_id = request.user.get("id")
+    user_id = request.user.get("uid")
     if not access_token or not user_id:
         return
     payload = request.get_json(silent=True) or {}
@@ -2259,7 +2259,7 @@ def api_membership_subscription():
             }
         })
     access_token = request.user.get("token")
-    user_id = request.user.get("id")
+    user_id = request.user.get("uid")
     subscription = db.get_user_subscription(access_token, user_id) if access_token and user_id else {}
     return jsonify({"subscription": subscription or {"status": "free", "source": "default"}})
 
@@ -2278,7 +2278,7 @@ def api_membership_mock_checkout():
         })
 
     access_token = request.user.get("token")
-    user_id = request.user.get("id")
+    user_id = request.user.get("uid")
     plans = db.list_membership_plans()
     plan = next((p for p in plans if str(p.get("plan_code")).lower() == plan_code), None)
     if not plan:
@@ -2320,7 +2320,7 @@ def api_external_sync_manual():
             "sync": {"platform": platform, "holdings_snapshot": holdings, "total_value_usd": total_value},
         })
     access_token = request.user.get("token")
-    user_id = request.user.get("id")
+    user_id = request.user.get("uid")
     ok = db.save_manual_asset_sync_log(
         access_token,
         user_id,
