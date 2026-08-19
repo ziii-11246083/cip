@@ -68,10 +68,10 @@ class RAGService:
         if _ENABLE_ROUTING:
             try:
                 route_decision = self._ensure_router().route(query, endpoint)
-                logger.debug("Route: %s → %s", query[:50], route_decision.route)
-            except Exception as exc:
-                logger.warning("Router failed: %s", exc)
-                fallback_reason = f"router_error: {exc}"
+                logger.debug("Route decided: %s", route_decision.route)
+            except Exception:
+                logger.warning("Router failed (code=router_error)")
+                fallback_reason = "router_error"
         else:
             route_decision = type('obj', (object,), {
                 'route': 'fast', 'reason': 'routing_disabled',
@@ -87,20 +87,20 @@ class RAGService:
                 rewrite_result = self._ensure_rewriter().rewrite(query, endpoint)
                 if rewrite_result.used:
                     query = rewrite_result.rewritten
-                    logger.debug("Rewrite: %s → %s (sim=%.3f)",
-                                 rewrite_result.original[:40], rewrite_result.rewritten[:40],
-                                 rewrite_result.similarity)
-            except Exception as exc:
-                logger.warning("Rewrite failed: %s", exc)
+                    logger.debug("Rewrite applied (sim=%.3f)", rewrite_result.similarity)
+            except Exception:
+                # 固定安全代碼；仍以原 query 繼續 retrieval（不得 fatal）
+                logger.warning("Rewrite failed (code=rewrite_error)")
+                fallback_reason = "rewrite_error"
 
         # Step 3: Retrieve
         try:
             retrieval_meta = self._retrieval.retrieve_with_meta(
                 query, topics=topics, max_results=max_results * 2 if is_deep else max_results
             )
-        except Exception as exc:
-            logger.warning("Retrieval failed: %s", exc)
-            fallback_reason = f"retrieval_error: {exc}"
+        except Exception:
+            logger.warning("Retrieval failed (code=retrieval_error)")
+            fallback_reason = "retrieval_error"
             retrieval_meta = {
                 "results": [], "sparse_hit_count": 0, "dense_hit_count": 0,
                 "final_context_count": 0, "method": "failed",
@@ -179,6 +179,9 @@ class RAGService:
         """Build RAG-augmented context for /api/ai-chat."""
         results: List[RetrievalResult] = []
         retrieval_meta: Dict[str, Any] = {}
+        # 安全 metrics：無論成功或降級都回傳足以判定狀態的紀錄；
+        # fallback_reason 只使用固定代碼（不含 provider exception text）。
+        pipe: Optional[Dict[str, Any]] = None
         try:
             if self.kb_loaded:
                 pipe = self._retrieve_for_endpoint(
@@ -190,16 +193,36 @@ class RAGService:
                 retrieval_meta = pipe["meta"]
             else:
                 logger.info("RAG kb not loaded, skipping chat retrieval")
-        except Exception as exc:
-            logger.warning("RAG retrieval failed for chat, falling back: %s", exc)
+                pipe = {
+                    "results": [],
+                    "meta": {},
+                    "metrics_record": {
+                        "empty_context": True,
+                        "fallback_reason": "kb_unavailable",
+                    },
+                }
+        except Exception:
+            logger.warning("RAG retrieval failed for chat, falling back (code=retrieval_error)")
+            pipe = {
+                "results": [],
+                "meta": {},
+                "metrics_record": {
+                    "empty_context": True,
+                    "fallback_reason": "retrieval_error",
+                },
+            }
 
-        return self._builder.build_chat_prompt(
+        prompt = self._builder.build_chat_prompt(
             user_message=user_message,
             risk_profile=risk_profile,
             retrieval_results=results,
             user_context=user_context,
             retrieval_meta=retrieval_meta,
         )
+        # Trace payloads (additive; TASK 02): retrieval sources + pipeline metrics
+        prompt["retrieval_results"] = results
+        prompt["metrics_record"] = pipe.get("metrics_record", {}) if pipe else {}
+        return prompt
 
     def augment_agent(
         self,
@@ -210,6 +233,7 @@ class RAGService:
         """Build RAG-augmented context for /api/agent-plan."""
         results: List[RetrievalResult] = []
         retrieval_meta: Dict[str, Any] = {}
+        pipe: Optional[Dict[str, Any]] = None
         try:
             if self.kb_loaded:
                 pipe = self._retrieve_for_endpoint(
@@ -219,16 +243,37 @@ class RAGService:
                 )
                 results = pipe["results"]
                 retrieval_meta = pipe["meta"]
-        except Exception as exc:
-            logger.warning("RAG retrieval failed for agent, falling back: %s", exc)
+            else:
+                pipe = {
+                    "results": [],
+                    "meta": {},
+                    "metrics_record": {
+                        "empty_context": True,
+                        "fallback_reason": "kb_unavailable",
+                    },
+                }
+        except Exception:
+            logger.warning("RAG retrieval failed for agent, falling back (code=retrieval_error)")
+            pipe = {
+                "results": [],
+                "meta": {},
+                "metrics_record": {
+                    "empty_context": True,
+                    "fallback_reason": "retrieval_error",
+                },
+            }
 
-        return self._builder.build_agent_prompt(
+        prompt = self._builder.build_agent_prompt(
             goal=goal,
             risk_profile=risk_profile,
             budget=budget,
             retrieval_results=results,
             retrieval_meta=retrieval_meta,
         )
+        # Trace payloads (additive; TASK 03)
+        prompt["retrieval_results"] = results
+        prompt["metrics_record"] = pipe.get("metrics_record", {}) if pipe else {}
+        return prompt
 
     def augment_podcast(
         self,
@@ -238,6 +283,7 @@ class RAGService:
         """Build RAG-augmented context for /podcast/generate."""
         results: List[RetrievalResult] = []
         retrieval_meta: Dict[str, Any] = {}
+        pipe: Optional[Dict[str, Any]] = None
         try:
             if self.kb_loaded:
                 pipe = self._retrieve_for_endpoint(
@@ -247,20 +293,42 @@ class RAGService:
                 )
                 results = pipe["results"]
                 retrieval_meta = pipe["meta"]
-        except Exception as exc:
-            logger.warning("RAG retrieval failed for podcast, falling back: %s", exc)
+            else:
+                pipe = {
+                    "results": [],
+                    "meta": {},
+                    "metrics_record": {
+                        "empty_context": True,
+                        "fallback_reason": "kb_unavailable",
+                    },
+                }
+        except Exception:
+            logger.warning("RAG retrieval failed for podcast, falling back (code=retrieval_error)")
+            pipe = {
+                "results": [],
+                "meta": {},
+                "metrics_record": {
+                    "empty_context": True,
+                    "fallback_reason": "retrieval_error",
+                },
+            }
 
-        return self._builder.build_podcast_prompt(
+        prompt = self._builder.build_podcast_prompt(
             topic=topic,
             retrieval_results=results,
             market_context=market_context,
             retrieval_meta=retrieval_meta,
         )
+        # Trace payloads (additive; TASK 03)
+        prompt["retrieval_results"] = results
+        prompt["metrics_record"] = pipe.get("metrics_record", {}) if pipe else {}
+        return prompt
 
     def augment_scam(self, content: str) -> Dict[str, Any]:
         """Build RAG context for scam detection education supplement."""
         results: List[RetrievalResult] = []
         retrieval_meta: Dict[str, Any] = {}
+        pipe: Optional[Dict[str, Any]] = None
         try:
             if self.kb_loaded:
                 pipe = self._retrieve_for_endpoint(
@@ -270,17 +338,41 @@ class RAGService:
                 )
                 results = pipe["results"]
                 retrieval_meta = pipe["meta"]
-        except Exception as exc:
-            logger.warning("RAG retrieval failed for scam, falling back: %s", exc)
+            else:
+                pipe = {
+                    "results": [],
+                    "meta": {},
+                    "metrics_record": {
+                        "empty_context": True,
+                        "fallback_reason": "kb_unavailable",
+                    },
+                }
+        except Exception:
+            logger.warning("RAG retrieval failed for scam, falling back (code=retrieval_error)")
+            pipe = {
+                "results": [],
+                "meta": {},
+                "metrics_record": {
+                    "empty_context": True,
+                    "fallback_reason": "retrieval_error",
+                },
+            }
 
         snippets = []
         for r in results:
             snippets.append(f"[{r.topic}] {r.snippet[:300]}")
+        # route 只使用 snippets[:2]，且 max_results=2 → 全部 retrieved 均為 injected
         return {
             "rag_snippets": snippets,
             "retrieval_count": len(results),
             "kb_available": self.kb_loaded,
             "retrieval_method": retrieval_meta.get("method", "keyword"),
+            # Trace payloads (additive; TASK 03)
+            "retrieval_results": results,
+            "metrics_record": pipe.get("metrics_record", {}) if pipe else {},
+            "citations": [],
+            "confidence": None,
+            "injected_count": len(results),
         }
 
     def augment_health(
@@ -291,6 +383,7 @@ class RAGService:
         """Build RAG-augmented context for /portfolio/analyze-llm."""
         results: List[RetrievalResult] = []
         retrieval_meta: Dict[str, Any] = {}
+        pipe: Optional[Dict[str, Any]] = None
         try:
             if self.kb_loaded:
                 pipe = self._retrieve_for_endpoint(
@@ -300,15 +393,36 @@ class RAGService:
                 )
                 results = pipe["results"]
                 retrieval_meta = pipe["meta"]
-        except Exception as exc:
-            logger.warning("RAG retrieval failed for health, falling back: %s", exc)
+            else:
+                pipe = {
+                    "results": [],
+                    "meta": {},
+                    "metrics_record": {
+                        "empty_context": True,
+                        "fallback_reason": "kb_unavailable",
+                    },
+                }
+        except Exception:
+            logger.warning("RAG retrieval failed for health, falling back (code=retrieval_error)")
+            pipe = {
+                "results": [],
+                "meta": {},
+                "metrics_record": {
+                    "empty_context": True,
+                    "fallback_reason": "retrieval_error",
+                },
+            }
 
-        return self._builder.build_health_prompt(
+        prompt = self._builder.build_health_prompt(
             risk_health=risk_health,
             holdings_text=holdings_text,
             retrieval_results=results,
             retrieval_meta=retrieval_meta,
         )
+        # Trace payloads (additive; TASK 03)
+        prompt["retrieval_results"] = results
+        prompt["metrics_record"] = pipe.get("metrics_record", {}) if pipe else {}
+        return prompt
 
     # ── lazy service accessors ────────────────────────────────
 

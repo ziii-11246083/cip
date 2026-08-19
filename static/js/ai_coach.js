@@ -23,21 +23,193 @@
       .replaceAll("'", "&#039;");
   }
 
-  function appendChatBubble(speaker, text, isUser = false) {
+  // ── TASK 04：純函式（可測試）─────────────────────────────────────
+  function citationLines(citation) {
+    if (typeof citation === "string") {
+      const text = String(citation).trim();
+      return text ? [{ label: "來源", text }] : null;
+    }
+    if (citation && typeof citation === "object" && !Array.isArray(citation)) {
+      const lines = [];
+      if (citation.source) lines.push({ label: "來源", text: String(citation.source) });
+      if (citation.topic) lines.push({ label: "主題", text: String(citation.topic) });
+      if (citation.section) lines.push({ label: "章節", text: String(citation.section) });
+      if (citation.chunk_id) lines.push({ label: "段落", text: String(citation.chunk_id) });
+      return lines.length ? lines : null;
+    }
+    return null;
+  }
+
+  function displayableCitationCount(citations) {
+    const items = Array.isArray(citations) ? citations : [];
+    let count = 0;
+    items.forEach((citation) => {
+      if (citationLines(citation)) count += 1;
+    });
+    return count;
+  }
+
+  function hintsFor(confidence, hasCitations) {
+    const hints = [];
+    if (!hasCitations) hints.push("本回答未取得可引用知識，內容僅供參考。");
+    if (confidence === "low") hints.push("目前知識庫中與此問題直接相關的資訊有限，此回答僅供參考。");
+    return hints;
+  }
+
+  function feedbackVisible(traceId) {
+    return typeof traceId === "string" && traceId.length >= 8 && traceId.length <= 128;
+  }
+
+  function buildCitationBlock(citations) {
+    const items = Array.isArray(citations) ? citations : [];
+    const displayable = displayableCitationCount(items);
+    if (displayable === 0) return null;
+    const details = document.createElement("details");
+    details.className = "cite-details";
+    const summary = document.createElement("summary");
+    summary.textContent = `參考來源（${displayable}）`;
+    details.appendChild(summary);
+    const list = document.createElement("ul");
+    list.className = "cite-list";
+    items.forEach((citation) => {
+      const lines = citationLines(citation);
+      if (!lines) return;
+      lines.forEach((line) => {
+        const li = document.createElement("li");
+        li.className = "cite-item";
+        const label = document.createElement("span");
+        label.className = "cite-label";
+        label.textContent = line.label;
+        const text = document.createElement("span");
+        text.className = "cite-text";
+        text.textContent = line.text; // server data 一律 textContent，不做 innerHTML
+        li.appendChild(label);
+        li.appendChild(text);
+        list.appendChild(li);
+      });
+    });
+    details.appendChild(list);
+    return details;
+  }
+
+  function buildFeedbackBar(traceId) {
+    if (!feedbackVisible(traceId)) return null;
+    const bar = document.createElement("div");
+    bar.className = "feedback-bar";
+    const label = document.createElement("span");
+    label.className = "feedback-label";
+    label.textContent = "這個回答有幫助嗎？";
+    const up = document.createElement("button");
+    up.type = "button";
+    up.className = "feedback-btn";
+    up.textContent = "👍 有幫助";
+    const down = document.createElement("button");
+    down.type = "button";
+    down.className = "feedback-btn";
+    down.textContent = "👎 沒幫助";
+    const errorEl = document.createElement("span");
+    errorEl.className = "feedback-error";
+    errorEl.setAttribute("role", "status");
+
+    let inFlight = false;
+    const setLocked = (locked) => {
+      up.disabled = locked;
+      down.disabled = locked;
+      bar.classList.toggle("is-pending", locked);
+      if (locked) {
+        up.setAttribute("aria-busy", "true");
+        down.setAttribute("aria-busy", "true");
+      } else {
+        up.removeAttribute("aria-busy");
+        down.removeAttribute("aria-busy");
+      }
+    };
+    const setActive = (btn) => {
+      up.classList.toggle("active", btn === up);
+      down.classList.toggle("active", btn === down);
+      up.setAttribute("aria-pressed", String(btn === up));
+      down.setAttribute("aria-pressed", String(btn === down));
+    };
+    const submit = async (vote, btn) => {
+      if (inFlight) return; // pending 期間忽略額外提交：同時最多一個 in-flight request
+      inFlight = true;      // 必須在任何 await 之前上鎖，避免競態視窗
+      setLocked(true);
+      errorEl.textContent = "";
+      const token = await getAuthToken();
+      if (!token) {
+        errorEl.textContent = "請先登入會員。";
+        inFlight = false;
+        setLocked(false);
+        return;
+      }
+      try {
+        const res = await fetch("/api/rag-feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ trace_id: traceId, vote }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.ok) {
+          setActive(btn);
+        } else {
+          errorEl.textContent = (typeof data.message === "string" && data.message)
+            ? data.message : "回饋送出失敗，請稍後再試。";
+        }
+      } catch {
+        errorEl.textContent = "連線不穩，回饋未送出，請稍後重試。";
+      } finally {
+        inFlight = false;
+        setLocked(false); // 完成（成功或失敗）後解除鎖定，可改票／重試
+      }
+    };
+    up.addEventListener("click", () => submit("up", up));
+    down.addEventListener("click", () => submit("down", down));
+    bar.appendChild(label);
+    bar.appendChild(up);
+    bar.appendChild(down);
+    bar.appendChild(errorEl);
+    return bar;
+  }
+
+  function appendChatBubble(speaker, text, isUser = false, meta = null) {
     const stream = $("chatStream");
     if (!stream) return;
 
     const row = document.createElement("div");
     row.className = `chat-row ${isUser ? "user" : "ai"}`;
 
-    row.innerHTML = `
-      <div class="avatar">${isUser ? "你" : "AI"}</div>
-      <div class="bubble">
-        <b>${escapeHTML(speaker)}</b>
-        <p>${escapeHTML(text)}</p>
-      </div>
-    `;
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.textContent = isUser ? "你" : "AI";
 
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    const nameEl = document.createElement("b");
+    nameEl.textContent = speaker;
+    const textEl = document.createElement("p");
+    textEl.textContent = text;
+    bubble.appendChild(nameEl);
+    bubble.appendChild(textEl);
+
+    // ── TASK 04：本次回答的來源／信心／feedback（舊 history 無 meta → 不顯示）──
+    if (!isUser && meta) {
+      const citations = Array.isArray(meta.citations) ? meta.citations : [];
+      // hasCitations 依「可顯示來源」判定：invalid-only citations 等同無來源
+      const hasCitations = displayableCitationCount(citations) > 0;
+      hintsFor(meta.confidence, hasCitations).forEach((hint) => {
+        const note = document.createElement("p");
+        note.className = "confidence-note";
+        note.textContent = hint;
+        bubble.appendChild(note);
+      });
+      const citeBlock = buildCitationBlock(citations);
+      if (citeBlock) bubble.appendChild(citeBlock);
+      const feedbackBar = buildFeedbackBar(meta.trace_id);
+      if (feedbackBar) bubble.appendChild(feedbackBar);
+    }
+
+    row.appendChild(avatar);
+    row.appendChild(bubble);
     stream.appendChild(row);
     stream.scrollTop = stream.scrollHeight;
   }
@@ -354,7 +526,11 @@
         setActiveConversation(data.conversation_id);
       }
       const replyText = data.reply || "我收到你的問題了，但目前沒有取得完整回覆。";
-      appendChatBubble("Smart Invest AI 教練", replyText);
+      appendChatBubble("Smart Invest AI 教練", replyText, false, {
+        citations: data.citations,
+        confidence: data.confidence,
+        trace_id: data.trace_id,
+      });
       recordMessage("assistant", replyText);
     } catch {
       removeTypingBubble();
@@ -381,6 +557,17 @@
       resetChat(true);
       loadConversations();
     });
+  }
+
+  // ── TASK 04：純函式／渲染測試 hooks ─────────────────────────────────
+  if (typeof window !== "undefined") {
+    window.aiCoachTestHooks = {
+      citationLines,
+      hintsFor,
+      feedbackVisible,
+      displayableCitationCount,
+      appendChatBubble,
+    };
   }
 
   document.addEventListener("DOMContentLoaded", async () => {
