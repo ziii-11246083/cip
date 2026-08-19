@@ -11,6 +11,8 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from services.rag_trace_service import sanitize_text
+
 logger = logging.getLogger(__name__)
 
 METRICS_DIR = Path(__file__).resolve().parent.parent / "data" / "rag_metrics"
@@ -119,7 +121,8 @@ class RAGMetricsService:
         """Build a standardized metrics record."""
         return {
             "endpoint": endpoint,
-            "query": query[:200],  # Truncate for storage
+            # 安全化後才落盤（TASK 02）：raw query 不進入 legacy metrics/JSONL
+            "query": sanitize_text(query, max_len=200),
             "route_type": route_type,
             "rewrite_used": rewrite_result.get("used", False) if rewrite_result else False,
             "rewrite_rejected": rewrite_result.get("rejected", False) if rewrite_result else False,

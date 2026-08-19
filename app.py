@@ -56,7 +56,154 @@ except Exception as _rag_exc:
     _rag_metrics = None
 
 # 載入環境變數
+# （須在 RAG trace singleton 建立之前，否則 .env 中的 HMAC secret 與
+#   service-role credential 不會被 trace service 看到，會誤判 missing）
 load_dotenv()
+
+# ── RAG Trace (TASK 02 / TASK 03) ───────────────────────────
+try:
+    from services.rag_trace_service import get_trace_service as _get_trace_service
+    from services.rag_trace_service import sanitize_text as _trace_sanitize
+    _trace = _get_trace_service()
+except Exception:
+    _trace = None
+    _trace_sanitize = None
+
+
+_TRACE_TRUNC_MARKER = "…[truncated]"
+_TRACE_LEAF_BUDGETS = [200, 100, 50, 20, 10, 5]
+_TRACE_LIST_CAPS = [200, 50, 10, 2]
+_TRACE_DICT_CAPS = [200, 50, 10, 2]
+_TRACE_KEY_MAX_LEN = 80
+
+
+def _trace_clean_key(key):
+    """nested dict key 清理：sanitize（不得洩漏 secret）＋過長截斷（附標記）。"""
+    text = str(key)
+    if _trace_sanitize is not None:
+        text = _trace_sanitize(text)
+    if len(text) > _TRACE_KEY_MAX_LEN:
+        text = text[:_TRACE_KEY_MAX_LEN] + _TRACE_TRUNC_MARKER
+    return text
+
+
+def _trace_shrink(value, leaf_budget=None, list_cap=None, dict_cap=None):
+    """JSON-aware 縮減（TASK 03 Codex R2/R3）：
+    - 每個 string value 先經 sanitizer（絕不對 serialized JSON 語法跑 sanitizer）；
+    - leaf 超長加固定截斷標記；list 超長保留前段＋尾端標記元素；
+    - dict 以「sorted 原始 key」決定性選取前段，key 先清理（collision-safe，
+      碰撞時以 #2/#3 固定後綴區隔，不靜默覆蓋），並附加截斷標記 entry。"""
+    if isinstance(value, str):
+        text = _trace_sanitize(value) if _trace_sanitize is not None else value
+        if leaf_budget is not None and len(text) > leaf_budget:
+            text = text[:leaf_budget] + _TRACE_TRUNC_MARKER
+        return text
+    if isinstance(value, list):
+        items = value
+        if list_cap is not None and len(items) > list_cap:
+            items = items[:list_cap] + [_TRACE_TRUNC_MARKER]
+        return [_trace_shrink(v, leaf_budget, list_cap, dict_cap) for v in items]
+    if isinstance(value, dict):
+        raw_keys = sorted(value.keys(), key=lambda k: str(k))
+        selected = raw_keys
+        if dict_cap is not None and len(selected) > dict_cap:
+            selected = selected[:dict_cap]
+        cleaned = {}
+        for raw_key in selected:
+            base = _trace_clean_key(raw_key)
+            candidate = base
+            suffix = 1
+            while candidate in cleaned:
+                suffix += 1
+                candidate = f"{base}#{suffix}"
+            cleaned[candidate] = _trace_shrink(value[raw_key], leaf_budget,
+                                               list_cap, dict_cap)
+        if dict_cap is not None and len(raw_keys) > dict_cap:
+            marker_key = _TRACE_TRUNC_MARKER
+            while marker_key in cleaned:
+                marker_key = marker_key + "#"
+            cleaned[marker_key] = _TRACE_TRUNC_MARKER
+        return cleaned
+    return value
+
+
+def _trace_snapshot(payload, max_len=4000):
+    """deterministic、經 PII/secret 遮罩、且任何輸入下皆為合法 JSON 的 snapshot
+    （TASK 03）。遮罩在「每個 string value／nested key」層級先完成，最後才
+    json.dumps（sort_keys＋固定 separators）——絕不對 serialized JSON 執行
+    sanitizer，也絕不直接切片 JSON 字串。未超上限時 byte-for-byte 維持原結果。"""
+    def _serialize(obj):
+        try:
+            return json.dumps(obj, ensure_ascii=False, sort_keys=True,
+                              separators=(",", ":"))
+        except Exception:
+            return json.dumps({"error": "snapshot_serialize_failed"},
+                              ensure_ascii=False, sort_keys=True)
+
+    text = _serialize(_trace_shrink(payload))
+    if len(text) <= max_len:
+        return text
+
+    for budget in _TRACE_LEAF_BUDGETS:
+        text = _serialize(_trace_shrink(payload, leaf_budget=budget))
+        if len(text) <= max_len:
+            return text
+
+    for cap in _TRACE_LIST_CAPS:
+        text = _serialize(_trace_shrink(payload, leaf_budget=_TRACE_LEAF_BUDGETS[-1],
+                                        list_cap=cap))
+        if len(text) <= max_len:
+            return text
+
+    for cap in _TRACE_DICT_CAPS:
+        text = _serialize(_trace_shrink(payload, leaf_budget=_TRACE_LEAF_BUDGETS[-1],
+                                        list_cap=_TRACE_LIST_CAPS[-1], dict_cap=cap))
+        if len(text) <= max_len:
+            return text
+
+    # 終極 fallback：僅供不可序列化型別等病態輸入的安全保護；
+    # 正常 JSON request 的長 string/list/dict 不會走到這裡
+    return json.dumps(
+        {"error": "snapshot_too_large", "marker": _TRACE_TRUNC_MARKER},
+        ensure_ascii=False, sort_keys=True)
+
+
+def _start_trace(endpoint, query, user_id=None, conversation_id=None, model=""):
+    """共用 trace 起點（TASK 03）；trace 不可用或 endpoint 被拒時回 None，不影響原流程。"""
+    if _trace is None:
+        return None
+    try:
+        return _trace.start_run(
+            endpoint, query, user_id=user_id, conversation_id=conversation_id, model=model)
+    except Exception:
+        app.logger.warning("rag_trace start failed (code=start_failed)")
+        return None
+
+
+def _record_rag_for_trace(trace_run, rag_result):
+    if trace_run is None:
+        return
+    if rag_result is not None:
+        trace_run.record_rag(rag_result)
+    elif not (_rag and _rag_available):
+        trace_run.note_rag_unavailable()
+
+
+def _finish_trace(trace_run, answer, error=None, prompt_tokens=0, completion_tokens=0):
+    if trace_run is not None:
+        trace_run.finish(
+            answer=answer, error=error,
+            prompt_tokens=prompt_tokens, completion_tokens=completion_tokens)
+
+
+def _trace_meta(trace_run):
+    """response 增量 metadata：trace_id + 結構化安全 citations + confidence（若有）。"""
+    if trace_run is None:
+        return {}
+    meta = {"trace_id": trace_run.trace_id, "citations": trace_run.safe_citations()}
+    if trace_run.confidence is not None:
+        meta["confidence"] = trace_run.confidence
+    return meta
 
 # Supabase Client
 try:
@@ -1464,6 +1611,20 @@ def api_ai_chat():
     if not client:
         return jsonify({"reply": "API Key 未設定，無法連線 AI。"})
 
+    # ── RAG trace (TASK 02)：demo 使用者不寫 user_id（非 UUID，且避免污染正式使用者資料）
+    trace_run = None
+    if _trace is not None:
+        try:
+            trace_run = _trace.start_chat_run(
+                query=user_msg,
+                user_id=None if is_demo else user_uid,
+                conversation_id=None,
+                model=os.getenv("OPENAI_MODEL", "gpt-5.4"),
+            )
+        except Exception:
+            app.logger.warning("rag_trace start failed (code=start_failed)")
+            trace_run = None
+
     conversation_id = None
     history_rows: List[Dict[str, Any]] = []
     if db:
@@ -1542,18 +1703,30 @@ def api_ai_chat():
             except Exception:
                 app.logger.exception("ai_chat save user message failed")
 
+    if trace_run and conversation_id:
+        trace_run.set_conversation_id(conversation_id)
+
     try:
         system_prompt = build_ai_system_prompt(risk_profile)
         # ── RAG injection ──
         rag_context = ""
+        rag_result = None
         try:
             if _rag and _rag_available:
-                rag = _rag.augment_chat(user_msg, risk_profile)
-                ctx = "\n".join(rag.get("context", []))
+                rag_result = _rag.augment_chat(user_msg, risk_profile)
+                ctx = "\n".join(rag_result.get("context", []))
                 if ctx:
                     rag_context = f"\n\n【參考知識】\n{ctx}"
         except Exception:
-            pass  # RAG failure → silent fallback
+            rag_result = None  # RAG failure → silent fallback（既有行為不變）
+            if trace_run:
+                trace_run.note_rag_error()
+        if trace_run:
+            if rag_result is not None:
+                trace_run.record_rag(rag_result)
+            elif not (_rag and _rag_available):
+                # KB/RAG 不可用：trace 必須明確 degraded（不改變既有回答流程）
+                trace_run.note_rag_unavailable()
         messages: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt + rag_context}]
 
         if history_rows:
@@ -1628,6 +1801,13 @@ def api_ai_chat():
 
         tokens_used = prompt_tokens_total + completion_tokens_total
 
+        if trace_run:
+            trace_run.finish(
+                answer=reply_text,
+                prompt_tokens=prompt_tokens_total,
+                completion_tokens=completion_tokens_total,
+            )
+
         if db and conversation_id:
             try:
                 if access_token:
@@ -1657,9 +1837,22 @@ def api_ai_chat():
         payload = {"reply": reply_text or ""}
         if conversation_id:
             payload["conversation_id"] = conversation_id
+        if trace_run:
+            payload["trace_id"] = trace_run.trace_id
+            payload["citations"] = trace_run.citations
+            payload["confidence"] = trace_run.confidence
         return jsonify(payload)
-    except Exception as e:
-        return jsonify({"reply": f"系統錯誤: {str(e)}"})
+    except Exception:
+        # 錯誤訊息固定化：不回傳、不保存 provider exception text（可能含 token）
+        if trace_run:
+            trace_run.finish(answer="", error="ai_chat_error")
+            return jsonify({
+                "reply": "系統錯誤，請稍後再試。",
+                "trace_id": trace_run.trace_id,
+                "citations": [],
+                "confidence": None,
+            })
+        return jsonify({"reply": "系統錯誤，請稍後再試。"})
 
 @app.route('/api/ai-chat/history', methods=['GET'])
 @token_required
@@ -1711,6 +1904,60 @@ def api_ai_chat_conversations():
     except Exception:
         app.logger.exception("ai_chat conversations failed")
         return jsonify({"error": "conversation list fetch failed"}), 500
+
+
+@app.route('/api/rag-feedback', methods=['POST'])
+@token_required
+def api_rag_feedback():
+    """TASK 04 — 綁定 trace_id 的 up/down feedback。
+
+    權限：以使用者 JWT（authed client）查詢／寫入，RLS 實際驗證所有權；
+    client 傳入的 user_id/run_id 一律忽略；demo fail closed（403）；
+    wrong-user 與不存在的 trace 統一固定 404。
+    """
+    if bool(request.user.get('is_demo')):
+        return jsonify({
+            "ok": False,
+            "error": "feedback_not_available_for_demo",
+            "message": "此功能僅開放正式會員使用。",
+        }), 403
+
+    req = request.get_json(silent=True)
+    if not isinstance(req, dict):
+        return jsonify({"ok": False, "error": "invalid_request",
+                        "message": "請提供有效的 JSON 物件。"}), 400
+    trace_id = req.get("trace_id")
+    vote = req.get("vote")
+    if not isinstance(trace_id, str) or not (8 <= len(trace_id) <= 128):
+        return jsonify({"ok": False, "error": "invalid_trace_id",
+                        "message": "trace_id 無效。"}), 400
+    if vote not in ("up", "down"):
+        return jsonify({"ok": False, "error": "invalid_vote",
+                        "message": "vote 只能是 up 或 down。"}), 400
+    # 本階段不做 comment UI；req 中的 user_id/run_id/comment 一律忽略
+
+    user_uid = request.user.get('uid')
+    access_token = request.user.get('token')
+    if not db or not access_token:
+        return jsonify({"ok": False, "error": "db_unavailable",
+                        "message": "資料庫服務暫時不可用，請稍後再試。"}), 503
+
+    run_id, lookup_error = db.rag_find_run_id_by_trace(access_token, user_uid, trace_id)
+    if lookup_error:
+        return jsonify({"ok": False, "error": "db_unavailable",
+                        "message": "資料庫服務暫時不可用，請稍後再試。"}), 503
+    if not run_id:
+        # 不存在與非本人統一回固定 404，不洩漏所有權資訊
+        return jsonify({"ok": False, "error": "trace_not_found",
+                        "message": "找不到對應的對話紀錄。"}), 404
+
+    ok, upsert_error = db.rag_upsert_feedback(access_token, run_id, user_uid, vote)
+    if not ok:
+        # 固定安全錯誤，不回傳 DB exception 原文
+        return jsonify({"ok": False, "error": "feedback_failed",
+                        "message": "回饋儲存失敗，請稍後再試。"}), 500
+
+    return jsonify({"ok": True, "vote": vote, "trace_id": trace_id})
 
 def parse_budget_amount(value: Any, default: float = 100000.0) -> float:
     text = str(value or "")
@@ -2113,6 +2360,18 @@ def api_agent_plan():
     if not goal:
         return jsonify({"error": "請先輸入要交給 Agent 的任務。"}), 400
 
+    # ── RAG trace (TASK 03)：驗證已通過 → 建立 trace；demo 使用者 user_id=NULL
+    user_uid = request.user.get('uid')
+    is_demo = bool(request.user.get('is_demo'))
+    # query snapshot：實際影響回答的輸入＋實際 retrieval query
+    query_snapshot = _trace_snapshot({
+        "goal": goal, "profile": profile, "budget": budget,
+        "retrieval_query": goal,
+    })
+    trace_run = _start_trace(
+        "agent", query_snapshot, user_id=None if is_demo else user_uid,
+        model=os.getenv("OPENAI_MODEL_AGENT", "gpt-5.4"))
+
     fallback = {
         "summary": f"已根據「{goal[:42]}」整理出初步行動計畫",
         "allocation": build_agent_allocation(profile, budget),
@@ -2132,18 +2391,26 @@ def api_agent_plan():
     }
 
     if not client:
-        return jsonify(fallback)
+        if trace_run:
+            trace_run.note_llm_unavailable()
+        # 使用者實際收到的完整 fallback plan 即為 answer snapshot
+        _finish_trace(trace_run, answer=_trace_snapshot(fallback, max_len=8000))
+        return jsonify({**fallback, **_trace_meta(trace_run)})
 
     # ── RAG injection ──
     rag_context = ""
+    rag_result = None
     try:
         if _rag and _rag_available:
-            rag = _rag.augment_agent(goal, profile, str(budget))
-            ctx = "\n".join(rag.get("context", []))
+            rag_result = _rag.augment_agent(goal, profile, str(budget))
+            ctx = "\n".join(rag_result.get("context", []))
             if ctx:
                 rag_context = f"\n\n參考知識：\n{ctx}"
     except Exception:
-        pass
+        rag_result = None  # RAG failure → 既有 silent fallback 行為不變
+        if trace_run:
+            trace_run.note_rag_error()
+    _record_rag_for_trace(trace_run, rag_result)
 
     try:
         prompt = f"""
@@ -2161,8 +2428,8 @@ def api_agent_plan():
   "risks": ["風險1", "風險2", "風險3"],
   "next_action": "最建議使用者下一步立刻做什麼",
   "allocation": [
-    {"symbol": "BTC", "weight": 0.4, "amount_usd": 40000},
-    {"symbol": "ETH", "weight": 0.3, "amount_usd": 30000}
+    {{"symbol": "BTC", "weight": 0.4, "amount_usd": 40000}},
+    {{"symbol": "ETH", "weight": 0.3, "amount_usd": 30000}}
   ]
 }}
 """
@@ -2176,16 +2443,21 @@ def api_agent_plan():
             temperature=0.35,
         )
         parsed = json.loads(res.choices[0].message.content or "{}")
-        return jsonify({
+        business = {
             "summary": parsed.get("summary") or fallback["summary"],
             "steps": parsed.get("steps") or fallback["steps"],
             "risks": parsed.get("risks") or fallback["risks"],
             "next_action": parsed.get("next_action") or fallback["next_action"],
             "allocation": parsed.get("allocation") or fallback["allocation"],
-        })
-    except Exception as e:
-        fallback["debug"] = str(e)
-        return jsonify(fallback)
+        }
+        # answer snapshot = 實際回給使用者的完整 business response（不含 trace metadata）
+        _finish_trace(trace_run, answer=_trace_snapshot(business, max_len=8000))
+        return jsonify({**business, **_trace_meta(trace_run)})
+    except Exception:
+        # 不回傳 provider exception text（安全修正）；trace 記固定代碼；
+        # 使用者實際收到的是 fallback plan → 以同一份內容做 answer snapshot
+        _finish_trace(trace_run, answer=_trace_snapshot(fallback, max_len=8000), error="llm_error")
+        return jsonify({**fallback, **_trace_meta(trace_run)})
 
 
 @app.route('/api/agent-auto-order', methods=['POST'])
@@ -2247,21 +2519,35 @@ def api_agent_auto_order():
 def api_scam_scan():
     req = request.get_json(silent=True) or {}
     text = (req.get("text") or "").strip()
-    scam_client = refresh_openai_client()
-    if not scam_client:
-        return jsonify({"risk_level": "unknown", "report": "API Key 未設定，無法連線 AI。"})
     if not text:
         return jsonify({"risk_level": "unknown", "report": "請提供要檢測的內容。"})
+
+    # ── RAG trace (TASK 03)：匿名 endpoint → user_id=NULL；query snapshot 含實際 retrieval query
+    trace_run = _start_trace(
+        "scam", _trace_snapshot({"text": text, "retrieval_query": text}),
+        model=os.getenv("OPENAI_MODEL", "gpt-5.4"))
+
+    scam_client = refresh_openai_client()
+    if not scam_client:
+        if trace_run:
+            trace_run.note_llm_unavailable()
+        business = {"risk_level": "unknown", "report": "API Key 未設定，無法連線 AI。"}
+        _finish_trace(trace_run, answer=_trace_snapshot(business, max_len=8000))
+        return jsonify({**business, **_trace_meta(trace_run)})
     # ── RAG: scam pattern knowledge supplement ──
     rag_supplement = ""
+    rag_result = None
     try:
         if _rag and _rag_available:
-            rag = _rag.augment_scam(text)
-            snippets = rag.get("rag_snippets", [])
+            rag_result = _rag.augment_scam(text)
+            snippets = rag_result.get("rag_snippets", [])
             if snippets:
                 rag_supplement = "\n參考詐騙模式知識：\n" + "\n".join(snippets[:2])
     except Exception:
-        pass
+        rag_result = None  # RAG failure → 既有 silent fallback 行為不變
+        if trace_run:
+            trace_run.note_rag_error()
+    _record_rag_for_trace(trace_run, rag_result)
 
     try:
         system_prompt = (
@@ -2282,32 +2568,64 @@ def api_scam_scan():
         parsed = completion.choices[0].message.parsed
         risk_level = parsed.risk_level if parsed and parsed.risk_level in {"high", "medium", "low"} else "unknown"
         report = parsed.report if parsed and parsed.report else "目前沒有取得分析報告。"
-        return jsonify({"risk_level": risk_level, "report": report})
-    except Exception as e:
-        return jsonify({"risk_level": "unknown", "report": f"系統錯誤: {str(e)}"})
+        business = {"risk_level": risk_level, "report": report}
+        _finish_trace(trace_run, answer=_trace_snapshot(business, max_len=8000))
+        return jsonify({**business, **_trace_meta(trace_run)})
+    except Exception:
+        # 不回傳 provider exception text（安全修正）；trace 記固定代碼；
+        # 使用者實際收到的是固定 fallback report → 以同一份內容做 answer snapshot
+        business = {"risk_level": "unknown", "report": "系統錯誤，請稍後再試。"}
+        _finish_trace(trace_run, answer=_trace_snapshot(business, max_len=8000), error="llm_error")
+        return jsonify({**business, **_trace_meta(trace_run)})
 
 @app.route("/podcast/generate", methods=["POST"])
 def generate_podcast():
     try: req = PodcastGenerateRequest(**(request.get_json(silent=True) or {}))
     except ValidationError as e: return jsonify({"detail": str(e)}), 422
+
     personal_summary = ""
     if req.market == "PERSONAL" and req.portfolio_summary:
         personal_summary = f"\n會員模擬資產摘要={json.dumps(req.portfolio_summary, ensure_ascii=False)[:1800]}\n請在開場自然唸出會員目前總資產、現金與已投入的幣種市值摘要。"
+
+    # ── RAG trace (TASK 03)：匿名 endpoint → user_id=NULL；
+    #    snapshot 含實際使用的市場/風險屬性/關注清單/事件/資產摘要＋實際 retrieval query
+    snapshot_payload = {
+        "market": str(req.market),
+        "risk_level": str(req.profile.risk_level),
+        "watchlist": list(req.watchlist or []),
+        "events": list(req.events or []),
+        "retrieval_query": str(req.market),
+    }
+    if req.market == "PERSONAL" and req.portfolio_summary:
+        snapshot_payload["portfolio_summary"] = req.portfolio_summary
+    trace_run = _start_trace(
+        "podcast", _trace_snapshot(snapshot_payload),
+        model=os.getenv("OPENAI_MODEL", "gpt-5.4"))
+
     prompt = f"市場={req.market}\n風險={req.profile.risk_level}\n關注清單={req.watchlist}\n事件={req.events}{personal_summary}\n請用口語播報市場與配置重點。"
     # ── RAG injection ──
     rag_context = ""
+    rag_result = None
     try:
         if _rag and _rag_available:
-            rag = _rag.augment_podcast(req.market, market_context=f"市場={req.market} 風險={req.profile.risk_level}")
-            ctx = "\n".join(rag.get("context", []))
+            rag_result = _rag.augment_podcast(req.market, market_context=f"市場={req.market} 風險={req.profile.risk_level}")
+            ctx = "\n".join(rag_result.get("context", []))
             if ctx:
                 rag_context = f"\n風格參考：\n{ctx}"
     except Exception:
-        pass
+        rag_result = None  # RAG failure → 既有 silent fallback 行為不變
+        if trace_run:
+            trace_run.note_rag_error()
+    _record_rag_for_trace(trace_run, rag_result)
     system_msg = "你是加密貨幣晨報 Podcast 主持人與分析師。請遵循 Podcast 風格指南，開場含日期與市場概覽，結尾含投資提醒。輸出 JSON。" + rag_context
     try:
         podcast_client = refresh_openai_client()
-        if not podcast_client: return jsonify(build_fallback_podcast(req))
+        if not podcast_client:
+            if trace_run:
+                trace_run.note_llm_unavailable()
+            business = build_fallback_podcast(req)
+            _finish_trace(trace_run, answer=_trace_snapshot(business, max_len=8000))
+            return jsonify({**business, **_trace_meta(trace_run)})
         completion = podcast_client.beta.chat.completions.parse(
             model=os.getenv("OPENAI_MODEL", "gpt-5.4"),
             messages=[{"role": "system", "content": system_msg}, {"role": "user", "content": prompt}],
@@ -2316,11 +2634,19 @@ def generate_podcast():
         out = completion.choices[0].message.parsed
         lines = out.lines
         estimated_seconds = max(35, int(sum(len(l.text) for l in lines) / 3.0))
-        return jsonify({"title": out.title, "bullets": out.bullets, "script": "\n".join([f"{l.speaker}：{l.text}" for l in lines]), "estimated_seconds": estimated_seconds, "lines": [l.model_dump() for l in lines]})
-    except Exception as e:
-        fallback = build_fallback_podcast(req)
-        fallback["debug"] = f"OpenAI fallback: {type(e).__name__}"
-        return jsonify(fallback)
+        script_text = "\n".join([f"{l.speaker}：{l.text}" for l in lines])
+        business = {
+            "title": out.title, "bullets": out.bullets, "script": script_text,
+            "estimated_seconds": estimated_seconds, "lines": [l.model_dump() for l in lines],
+        }
+        _finish_trace(trace_run, answer=_trace_snapshot(business, max_len=8000))
+        return jsonify({**business, **_trace_meta(trace_run)})
+    except Exception:
+        # 不回傳 provider exception 資訊（安全修正）；trace 記固定代碼；
+        # 使用者實際收到 fallback podcast → 以同一份內容做 answer snapshot
+        business = build_fallback_podcast(req)
+        _finish_trace(trace_run, answer=_trace_snapshot(business, max_len=8000), error="llm_error")
+        return jsonify({**business, **_trace_meta(trace_run)})
 
 @app.route("/api/podcast/generate", methods=["POST"])
 def api_generate_podcast_alias():
@@ -2438,18 +2764,49 @@ def analyze_portfolio_llm():
     try: req = RiskHealthRequest(**(request.get_json(silent=True) or {}))
     except ValidationError as e: return jsonify({"detail": str(e)}), 422
     rh_dict = calculate_portfolio_risk_health(req)
-    if client is None: return jsonify({"risk_health": rh_dict, "narrative": "未設定金鑰，改用規則摘要。請注意波動風險。", "highlights": ["提醒：無 AI 金鑰"]})
     holdings_text = ", ".join([f"{h.ticker}({h.weight:.2f})" for h in req.holdings])
+
+    # ── RAG trace (TASK 03)：驗證已通過 → 建立 trace；demo 使用者 user_id=NULL；
+    #    snapshot 含持倉、實際提供給模型的風險指標與固定 retrieval query
+    user_uid = request.user.get('uid')
+    is_demo = bool(request.user.get('is_demo'))
+    query_snapshot = _trace_snapshot({
+        "holdings": holdings_text,
+        "metrics": {
+            "top1_weight": rh_dict.get("top1_weight"),
+            "annual_vol": rh_dict.get("annual_vol"),
+            "max_drawdown": rh_dict.get("max_drawdown"),
+        },
+        "retrieval_query": "配置風險波動集中度",
+    })
+    trace_run = _start_trace(
+        "health", query_snapshot, user_id=None if is_demo else user_uid,
+        model=os.getenv("OPENAI_MODEL_PORTFOLIO", "gpt-5.4"))
+
+    if client is None:
+        if trace_run:
+            trace_run.note_llm_unavailable()
+        business = {
+            "risk_health": rh_dict,
+            "narrative": "未設定金鑰，改用規則摘要。請注意波動風險。",
+            "highlights": ["提醒：無 AI 金鑰"],
+        }
+        _finish_trace(trace_run, answer=_trace_snapshot(business, max_len=8000))
+        return jsonify({**business, **_trace_meta(trace_run)})
     # ── RAG: health education supplement ──
     rag_context = ""
+    rag_result = None
     try:
         if _rag and _rag_available:
-            rag = _rag.augment_health(rh_dict, holdings_text)
-            ctx = "\n".join(rag.get("context", []))
+            rag_result = _rag.augment_health(rh_dict, holdings_text)
+            ctx = "\n".join(rag_result.get("context", []))
             if ctx:
                 rag_context = f"\n參考配置原則：\n{ctx}"
     except Exception:
-        pass
+        rag_result = None  # RAG failure → 既有 silent fallback 行為不變
+        if trace_run:
+            trace_run.note_rag_error()
+    _record_rag_for_trace(trace_run, rag_result)
     prompt = f"請用非常白話的中文分析配置：\n【持幣】{holdings_text}\n【指標】Top1={rh_dict['top1_weight']:.2f}, 年化波動={rh_dict['annual_vol']:.2f}, 最大回撤={rh_dict['max_drawdown']:.2f}"
     try:
         completion = client.beta.chat.completions.parse(
@@ -2458,8 +2815,19 @@ def analyze_portfolio_llm():
             response_format=PortfolioLLMOut
         )
         out = completion.choices[0].message.parsed
-        return jsonify({"risk_health": rh_dict, "narrative": out.narrative, "highlights": out.highlights or []})
-    except Exception as e: return jsonify({"risk_health": rh_dict, "narrative": "LLM 分析連線失敗，請檢查金鑰。", "highlights": ["連線異常"]})
+        business = {
+            "risk_health": rh_dict, "narrative": out.narrative,
+            "highlights": out.highlights or [],
+        }
+        _finish_trace(trace_run, answer=_trace_snapshot(business, max_len=8000))
+        return jsonify({**business, **_trace_meta(trace_run)})
+    except Exception:
+        business = {
+            "risk_health": rh_dict, "narrative": "LLM 分析連線失敗，請檢查金鑰。",
+            "highlights": ["連線異常"],
+        }
+        _finish_trace(trace_run, answer=_trace_snapshot(business, max_len=8000), error="llm_error")
+        return jsonify({**business, **_trace_meta(trace_run)})
 
 @app.route("/api/portfolio/analyze", methods=["POST"])
 @token_required

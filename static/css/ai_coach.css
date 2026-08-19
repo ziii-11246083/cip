@@ -611,3 +611,89 @@
     max-width:100%;
   }
 }
+
+/* ── TASK 04：來源顯示、信心提示與 feedback ─────────────────────── */
+.cite-details{
+  margin-top:.55rem;
+  border:1px solid var(--border,#e2e8f0);
+  border-radius:.55rem;
+  background:var(--surface,#f8fafc);
+  padding:.35rem .6rem;
+  font-size:.85rem;
+}
+.cite-details summary{
+  cursor:pointer;
+  color:var(--muted,#64748b);
+  font-weight:600;
+  user-select:none;
+}
+.cite-details[open] summary{
+  margin-bottom:.3rem;
+}
+.cite-list{
+  list-style:none;
+  margin:0;
+  padding:0;
+  max-height:11rem;
+  overflow:auto;
+}
+.cite-item{
+  display:flex;
+  gap:.45rem;
+  padding:.22rem 0;
+  border-top:1px dashed var(--border,#e2e8f0);
+  word-break:break-all;
+}
+.cite-item:first-child{
+  border-top:0;
+}
+.cite-label{
+  flex:none;
+  color:var(--muted,#64748b);
+}
+.cite-text{
+  color:var(--text,#1e293b);
+}
+.confidence-note{
+  margin:.55rem 0 0;
+  font-size:.85rem;
+  color:#b45309;
+  background:#fffbeb;
+  border:1px solid #fde68a;
+  border-radius:.5rem;
+  padding:.4rem .6rem;
+}
+.feedback-bar{
+  margin-top:.7rem;
+  display:flex;
+  align-items:center;
+  gap:.5rem;
+  flex-wrap:wrap;
+}
+.feedback-label{
+  font-size:.85rem;
+  color:var(--muted,#64748b);
+}
+.feedback-btn{
+  border:1px solid var(--border,#e2e8f0);
+  background:var(--surface,#fff);
+  color:var(--text,#1e293b);
+  border-radius:999px;
+  padding:.28rem .8rem;
+  font-size:.85rem;
+  cursor:pointer;
+  transition:border-color .15s, background .15s;
+}
+.feedback-btn:hover{
+  border-color:var(--accent,#3b82f6);
+}
+.feedback-btn.active{
+  border-color:var(--accent,#3b82f6);
+  background:var(--accent,#3b82f6);
+  color:#fff;
+}
+.feedback-error{
+  width:100%;
+  font-size:.82rem;
+  color:#b91c1c;
+}

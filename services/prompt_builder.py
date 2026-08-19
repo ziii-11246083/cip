@@ -79,6 +79,7 @@ class PromptBuilder:
             ctx.confidence_note = ""
 
         # RAG context
+        injected_count = 0
         if retrieval_results:
             ctx.context_parts.append("參考以下知識庫內容輔助回答（請優先依據這些內容）：")
             chars_used = 0
@@ -89,6 +90,7 @@ class PromptBuilder:
                 ctx.context_parts.append(f"- [{r.topic}] {snippet}")
                 ctx.citations.append(f"知識庫: {r.source} ({r.topic})")
                 chars_used += len(snippet)
+                injected_count += 1
         else:
             ctx.fallback_note = "（目前無相關知識庫內容，請基於一般投資知識回答，並提醒使用者資訊可能不完整。）"
 
@@ -115,6 +117,7 @@ class PromptBuilder:
             "citations": ctx.citations,
             "user_message": user_message,
             "confidence": confidence,
+            "injected_count": injected_count,
         }
 
     def build_agent_prompt(
@@ -133,6 +136,7 @@ class PromptBuilder:
             f"使用者風格為【{risk_profile}】，預算範圍約【{budget}】。"
         )
 
+        injected_count = 0
         if retrieval_results:
             ctx.context_parts.append("參考知識庫（請優先依據這些內容規劃）：")
             chars_used = 0
@@ -143,6 +147,7 @@ class PromptBuilder:
                 ctx.context_parts.append(f"- [{r.topic}] {snippet}")
                 ctx.citations.append(f"{r.source}")
                 chars_used += len(snippet)
+                injected_count += 1
 
         confidence = _estimate_confidence(retrieval_results, retrieval_meta)
         return {
@@ -151,6 +156,7 @@ class PromptBuilder:
             "citations": ctx.citations,
             "goal": goal,
             "confidence": confidence,
+            "injected_count": injected_count,
         }
 
     def build_podcast_prompt(
@@ -178,11 +184,13 @@ class PromptBuilder:
             for r in retrieval_results:
                 ctx.context_parts.append(f"- [{r.topic}] {r.snippet[:250]}")
 
+        # podcast 風格段落無字數預算截斷 → 全部 retrieved 均為 injected
         return {
             "system": ctx.system_parts,
             "context": ctx.context_parts,
             "citations": ctx.citations,
             "topic": topic,
+            "injected_count": len(retrieval_results) if retrieval_results else 0,
         }
 
     def build_health_prompt(
@@ -213,11 +221,13 @@ class PromptBuilder:
             for r in retrieval_results:
                 ctx.context_parts.append(f"- [{r.topic}] {r.snippet[:200]}")
 
+        # health 段落無字數預算截斷 → 全部 retrieved 均為 injected
         return {
             "system": ctx.system_parts,
             "context": ctx.context_parts,
             "citations": ctx.citations,
             "metrics": risk_health,
+            "injected_count": len(retrieval_results) if retrieval_results else 0,
         }
 
     def build_scam_prompt(
