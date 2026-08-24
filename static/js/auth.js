@@ -187,7 +187,6 @@ async function applyAuthFromUrl() {
         currentSession = session;
         updateMembership(session);
         setAuthUiBySession(session);
-        console.log("[auth] redirect session", session);
         clearUrlHashAfterLogin();
     }
 
@@ -291,7 +290,6 @@ async function refreshSession() {
     }
     updateMembership(currentSession);
     setAuthUiBySession(currentSession);
-    console.log("[auth] refresh session", currentSession);
     return currentSession;
 }
 
@@ -441,7 +439,6 @@ if (supabase) {
                 currentSession = session || null;
                 updateMembership(session || null);
                 setAuthUiBySession(session || null);
-                console.log("[auth] onAuthStateChange", _event, session);
                 if (session) {
                     clearUrlHashAfterLogin();
                 }
