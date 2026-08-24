@@ -1,4 +1,23 @@
+﻿<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <style>
+    html.js-enabled body{opacity:0;transition:opacity .5s ease;}
+    html.js-enabled body.page-ready{opacity:1;}
+  </style>
+  <script>document.documentElement.classList.add('js-enabled');</script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>市場總覽 | Smart Invest Crypto</title>
 
+  <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo.jpg') }}">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/iansui@1.0/dist/iansui.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=shared-site-density">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/market.css') }}?v=shared-market-bg">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
 
 <body class="market-page">
   
