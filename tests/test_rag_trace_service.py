@@ -835,8 +835,21 @@ class RewriteFallbackTraceTests(unittest.TestCase):
         from services.prompt_builder import PromptBuilder
         from services.query_rewrite_service import QueryRewriteService
         from services.rag_service import RAGService
+        from services.retrieval_service import RetrievalService
+
+        # 這是本地 retrieval 行為測試，不得因開發者的
+        # OPENAI_API_KEY / parent .env 而呼叫真實 embedding API。
+        embedding_patcher = mock.patch(
+            "services.retrieval_service._ENABLE_EMBEDDINGS", False)
+        vector_patcher = mock.patch(
+            "services.retrieval_service._ENABLE_VECTOR_STORE", False)
+        embedding_patcher.start()
+        vector_patcher.start()
+        self.addCleanup(embedding_patcher.stop)
+        self.addCleanup(vector_patcher.stop)
 
         rag = RAGService()
+        rag._retrieval = RetrievalService(kb=rag._kb)
         handler, records, loggers = self._capture_logs(
             ["services.rag_service", "services.rag_trace_service"])
         try:
@@ -854,6 +867,8 @@ class RewriteFallbackTraceTests(unittest.TestCase):
         # 前置條件：router deep、rewrite exception 後 retrieval 仍成功
         self.assertEqual(pipe["route_decision"].route, "deep")
         self.assertGreaterEqual(len(pipe["results"]), 1)
+        self.assertIsNone(rag._retrieval._embedding)
+        self.assertFalse(rag._retrieval._dense_available)
         metrics = pipe["metrics_record"]
         self.assertEqual(metrics.get("fallback_reason"), "rewrite_error")
 

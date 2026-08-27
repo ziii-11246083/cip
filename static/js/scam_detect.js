@@ -52,8 +52,8 @@ function setReportState(type) {
       reportBadge.classList.add("risk-medium");
       break;
     case "low":
-      reportHeader.textContent = "低風險內容";
-      reportBadge.textContent = "低風險";
+      reportHeader.textContent = "文案未見明顯紅旗";
+      reportBadge.textContent = "低風險（僅文案）";
       reportHeader.classList.add("risk-low");
       reportBadge.classList.add("risk-low");
       break;
@@ -71,6 +71,48 @@ function updateCounter() {
   const counter = document.getElementById("charCounter");
   if (input && counter) {
     counter.textContent = `${input.value.length} 字`;
+  }
+}
+
+function renderTextList(elementId, values, emptyText) {
+  const list = document.getElementById(elementId);
+  if (!list) return;
+  list.replaceChildren();
+  const items = Array.isArray(values) && values.length ? values : [emptyText];
+  items.forEach(function(value) {
+    const item = document.createElement("li");
+    item.textContent = String(value || emptyText);
+    list.appendChild(item);
+  });
+}
+
+function evidenceLabel(entry) {
+  if (!entry || typeof entry !== "object") return "未提供結構化證據";
+  if (entry.type === "deterministic_rule") {
+    return `文字規則｜${entry.label || entry.rule_id || "未命名"}｜${entry.severity || "unknown"}`;
+  }
+  if (entry.type === "knowledge_base") {
+    return `知識庫｜${entry.source || "未提供來源"}｜${entry.topic || "未提供主題"}`;
+  }
+  if (entry.type === "llm_text_analysis") {
+    return `AI 文字分析｜${entry.status || "unavailable"}`;
+  }
+  return `其他證據｜${entry.type || "unknown"}`;
+}
+
+function renderStructuredResult(data) {
+  renderTextList("scamReasons", data.reasons, "沒有可顯示的規則原因");
+  renderTextList("scamWarnings", data.warnings, "仍需自行查證");
+  renderTextList(
+    "scamEvidence",
+    Array.isArray(data.evidence) ? data.evidence.map(evidenceLabel) : [],
+    "沒有可顯示的結構化證據"
+  );
+  const uncertainty = document.getElementById("scamUncertainty");
+  if (uncertainty) {
+    const item = data.uncertainty && typeof data.uncertainty === "object"
+      ? data.uncertainty : {};
+    uncertainty.textContent = `${item.level || "unknown"}｜${item.reason || "資訊不足，請自行查證。"}`;
   }
 }
 
@@ -128,6 +170,7 @@ async function runScan() {
     const reportStr = data.report || "目前沒有取得分析報告。";
     const riskLevel = typeof data.risk_level === "string" ? data.risk_level.toLowerCase() : "unknown";
     reportContent.textContent = reportStr;
+    renderStructuredResult(data);
     setReportState(riskLevel);
     reportBox.style.display = "block";
   } catch (error) {
@@ -137,7 +180,7 @@ async function runScan() {
   } finally {
     btn.disabled = false;
     btn.classList.remove("btn-loading");
-    btn.innerHTML = '<i class="fas fa-magnifying-glass"></i> 開始掃描分析';
+    btn.innerHTML = '<i class="fas fa-magnifying-glass"></i> 開始文案風險辨識';
   }
 }
 
@@ -185,16 +228,21 @@ function initReportButtons() {
     btnClear.addEventListener("click", function() {
       if (input) input.value = "";
       if (reportContent) reportContent.textContent = "";
+      renderTextList("scamReasons", [], "沒有可顯示的規則原因");
+      renderTextList("scamWarnings", [], "仍需自行查證");
+      renderTextList("scamEvidence", [], "沒有可顯示的結構化證據");
+      const uncertainty = document.getElementById("scamUncertainty");
+      if (uncertainty) uncertainty.textContent = "";
       if (reportBox) reportBox.style.display = "none";
       if (scanLoading) scanLoading.classList.remove("show");
       if (reportEmpty) reportEmpty.style.display = "grid";
       if (reportHeader) {
-        reportHeader.textContent = "檢測結果";
+        reportHeader.textContent = "風險辨識結果";
         reportHeader.classList.remove("risk-high", "risk-medium", "risk-low", "risk-unknown");
         reportHeader.style.background = "";
       }
       if (reportBadge) {
-        reportBadge.textContent = "等待檢測";
+        reportBadge.textContent = "等待辨識";
         reportBadge.classList.remove("risk-high", "risk-medium", "risk-low", "risk-unknown");
         reportBadge.style.color = "";
         reportBadge.style.background = "";

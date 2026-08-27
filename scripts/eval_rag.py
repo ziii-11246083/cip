@@ -19,13 +19,17 @@ Usage:
   python scripts/eval_rag.py
   python scripts/eval_rag.py --cases eval/rag_eval_cases.jsonl
   python scripts/eval_rag.py --output-root eval/results --k 3 5 --verbose
+  python scripts/eval_rag.py --approve-baseline --baseline-name rag-15-approved-v1
+  python scripts/eval_rag.py --baseline eval/baselines/rag-15-approved-v1.json --threshold MRR=0.03
   （--run-id／--clock 主要供 deterministic tests 注入；未指定時自動產生）
 """
 
 import argparse
+import hashlib
 import json
 import math
 import os
+import re
 import subprocess
 import sys
 import time
@@ -42,6 +46,7 @@ from services.rag_trace_service import (
     clean_chunk_id,
     clean_public_label,
     display_source,
+    sanitize_text,
 )
 
 # ── 固定安全代碼（錯誤訊息只含 code＋行號等非敏感定位資訊）──────────
@@ -55,11 +60,30 @@ ERR_EMPTY_EXPECTED = "eval_case_empty_expected"
 ERR_INVALID_K = "eval_invalid_k"
 ERR_RETRIEVAL_FAILED = "eval_case_retrieval_failed"
 ERR_OUTPUT_EXISTS = "eval_output_exists"
+ERR_CASES_UNAVAILABLE = "eval_cases_unavailable"
+ERR_INVALID_CLOCK = "eval_invalid_clock"
+ERR_INITIALIZATION_FAILED = "eval_initialization_failed"
+ERR_INVALID_RUN_ID = "eval_invalid_run_id"
+ERR_OUTPUT_PATH = "eval_output_path_invalid"
+ERR_OUTPUT_WRITE_FAILED = "eval_output_write_failed"
+ERR_ARTIFACT_MISMATCH = "eval_artifact_run_id_mismatch"
+ERR_BASELINE_INVALID = "eval_baseline_invalid"
+ERR_BASELINE_EXISTS = "eval_baseline_exists"
+ERR_BASELINE_INELIGIBLE = "eval_baseline_ineligible"
+ERR_BASELINE_INCOMPATIBLE = "eval_baseline_incompatible"
+ERR_THRESHOLD_INVALID = "eval_threshold_invalid"
+ERR_BASELINE_FLAGS = "eval_baseline_flags_invalid"
 
 ALLOWED_ENDPOINTS = {"chat", "agent", "scam", "podcast", "health"}
 ALLOWED_REVIEW_STATUS = {"pending_review", "approved", "rejected"}
 ANSWER_METRICS_UNAVAILABLE = "unavailable"
 ANSWER_METRICS_REASON = "not_evaluated_in_task_05a"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_SAFE_SLUG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+_SAFE_TIMESTAMP_RE = re.compile(r"^[0-9]{8}T[0-9]{6}Z$")
+BASELINE_SCHEMA_VERSION = "rag-baseline-v1"
+METRIC_SCHEMA_VERSION = "rag-retrieval-metrics-v2-distinct-topic"
+_LOWER_IS_BETTER = {"latency.avg_ms"}
 
 
 class EvalCaseError(Exception):
@@ -77,6 +101,15 @@ def _require(condition: bool, code: str, detail: str) -> None:
         raise EvalCaseError(code, detail)
 
 
+def _is_safe_slug(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and bool(_SAFE_SLUG_RE.fullmatch(value))
+        and ".." not in value
+        and sanitize_text(value) == value
+    )
+
+
 def load_cases(path: str) -> List[Dict[str, Any]]:
     """載入並驗證 eval cases。任何違規立即 raise EvalCaseError（固定 code）。
 
@@ -92,50 +125,64 @@ def load_cases(path: str) -> List[Dict[str, Any]]:
     cases: List[Dict[str, Any]] = []
     versions: set = set()
     seen_ids: set = set()
-    with open(path, "r", encoding="utf-8") as f:
-        for lineno, raw in enumerate(f, start=1):
-            line = raw.strip()
-            if not line or line.startswith("#"):
-                continue
-            try:
-                case = json.loads(line)
-            except Exception:
-                raise EvalCaseError(ERR_INVALID_JSON, f"line {lineno}")
-            _require(isinstance(case, dict), ERR_INVALID_JSON, f"line {lineno}")
+    try:
+        case_file = open(path, "r", encoding="utf-8")
+    except (OSError, UnicodeError, TypeError):
+        raise EvalCaseError(ERR_CASES_UNAVAILABLE, "input")
 
-            for field in ["case_id", "dataset_version", "query", "endpoint",
-                          "expected_topics", "expected_sources", "expected_keywords",
-                          "review_status", "reviewer", "gold_answer"]:
-                _require(field in case, ERR_MISSING_FIELD, f"line {lineno} field {field}")
+    with case_file as f:
+        try:
+            rows = list(enumerate(f, start=1))
+        except (OSError, UnicodeError):
+            raise EvalCaseError(ERR_CASES_UNAVAILABLE, "input")
 
-            _require(isinstance(case["case_id"], str) and case["case_id"].strip(),
-                     ERR_BAD_TYPE, f"line {lineno} field case_id")
-            _require(isinstance(case["dataset_version"], str) and case["dataset_version"].strip(),
-                     ERR_BAD_TYPE, f"line {lineno} field dataset_version")
-            _require(isinstance(case["query"], str) and case["query"].strip(),
-                     ERR_BAD_TYPE, f"line {lineno} field query")
-            _require(isinstance(case["gold_answer"], str),
-                     ERR_BAD_TYPE, f"line {lineno} field gold_answer")
-            _require(case["endpoint"] in ALLOWED_ENDPOINTS,
-                     ERR_BAD_TYPE, f"line {lineno} field endpoint")
-            for field in ["expected_topics", "expected_sources", "expected_keywords"]:
-                value = case[field]
-                _require(isinstance(value, list) and
-                         all(isinstance(item, str) and item.strip() for item in value),
-                         ERR_BAD_TYPE, f"line {lineno} field {field}")
-                _require(len(value) > 0, ERR_EMPTY_EXPECTED,
-                         f"line {lineno} field {field}")
-            _require(case["review_status"] in ALLOWED_REVIEW_STATUS,
-                     ERR_BAD_REVIEW_STATUS, f"line {lineno} field review_status")
-            _require(case["review_status"] == "pending_review" and case["reviewer"] is None,
-                     ERR_BAD_REVIEW_STATUS,
-                     f"line {lineno} case {case['case_id']} must be pending_review with reviewer null")
+    for lineno, raw in rows:
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        try:
+            case = json.loads(line)
+        except Exception:
+            raise EvalCaseError(ERR_INVALID_JSON, f"line {lineno}")
+        _require(isinstance(case, dict), ERR_INVALID_JSON, f"line {lineno}")
 
-            _require(case["case_id"] not in seen_ids, ERR_DUPLICATE_ID,
-                     f"line {lineno} case_id {case['case_id']}")
-            seen_ids.add(case["case_id"])
-            versions.add(case["dataset_version"])
-            cases.append(case)
+        for field in ["case_id", "dataset_version", "query", "endpoint",
+                      "expected_topics", "expected_sources", "expected_keywords",
+                      "review_status", "reviewer", "gold_answer"]:
+            _require(field in case, ERR_MISSING_FIELD, f"line {lineno} field {field}")
+
+        _require(_is_safe_slug(case["case_id"]),
+                 ERR_BAD_TYPE, f"line {lineno} field case_id")
+        _require(_is_safe_slug(case["dataset_version"]),
+                 ERR_BAD_TYPE, f"line {lineno} field dataset_version")
+        _require(isinstance(case["query"], str) and case["query"].strip(),
+                 ERR_BAD_TYPE, f"line {lineno} field query")
+        _require(isinstance(case["gold_answer"], str),
+                 ERR_BAD_TYPE, f"line {lineno} field gold_answer")
+        _require(isinstance(case["endpoint"], str),
+                 ERR_BAD_TYPE, f"line {lineno} field endpoint")
+        _require(case["endpoint"] in ALLOWED_ENDPOINTS,
+                 ERR_BAD_TYPE, f"line {lineno} field endpoint")
+        for field in ["expected_topics", "expected_sources", "expected_keywords"]:
+            value = case[field]
+            _require(isinstance(value, list) and
+                     all(isinstance(item, str) and item.strip() for item in value),
+                     ERR_BAD_TYPE, f"line {lineno} field {field}")
+            _require(len(value) > 0, ERR_EMPTY_EXPECTED,
+                     f"line {lineno} field {field}")
+        _require(isinstance(case["review_status"], str),
+                 ERR_BAD_REVIEW_STATUS, f"line {lineno} field review_status")
+        _require(case["review_status"] in ALLOWED_REVIEW_STATUS,
+                 ERR_BAD_REVIEW_STATUS, f"line {lineno} field review_status")
+        _require(case["review_status"] == "pending_review" and case["reviewer"] is None,
+                 ERR_BAD_REVIEW_STATUS,
+                 f"line {lineno} field reviewer")
+
+        _require(case["case_id"] not in seen_ids, ERR_DUPLICATE_ID,
+                 f"line {lineno} field case_id")
+        seen_ids.add(case["case_id"])
+        versions.add(case["dataset_version"])
+        cases.append(case)
 
     _require(len(cases) > 0, ERR_MISSING_FIELD, "no cases found")
     _require(len(versions) == 1, ERR_VERSION_MISMATCH,
@@ -143,15 +190,28 @@ def load_cases(path: str) -> List[Dict[str, Any]]:
     return cases
 
 
-# ── 2. deterministic metrics（binary relevance；重複以位置計，語意見 README）──
+# ── 2. deterministic metrics（binary relevance；distinct label 一次命中）──
+
+def _topic_relevance(retrieved: List[str], expected: List[str], k: int) -> List[int]:
+    """每個 distinct expected topic 僅第一次 retrieved occurrence 計 relevant。"""
+    expected_set = set(expected)
+    seen: set = set()
+    relevance: List[int] = []
+    for topic in retrieved[:k]:
+        if topic in expected_set and topic not in seen:
+            relevance.append(1)
+            seen.add(topic)
+        else:
+            relevance.append(0)
+    return relevance
 
 def precision_at_k(retrieved: List[str], expected: List[str], k: int) -> float:
-    """P@K = |top-K ∩ expected| / K。retrieved 重複項以位置各計一次；K 恆為分母。"""
+    """P@K = distinct relevant topic 首次命中數 / K；K 恆為分母。"""
     if k <= 0:
         raise ValueError("invalid_k")
     if not expected:
         raise ValueError("empty_expected")
-    return sum(1 for t in retrieved[:k] if t in expected) / k
+    return sum(_topic_relevance(retrieved, expected, k)) / k
 
 
 def recall_at_k(retrieved: List[str], expected: List[str], k: int) -> float:
@@ -160,8 +220,7 @@ def recall_at_k(retrieved: List[str], expected: List[str], k: int) -> float:
         raise ValueError("invalid_k")
     if not expected:
         raise ValueError("empty_expected")
-    top_k = retrieved[:k]
-    return sum(1 for t in set(expected) if t in top_k) / len(set(expected))
+    return sum(_topic_relevance(retrieved, expected, k)) / len(set(expected))
 
 
 def mrr(retrieved: List[str], expected: List[str]) -> float:
@@ -179,8 +238,8 @@ def ndcg_at_k(retrieved: List[str], expected: List[str], k: int) -> float:
     if not expected:
         raise ValueError("empty_expected")
     dcg = sum(
-        1.0 / math.log2(i + 2)
-        for i, t in enumerate(retrieved[:k]) if t in expected
+        rel / math.log2(i + 2)
+        for i, rel in enumerate(_topic_relevance(retrieved, expected, k))
     )
     idcg = sum(1.0 / math.log2(i + 2) for i in range(min(len(set(expected)), k)))
     return dcg / idcg if idcg > 0 else 0.0
@@ -194,9 +253,19 @@ def keyword_overlap_score(retrieved_text: str, expected_keywords: List[str]) -> 
     return sum(1 for kw in expected_keywords if kw.lower() in text_lower) / len(expected_keywords)
 
 
-def source_match_count(expected_sources: List[str], retrieved_sources: List[str]) -> int:
-    """source match：expected source 為 retrieved source 子字串即計一筆。"""
-    return sum(1 for s in expected_sources if any(s in r for r in retrieved_sources))
+def _canonical_source_id(value: str) -> str:
+    """source identifier：basename、移除最後副檔名、case-fold 後精確比較。"""
+    basename = str(value).replace("\\", "/").rsplit("/", 1)[-1].strip()
+    return Path(basename).stem.casefold()
+
+
+def source_match_count(expected_sources: List[str], retrieved_sources: List[str]) -> float:
+    """相容舊函式名；回傳 distinct expected source 的精確命中比例 [0,1]。"""
+    if not expected_sources:
+        raise ValueError("empty_expected")
+    expected_ids = {_canonical_source_id(value) for value in expected_sources}
+    retrieved_ids = {_canonical_source_id(value) for value in retrieved_sources}
+    return len(expected_ids & retrieved_ids) / len(expected_ids)
 
 
 def _avg(values: List[float]) -> Optional[float]:
@@ -235,7 +304,7 @@ def git_code_commit() -> str:
     try:
         result = subprocess.run(
             ["git", "rev-parse", "HEAD"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True, text=True, timeout=10, cwd=PROJECT_ROOT,
         )
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
@@ -248,7 +317,7 @@ def git_dirty() -> Optional[bool]:
     try:
         result = subprocess.run(
             ["git", "status", "--porcelain"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True, text=True, timeout=10, cwd=PROJECT_ROOT,
         )
         if result.returncode == 0:
             return bool(result.stdout.strip())
@@ -265,16 +334,28 @@ def build_run_metadata(
     run_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """clock/run-id 可注入（deterministic tests）；production 不硬編值。"""
-    started = datetime.fromisoformat(clock) if clock else datetime.now(timezone.utc)
+    if clock:
+        try:
+            started = datetime.fromisoformat(clock)
+        except (TypeError, ValueError):
+            raise EvalCaseError(ERR_INVALID_CLOCK, "clock")
+    else:
+        started = datetime.now(timezone.utc)
+    actual_run_id = run_id or uuid.uuid4().hex[:8]
+    if not _is_safe_slug(actual_run_id):
+        raise EvalCaseError(ERR_INVALID_RUN_ID, "run_id")
     started_iso = started.isoformat()
     return {
-        "run_id": run_id or uuid.uuid4().hex[:8],
+        "run_id": actual_run_id,
         "dataset_version": dataset_version,
         "case_count": case_count,
         "k_values": list(k_values),
         "model": {
             "generation_model": "not_used",
-            "embedding_model": os.getenv("RAG_EMBEDDING_MODEL") or ANSWER_METRICS_UNAVAILABLE,
+            "embedding_model": (
+                clean_public_label(os.getenv("RAG_EMBEDDING_MODEL"))
+                or ANSWER_METRICS_UNAVAILABLE
+            ),
         },
         "config": {
             "config_fingerprint": _config_fingerprint(),
@@ -337,6 +418,11 @@ def _safe_case_result(case: Dict[str, Any], k_values: List[int]) -> Dict[str, An
     return result
 
 
+def _safe_artifact_label(value: Any) -> str:
+    cleaned = clean_public_label(value)
+    return cleaned if cleaned else ANSWER_METRICS_UNAVAILABLE
+
+
 def eval_cases(
     cases: List[Dict[str, Any]],
     retrieve_fn: Callable[[str, str], Dict[str, Any]],
@@ -354,55 +440,92 @@ def eval_cases(
         t_start = time.time()
         try:
             pipe = retrieve_fn(case["query"], case["endpoint"])
-            retrieved = list(pipe.get("results") or [])
+            if not isinstance(pipe, dict):
+                raise TypeError("invalid pipe")
+            raw_results = pipe.get("results")
+            if raw_results is None:
+                retrieved = []
+            elif isinstance(raw_results, (str, bytes, dict)):
+                raise TypeError("invalid results")
+            else:
+                retrieved = list(raw_results)
+
+            retrieved_topics: List[str] = []
+            retrieved_sources: List[str] = []
+            snippets: List[str] = []
+            chunk_ids: List[Optional[str]] = []
+            for item in retrieved:
+                topic = item.topic
+                source = item.source
+                snippet = item.snippet
+                metadata = getattr(item, "metadata", {})
+                if metadata is None:
+                    metadata = {}
+                if not isinstance(metadata, dict):
+                    raise TypeError("invalid metadata")
+                if topic:
+                    retrieved_topics.append(str(topic))
+                if source:
+                    retrieved_sources.append(str(source))
+                snippets.append(str(snippet))
+                chunk_ids.append(clean_chunk_id(metadata.get("chunk_id")))
+
+            all_snippets = " ".join(snippets)
+            meta = pipe.get("meta") or {}
+            if not isinstance(meta, dict):
+                raise TypeError("invalid meta")
+            method = _safe_artifact_label(
+                meta.get("method", ANSWER_METRICS_UNAVAILABLE)
+            )
+            route_decision = pipe.get("route_decision")
+            route = _safe_artifact_label(
+                getattr(route_decision, "route", ANSWER_METRICS_UNAVAILABLE)
+            )
+
+            metrics: Dict[str, Any] = {}
+            for k in k_values:
+                metrics[f"P@{k}"] = round(
+                    precision_at_k(retrieved_topics, case["expected_topics"], k), 4)
+                metrics[f"Recall@{k}"] = round(
+                    recall_at_k(retrieved_topics, case["expected_topics"], k), 4)
+                metrics[f"NDCG@{k}"] = round(
+                    ndcg_at_k(retrieved_topics, case["expected_topics"], k), 4)
+            metrics["MRR"] = round(mrr(retrieved_topics, case["expected_topics"]), 4)
+            metrics["keyword_overlap"] = round(
+                keyword_overlap_score(all_snippets, case["expected_keywords"]), 4)
+            metrics["source_match"] = round(
+                source_match_count(case["expected_sources"], retrieved_sources), 4)
+
+            latency_ms = (time.time() - t_start) * 1000
+            # artifact 只存經 public/safe 規則清理的來源識別
+            per_case.append({
+                "case_id": case["case_id"],
+                "endpoint": case["endpoint"],
+                "dataset_version": case["dataset_version"],
+                "review_status": case["review_status"],
+                "retrieval_status": "completed",
+                "error_code": None,
+                "metrics": metrics,
+                "latency_ms": round(latency_ms, 1),
+                "retrieved": {
+                    "sources": [_safe_artifact_label(display_source(s))
+                                for s in retrieved_sources][:10],
+                    "topics": [_safe_artifact_label(t) for t in retrieved_topics][:10],
+                    "chunks": chunk_ids[:10],
+                    "count": len(retrieved),
+                },
+                "method": method,
+                "route": route,
+                "answer_metrics": {
+                    "faithfulness": ANSWER_METRICS_UNAVAILABLE,
+                    "answer_relevance": ANSWER_METRICS_UNAVAILABLE,
+                    "citation_correctness": ANSWER_METRICS_UNAVAILABLE,
+                    "reason": ANSWER_METRICS_REASON,
+                },
+            })
         except Exception:
             failed_count += 1
             per_case.append(_safe_case_result(case, k_values))
-            continue
-
-        latency_ms = (time.time() - t_start) * 1000
-        retrieved_topics = [str(r.topic) for r in retrieved if getattr(r, "topic", None)]
-        retrieved_sources = [str(r.source) for r in retrieved if getattr(r, "source", None)]
-        all_snippets = " ".join(str(r.snippet) for r in retrieved)
-        method = pipe.get("meta", {}).get("method", ANSWER_METRICS_UNAVAILABLE)
-        route_decision = pipe.get("route_decision")
-        route = route_decision.route if route_decision else ANSWER_METRICS_UNAVAILABLE
-
-        metrics: Dict[str, Any] = {}
-        for k in k_values:
-            metrics[f"P@{k}"] = round(precision_at_k(retrieved_topics, case["expected_topics"], k), 4)
-            metrics[f"Recall@{k}"] = round(recall_at_k(retrieved_topics, case["expected_topics"], k), 4)
-            metrics[f"NDCG@{k}"] = round(ndcg_at_k(retrieved_topics, case["expected_topics"], k), 4)
-        metrics["MRR"] = round(mrr(retrieved_topics, case["expected_topics"]), 4)
-        metrics["keyword_overlap"] = round(keyword_overlap_score(all_snippets, case["expected_keywords"]), 4)
-        metrics["source_match"] = source_match_count(case["expected_sources"], retrieved_sources)
-
-        # artifact 只存經 public/safe 規則清理的來源識別
-        per_case.append({
-            "case_id": case["case_id"],
-            "endpoint": case["endpoint"],
-            "dataset_version": case["dataset_version"],
-            "review_status": case["review_status"],
-            "retrieval_status": "completed",
-            "error_code": None,
-            "metrics": metrics,
-            "latency_ms": round(latency_ms, 1),
-            "retrieved": {
-                "sources": [display_source(s) for s in retrieved_sources][:10],
-                "topics": [clean_public_label(t) for t in retrieved_topics][:10],
-                "chunks": [clean_chunk_id(getattr(r, "metadata", {}).get("chunk_id"))
-                           for r in retrieved][:10],
-                "count": len(retrieved),
-            },
-            "method": method,
-            "route": route,
-            "answer_metrics": {
-                "faithfulness": ANSWER_METRICS_UNAVAILABLE,
-                "answer_relevance": ANSWER_METRICS_UNAVAILABLE,
-                "citation_correctness": ANSWER_METRICS_UNAVAILABLE,
-                "reason": ANSWER_METRICS_REASON,
-            },
-        })
 
     completed = [c for c in per_case if c["retrieval_status"] == "completed"]
     latencies = [c["latency_ms"] for c in completed if c.get("latency_ms") is not None]
@@ -449,7 +572,330 @@ def eval_cases(
     }
 
 
-# ── 5. artifacts（timestamped run dir，不覆寫）──────────────────────
+# ── 5. baseline manifest 與 regression comparison ─────────────────
+
+def _metric_names(k_values: List[int]) -> List[str]:
+    names: List[str] = []
+    for k in k_values:
+        names.extend([f"P@{k}", f"Recall@{k}", f"NDCG@{k}"])
+    names.extend(["MRR", "keyword_overlap", "source_match", "latency.avg_ms"])
+    return names
+
+
+def _artifact_case_ids(artifact: Dict[str, Any]) -> List[str]:
+    try:
+        case_ids = [row["case_id"] for row in artifact["per_case"]]
+    except (KeyError, TypeError):
+        raise EvalCaseError(ERR_BASELINE_INVALID, "case_ids")
+    if not case_ids or any(not _is_safe_slug(case_id) for case_id in case_ids):
+        raise EvalCaseError(ERR_BASELINE_INVALID, "case_ids")
+    if len(case_ids) != len(set(case_ids)):
+        raise EvalCaseError(ERR_BASELINE_INVALID, "case_ids")
+    return sorted(case_ids)
+
+
+def _compatibility_snapshot(artifact: Dict[str, Any]) -> Dict[str, Any]:
+    try:
+        metadata = artifact["metadata"]
+        k_values = metadata["k_values"]
+        dataset_version = metadata["dataset_version"]
+        config_fingerprint = metadata["config"]["config_fingerprint"]
+    except (KeyError, TypeError):
+        raise EvalCaseError(ERR_BASELINE_INVALID, "compatibility")
+    if (
+        not _is_safe_slug(dataset_version)
+        or not isinstance(k_values, list)
+        or not k_values
+        or any(not isinstance(k, int) or isinstance(k, bool) or k <= 0 for k in k_values)
+        or len(k_values) != len(set(k_values))
+        or not isinstance(config_fingerprint, str)
+        or not bool(re.fullmatch(r"[0-9a-f]{64}", config_fingerprint))
+    ):
+        raise EvalCaseError(ERR_BASELINE_INVALID, "compatibility")
+    return {
+        "dataset_version": dataset_version,
+        "case_ids": _artifact_case_ids(artifact),
+        "k_values": sorted(k_values),
+        "metric_schema_version": METRIC_SCHEMA_VERSION,
+        "config_fingerprint": config_fingerprint,
+    }
+
+
+def _metric_value(artifact: Dict[str, Any], name: str) -> Any:
+    try:
+        if name == "latency.avg_ms":
+            return artifact["overall"]["latency"]["avg_ms"]
+        return artifact["overall"][name]
+    except (KeyError, TypeError):
+        return ANSWER_METRICS_UNAVAILABLE
+
+
+def _metric_snapshot(artifact: Dict[str, Any]) -> Dict[str, Any]:
+    compatibility = _compatibility_snapshot(artifact)
+    return {
+        name: _metric_value(artifact, name)
+        for name in _metric_names(compatibility["k_values"])
+    }
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    try:
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(65536), b""):
+                digest.update(chunk)
+    except (OSError, TypeError):
+        raise EvalCaseError(ERR_BASELINE_INVALID, "artifact")
+    return digest.hexdigest()
+
+
+def _baseline_artifact_eligible(artifact: Dict[str, Any]) -> bool:
+    try:
+        metadata = artifact["metadata"]
+        counts = artifact["case_counts"]
+        return (
+            metadata["run_status"] == "completed"
+            and counts["failed"] == 0
+            and counts["completed"] == counts["total"]
+            and counts["total"] == metadata["case_count"]
+            and counts["total"] == len(artifact["per_case"])
+            and counts["total"] > 0
+            and isinstance(metadata["code"]["commit"], str)
+            and bool(re.fullmatch(r"[0-9a-fA-F]{40,64}", metadata["code"]["commit"]))
+            and metadata["code"]["dirty"] is False
+        )
+    except (KeyError, TypeError):
+        return False
+
+
+def approve_baseline(
+    artifact: Dict[str, Any],
+    artifact_path: Path,
+    baseline_root: Path,
+    baseline_name: str,
+    approved_at: Optional[str] = None,
+    project_root: Path = PROJECT_ROOT,
+) -> Dict[str, Any]:
+    """明確核准 clean、completed run；manifest exclusive-create，永不覆寫。"""
+    if not _is_safe_slug(baseline_name):
+        raise EvalCaseError(ERR_BASELINE_INVALID, "baseline_name")
+    if not _baseline_artifact_eligible(artifact):
+        raise EvalCaseError(ERR_BASELINE_INELIGIBLE, "run")
+    metadata = artifact["metadata"]
+
+    resolved_project = project_root.resolve()
+    resolved_artifact = artifact_path.resolve()
+    if resolved_project not in resolved_artifact.parents or resolved_artifact.name != "results.json":
+        raise EvalCaseError(ERR_BASELINE_INVALID, "artifact_ref")
+    try:
+        artifact_ref = resolved_artifact.relative_to(resolved_project).as_posix()
+    except ValueError:
+        raise EvalCaseError(ERR_BASELINE_INVALID, "artifact_ref")
+    try:
+        with open(resolved_artifact, "r", encoding="utf-8") as f:
+            disk_artifact = json.load(f)
+    except (OSError, UnicodeError, json.JSONDecodeError, TypeError):
+        raise EvalCaseError(ERR_BASELINE_INVALID, "artifact")
+    if disk_artifact != artifact:
+        raise EvalCaseError(ERR_ARTIFACT_MISMATCH, "artifact")
+
+    if approved_at:
+        try:
+            approved_time = datetime.fromisoformat(approved_at)
+        except (TypeError, ValueError):
+            raise EvalCaseError(ERR_BASELINE_INVALID, "approved_at")
+    else:
+        approved_time = datetime.now(timezone.utc)
+
+    compatibility = _compatibility_snapshot(artifact)
+    manifest = {
+        "schema_version": BASELINE_SCHEMA_VERSION,
+        "baseline_id": baseline_name,
+        "approved_at": approved_time.isoformat(),
+        "artifact_ref": artifact_ref,
+        "artifact_sha256": _sha256_file(resolved_artifact),
+        "compatibility": compatibility,
+        "provenance": {
+            "run_id": metadata["run_id"],
+            "code": metadata["code"],
+            "kb": metadata["kb"],
+            "index": metadata["index"],
+            "model": metadata["model"],
+        },
+        "overall": _metric_snapshot(artifact),
+        "per_endpoint": artifact["per_endpoint"],
+    }
+    serialized = json.dumps(manifest, ensure_ascii=False, indent=2)
+    resolved_baseline_root = baseline_root.resolve()
+    manifest_path = (resolved_baseline_root / f"{baseline_name}.json").resolve()
+    if resolved_baseline_root not in manifest_path.parents:
+        raise EvalCaseError(ERR_BASELINE_INVALID, "manifest")
+    try:
+        resolved_baseline_root.mkdir(parents=True, exist_ok=True)
+        with open(manifest_path, "x", encoding="utf-8") as f:
+            f.write(serialized)
+    except FileExistsError:
+        raise EvalCaseError(ERR_BASELINE_EXISTS, "manifest")
+    except OSError:
+        raise EvalCaseError(ERR_BASELINE_INVALID, "manifest")
+    return {"manifest": manifest, "manifest_path": str(manifest_path)}
+
+
+def _load_baseline_manifest(
+    manifest_path: Path,
+    project_root: Path = PROJECT_ROOT,
+) -> Dict[str, Any]:
+    try:
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            manifest = json.load(f)
+    except (OSError, UnicodeError, json.JSONDecodeError, TypeError):
+        raise EvalCaseError(ERR_BASELINE_INVALID, "manifest")
+    try:
+        if manifest["schema_version"] != BASELINE_SCHEMA_VERSION:
+            raise EvalCaseError(ERR_BASELINE_INVALID, "schema")
+        if not _is_safe_slug(manifest["baseline_id"]):
+            raise EvalCaseError(ERR_BASELINE_INVALID, "baseline_id")
+        artifact_ref = manifest["artifact_ref"]
+        expected_hash = manifest["artifact_sha256"]
+        if not isinstance(artifact_ref, str) or not isinstance(expected_hash, str):
+            raise EvalCaseError(ERR_BASELINE_INVALID, "artifact_ref")
+    except (KeyError, TypeError):
+        raise EvalCaseError(ERR_BASELINE_INVALID, "manifest")
+
+    ref_path = Path(artifact_ref)
+    if ref_path.is_absolute() or ".." in ref_path.parts:
+        raise EvalCaseError(ERR_BASELINE_INVALID, "artifact_ref")
+    resolved_project = project_root.resolve()
+    resolved_artifact = (resolved_project / ref_path).resolve()
+    if resolved_project not in resolved_artifact.parents:
+        raise EvalCaseError(ERR_BASELINE_INVALID, "artifact_ref")
+    if _sha256_file(resolved_artifact) != expected_hash:
+        raise EvalCaseError(ERR_BASELINE_INVALID, "artifact_hash")
+    try:
+        with open(resolved_artifact, "r", encoding="utf-8") as f:
+            baseline_artifact = json.load(f)
+    except (OSError, UnicodeError, json.JSONDecodeError, TypeError):
+        raise EvalCaseError(ERR_BASELINE_INVALID, "artifact")
+    if (
+        manifest.get("compatibility") != _compatibility_snapshot(baseline_artifact)
+        or manifest.get("overall") != _metric_snapshot(baseline_artifact)
+        or manifest.get("per_endpoint") != baseline_artifact.get("per_endpoint")
+        or manifest.get("provenance", {}).get("run_id")
+        != baseline_artifact.get("metadata", {}).get("run_id")
+        or manifest.get("provenance", {}).get("code")
+        != baseline_artifact.get("metadata", {}).get("code")
+        or manifest.get("provenance", {}).get("kb")
+        != baseline_artifact.get("metadata", {}).get("kb")
+        or manifest.get("provenance", {}).get("index")
+        != baseline_artifact.get("metadata", {}).get("index")
+        or manifest.get("provenance", {}).get("model")
+        != baseline_artifact.get("metadata", {}).get("model")
+        or not _baseline_artifact_eligible(baseline_artifact)
+    ):
+        raise EvalCaseError(ERR_BASELINE_INVALID, "manifest_snapshot")
+    return manifest
+
+
+def parse_thresholds(items: Optional[List[str]], k_values: List[int]) -> Dict[str, float]:
+    allowed = set(_metric_names(k_values))
+    thresholds: Dict[str, float] = {}
+    for item in items or []:
+        if not isinstance(item, str) or "=" not in item:
+            raise EvalCaseError(ERR_THRESHOLD_INVALID, "threshold")
+        name, raw_value = item.split("=", 1)
+        if name not in allowed or name in thresholds:
+            raise EvalCaseError(ERR_THRESHOLD_INVALID, "threshold")
+        try:
+            value = float(raw_value)
+        except (TypeError, ValueError):
+            raise EvalCaseError(ERR_THRESHOLD_INVALID, "threshold")
+        if not math.isfinite(value) or value < 0:
+            raise EvalCaseError(ERR_THRESHOLD_INVALID, "threshold")
+        thresholds[name] = value
+    return thresholds
+
+
+def compare_to_baseline(
+    artifact: Dict[str, Any],
+    manifest_path: Path,
+    thresholds: Optional[Dict[str, float]] = None,
+    project_root: Path = PROJECT_ROOT,
+) -> Dict[str, Any]:
+    manifest = _load_baseline_manifest(manifest_path, project_root=project_root)
+    current_compatibility = _compatibility_snapshot(artifact)
+    if manifest.get("compatibility") != current_compatibility:
+        raise EvalCaseError(ERR_BASELINE_INCOMPATIBLE, "compatibility")
+    baseline_metrics = manifest.get("overall")
+    if not isinstance(baseline_metrics, dict):
+        raise EvalCaseError(ERR_BASELINE_INVALID, "metrics")
+
+    thresholds = dict(thresholds or {})
+    allowed = set(_metric_names(current_compatibility["k_values"]))
+    if any(
+        name not in allowed
+        or not isinstance(value, (int, float))
+        or isinstance(value, bool)
+        or not math.isfinite(float(value))
+        or value < 0
+        for name, value in thresholds.items()
+    ):
+        raise EvalCaseError(ERR_THRESHOLD_INVALID, "threshold")
+
+    comparisons: Dict[str, Any] = {}
+    failed_metrics: List[str] = []
+    for name in _metric_names(current_compatibility["k_values"]):
+        baseline_value = baseline_metrics.get(name, ANSWER_METRICS_UNAVAILABLE)
+        current_value = _metric_value(artifact, name)
+        both_numeric = (
+            isinstance(baseline_value, (int, float))
+            and not isinstance(baseline_value, bool)
+            and math.isfinite(float(baseline_value))
+            and isinstance(current_value, (int, float))
+            and not isinstance(current_value, bool)
+            and math.isfinite(float(current_value))
+        )
+        threshold = thresholds.get(name)
+        if not both_numeric:
+            status = "unavailable"
+            delta: Any = ANSWER_METRICS_UNAVAILABLE
+            degradation: Any = ANSWER_METRICS_UNAVAILABLE
+            gate_failed = threshold is not None and baseline_value != current_value
+        else:
+            delta = round(float(current_value) - float(baseline_value), 4)
+            if name in _LOWER_IS_BETTER:
+                degradation = round(max(0.0, delta), 4)
+                status = "improved" if delta < 0 else "regressed" if delta > 0 else "stable"
+            else:
+                degradation = round(max(0.0, -delta), 4)
+                status = "improved" if delta > 0 else "regressed" if delta < 0 else "stable"
+            gate_failed = threshold is not None and degradation > threshold
+        if gate_failed:
+            failed_metrics.append(name)
+        comparisons[name] = {
+            "baseline": baseline_value,
+            "current": current_value,
+            "delta": delta,
+            "degradation": degradation,
+            "direction": "lower_is_better" if name in _LOWER_IS_BETTER else "higher_is_better",
+            "status": status,
+            "threshold": threshold if threshold is not None else ANSWER_METRICS_UNAVAILABLE,
+            "gate_failed": gate_failed,
+        }
+    return {
+        "status": "compared",
+        "baseline_id": manifest["baseline_id"],
+        "compatible": True,
+        "metrics": comparisons,
+        "gate": {
+            "passed": not failed_metrics,
+            "failed_metrics": failed_metrics,
+            "thresholds": thresholds,
+        },
+        "baseline_provenance": manifest.get("provenance", {}),
+    }
+
+
+# ── 6. artifacts（timestamped run dir，不覆寫）──────────────────────
 
 def build_summary_md(artifact: Dict[str, Any]) -> str:
     meta = artifact["metadata"]
@@ -481,6 +927,28 @@ def build_summary_md(artifact: Dict[str, Any]) -> str:
         lines.append("")
         lines.extend(_md_agg_table(agg, meta["k_values"]))
         lines.append("")
+    comparison = artifact.get("baseline_comparison")
+    if isinstance(comparison, dict):
+        lines.append("## Baseline comparison")
+        lines.append("")
+        lines.append(f"- status: {comparison.get('status', ANSWER_METRICS_UNAVAILABLE)}")
+        if comparison.get("baseline_id"):
+            lines.append(f"- baseline_id: {comparison['baseline_id']}")
+        if comparison.get("error_code"):
+            lines.append(f"- error_code: {comparison['error_code']}")
+        gate = comparison.get("gate")
+        if isinstance(gate, dict):
+            lines.append(f"- gate_passed: {gate.get('passed')}")
+            lines.append(f"- failed_metrics: {gate.get('failed_metrics', [])}")
+        metrics = comparison.get("metrics")
+        if isinstance(metrics, dict):
+            for name, result in metrics.items():
+                lines.append(
+                    f"- {name}: baseline={result.get('baseline')} current={result.get('current')} "
+                    f"delta={result.get('delta')} status={result.get('status')} "
+                    f"threshold={result.get('threshold')} gate_failed={result.get('gate_failed')}"
+                )
+        lines.append("")
     lines.append("## unavailable 語意")
     lines.append("")
     lines.append("- answer metrics（faithfulness / answer_relevance / citation_correctness）："
@@ -510,18 +978,38 @@ def write_artifacts(
 ) -> Dict[str, str]:
     """建立 <output_root>/<timestamp>-<run_id>/ 並寫入 results.json＋summary.md。
     目錄已存在 → fail closed（不覆寫既有證據）。"""
-    run_dir = output_root / f"{timestamp}-{run_id}"
+    if not _is_safe_slug(run_id):
+        raise EvalCaseError(ERR_INVALID_RUN_ID, "run_id")
+    try:
+        artifact_run_id = artifact["metadata"]["run_id"]
+    except (KeyError, TypeError):
+        raise EvalCaseError(ERR_ARTIFACT_MISMATCH, "metadata")
+    if artifact_run_id != run_id:
+        raise EvalCaseError(ERR_ARTIFACT_MISMATCH, "run_id")
+    if not isinstance(timestamp, str) or not _SAFE_TIMESTAMP_RE.fullmatch(timestamp):
+        raise EvalCaseError(ERR_OUTPUT_PATH, "timestamp")
+
+    resolved_root = output_root.resolve()
+    run_dir = resolved_root / f"{timestamp}-{run_id}"
+    resolved_run_dir = run_dir.resolve()
+    if resolved_root not in resolved_run_dir.parents:
+        raise EvalCaseError(ERR_OUTPUT_PATH, "run_dir")
     if run_dir.exists():
         raise EvalCaseError(ERR_OUTPUT_EXISTS, f"run_dir {run_dir.name}")
-    run_dir.mkdir(parents=True, exist_ok=False)
+    try:
+        run_dir.mkdir(parents=True, exist_ok=False)
 
-    results_path = run_dir / "results.json"
-    with open(results_path, "w", encoding="utf-8") as f:
-        json.dump(artifact, f, ensure_ascii=False, indent=2)
+        results_path = run_dir / "results.json"
+        with open(results_path, "w", encoding="utf-8") as f:
+            json.dump(artifact, f, ensure_ascii=False, indent=2)
 
-    summary_path = run_dir / "summary.md"
-    with open(summary_path, "w", encoding="utf-8") as f:
-        f.write(build_summary_md(artifact))
+        summary_path = run_dir / "summary.md"
+        with open(summary_path, "w", encoding="utf-8") as f:
+            f.write(build_summary_md(artifact))
+    except FileExistsError:
+        raise EvalCaseError(ERR_OUTPUT_EXISTS, f"run_dir {run_dir.name}")
+    except Exception:
+        raise EvalCaseError(ERR_OUTPUT_WRITE_FAILED, "artifact")
 
     return {"run_dir": str(run_dir), "results_json": str(results_path),
             "summary_md": str(summary_path)}
@@ -543,44 +1031,75 @@ def run_cli(argv: Optional[List[str]] = None) -> int:
                         help="ISO 起始時間（預設 UTC now；供 deterministic tests 注入）")
     parser.add_argument("--verbose", "-v", action="store_true",
                         help="Print per-case results")
+    parser.add_argument("--baseline", default=None,
+                        help="Immutable baseline manifest path for comparison")
+    parser.add_argument("--threshold", action="append", default=[],
+                        help="Allowed absolute degradation, repeatable METRIC=VALUE")
+    parser.add_argument("--approve-baseline", action="store_true",
+                        help="Explicitly approve this completed clean run as baseline")
+    parser.add_argument("--baseline-name", default=None,
+                        help="Safe immutable manifest name; required with --approve-baseline")
+    parser.add_argument("--baseline-root", default="eval/baselines",
+                        help="Directory for immutable baseline manifests")
     args = parser.parse_args(argv)
 
-    project_root = Path(__file__).resolve().parent.parent
     cases_path = Path(args.cases)
     if not cases_path.is_absolute():
-        cases_path = project_root / args.cases
+        cases_path = PROJECT_ROOT / args.cases
     output_root = Path(args.output_root)
     if not output_root.is_absolute():
-        output_root = project_root / args.output_root
+        output_root = PROJECT_ROOT / args.output_root
+    baseline_root = Path(args.baseline_root)
+    if not baseline_root.is_absolute():
+        baseline_root = PROJECT_ROOT / args.baseline_root
+    baseline_path: Optional[Path] = None
+    if args.baseline:
+        baseline_path = Path(args.baseline)
+        if not baseline_path.is_absolute():
+            baseline_path = PROJECT_ROOT / args.baseline
 
     try:
+        if args.approve_baseline != bool(args.baseline_name):
+            raise EvalCaseError(ERR_BASELINE_FLAGS, "approval")
+        if args.approve_baseline and baseline_path is not None:
+            raise EvalCaseError(ERR_BASELINE_FLAGS, "mode")
+        if args.threshold and baseline_path is None:
+            raise EvalCaseError(ERR_BASELINE_FLAGS, "threshold")
         for k in args.k:
             if not isinstance(k, int) or k <= 0:
                 raise EvalCaseError(ERR_INVALID_K, f"k={k}")
+        thresholds = parse_thresholds(args.threshold, args.k)
         cases = load_cases(str(cases_path))
+        metadata = build_run_metadata(
+            dataset_version=cases[0]["dataset_version"],
+            case_count=len(cases),
+            k_values=args.k,
+            clock=args.clock,
+            run_id=args.run_id,
+        )
     except EvalCaseError as exc:
-        print(f"ERROR: {exc}")
+        print(f"ERROR: {exc.code}")
         return 1
-
-    metadata = build_run_metadata(
-        dataset_version=cases[0]["dataset_version"],
-        case_count=len(cases),
-        k_values=args.k,
-        clock=args.clock,
-        run_id=args.run_id,
-    )
     print(f"Loaded {len(cases)} cases（dataset {metadata['dataset_version']}）")
 
-    kb = get_kb()
-    if not kb.is_loaded:
-        kb.load_all()
-    rag: RAGService = get_rag()
+    try:
+        kb = get_kb()
+        if not kb.is_loaded:
+            kb.load_all()
+        rag: RAGService = get_rag()
+    except Exception:
+        print(f"ERROR: {ERR_INITIALIZATION_FAILED}")
+        return 1
     print(f"Knowledge base: {'loaded' if kb.is_loaded else 'NOT loaded'}")
 
     def retrieve_fn(query: str, endpoint: str) -> Dict[str, Any]:
         return rag._retrieve_for_endpoint(query, endpoint=endpoint, max_results=5)
 
-    evaluation = eval_cases(cases, retrieve_fn, args.k)
+    try:
+        evaluation = eval_cases(cases, retrieve_fn, args.k)
+    except EvalCaseError as exc:
+        print(f"ERROR: {exc.code}")
+        return 1
 
     ended = datetime.fromisoformat(args.clock) if args.clock else datetime.now(timezone.utc)
     metadata["ended_at"] = ended.isoformat()
@@ -597,12 +1116,29 @@ def run_cli(argv: Optional[List[str]] = None) -> int:
         "per_case": evaluation["per_case"],
     }
 
+    comparison_failed = False
+    if baseline_path is not None:
+        try:
+            comparison = compare_to_baseline(
+                artifact, baseline_path, thresholds=thresholds,
+                project_root=PROJECT_ROOT,
+            )
+            artifact["baseline_comparison"] = comparison
+            comparison_failed = not comparison["gate"]["passed"]
+        except EvalCaseError as exc:
+            artifact["baseline_comparison"] = {
+                "status": "error",
+                "error_code": exc.code,
+                "compatible": False,
+            }
+            comparison_failed = True
+
     timestamp = (datetime.fromisoformat(args.clock) if args.clock
                  else datetime.now(timezone.utc)).strftime("%Y%m%dT%H%M%SZ")
     try:
         paths = write_artifacts(output_root, artifact, metadata["run_id"], timestamp)
     except EvalCaseError as exc:
-        print(f"ERROR: {exc}")
+        print(f"ERROR: {exc.code}")
         return 1
 
     print(f"Run {metadata['run_id']} → {paths['run_dir']}")
@@ -610,12 +1146,34 @@ def run_cli(argv: Optional[List[str]] = None) -> int:
     print(f"  Cases: completed {counts['completed']} / failed {counts['failed']} / total {counts['total']}")
     print(f"  Overall MRR: {artifact['overall']['MRR']}（sample {artifact['overall']['sample_count']}）")
     print(f"  run_status: {metadata['run_status']}")
+    if baseline_path is not None:
+        comparison = artifact["baseline_comparison"]
+        if comparison["status"] == "error":
+            print(f"  baseline_comparison: ERROR {comparison['error_code']}")
+        else:
+            print(f"  baseline_comparison: {comparison['baseline_id']} "
+                  f"gate_passed={comparison['gate']['passed']}")
+
+    approval_failed = False
+    if args.approve_baseline:
+        try:
+            approved = approve_baseline(
+                artifact,
+                Path(paths["results_json"]),
+                baseline_root,
+                args.baseline_name,
+                project_root=PROJECT_ROOT,
+            )
+            print(f"  baseline_approved: {approved['manifest']['baseline_id']}")
+        except EvalCaseError as exc:
+            print(f"  baseline_approval: ERROR {exc.code}")
+            approval_failed = True
     if args.verbose:
         for c in artifact["per_case"]:
             print(f"  [{c['endpoint']}] {c['case_id']} {c['retrieval_status']}"
                   f"{(' error=' + c['error_code']) if c['error_code'] else ''}")
 
-    return 0 if counts["failed"] == 0 else 1
+    return 0 if counts["failed"] == 0 and not comparison_failed and not approval_failed else 1
 
 
 def main() -> None:

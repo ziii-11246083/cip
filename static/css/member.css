@@ -271,6 +271,137 @@ body.is-logged-in .member-lock-banner {
   display: none;
 }
 
+.real-asset-card {
+  margin-top: 18px;
+  border-color: rgba(17, 94, 89, .2);
+}
+
+.real-asset-safety,
+.real-disconnected {
+  border-radius: 999px;
+  padding: 9px 12px;
+  background: #ecfdf5;
+  color: #047857;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.real-asset-notice {
+  padding: 13px 15px;
+  border-radius: 14px;
+  background: #f0fdfa;
+  color: #115e59;
+  font-weight: 750;
+  line-height: 1.6;
+}
+
+.real-asset-connect {
+  margin: 16px 0 10px;
+}
+
+.real-asset-connect label {
+  display: block;
+  margin-bottom: 7px;
+  color: #334155;
+  font-weight: 900;
+}
+
+.real-asset-connect > div {
+  display: flex;
+  gap: 10px;
+}
+
+.real-asset-connect input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid #99f6e4;
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.real-asset-connect button,
+.real-account-actions button {
+  border: 0;
+  border-radius: 14px;
+  padding: 11px 14px;
+  background: #0f766e;
+  color: #fff;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.real-account-actions button.secondary {
+  background: #fff;
+  color: #9f1239;
+  border: 1px solid #fecdd3;
+}
+
+.real-account-actions button:disabled {
+  opacity: .55;
+  cursor: wait;
+}
+
+.real-asset-status {
+  min-height: 22px;
+  color: #64748b;
+  font-weight: 800;
+}
+
+.real-asset-status[data-kind="warning"] { color: #b45309; }
+.real-asset-status[data-kind="success"] { color: #047857; }
+
+.real-asset-accounts,
+.real-balance-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.real-account {
+  border: 1px solid #ccfbf1;
+  border-radius: 18px;
+  padding: 16px;
+  background: rgba(240, 253, 250, .55);
+}
+
+.real-account-head,
+.real-account-actions,
+.real-account-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.real-account-meta,
+.real-account-summary small,
+.real-balance-list small {
+  display: block;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+.real-account-summary {
+  margin: 14px 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.real-account-summary strong { color: #0f766e; }
+
+.real-balance-list > div {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 4px 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.real-balance-list small { grid-column: 2; }
+
 @media (max-width: 920px) {
   .member-hero-card,
   .member-card-head {
@@ -284,6 +415,12 @@ body.is-logged-in .member-lock-banner {
 
   .member-profile-mini {
     width: 100%;
+  }
+
+  .real-account-head,
+  .real-account-summary {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 
@@ -301,5 +438,12 @@ body.is-logged-in .member-lock-banner {
 
   .order-form {
     grid-template-columns: 1fr;
+  }
+
+  .real-asset-connect > div,
+  .real-account-actions {
+    align-items: stretch;
+    flex-direction: column;
+    width: 100%;
   }
 }

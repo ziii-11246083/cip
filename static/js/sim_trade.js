@@ -4,6 +4,7 @@
   let allocChart = null;
   let coinOptions = [];
   let currentPortfolio = null;
+  let lastStressResult = null;
   let isLocked = false;
   const DEFAULT_COINS = [
     { symbol: "BTC", name: "Bitcoin" },
@@ -56,6 +57,106 @@
     if (!el) return;
     el.textContent = message;
     el.className = "status " + (type || "");
+  }
+
+  function setStressStatus(message, type) {
+    const el = $("stressStatus");
+    if (!el) return;
+    el.textContent = message;
+    el.className = "status " + (type || "");
+  }
+
+  function appendStressText(parent, tag, text, className) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    node.textContent = text;
+    parent.appendChild(node);
+    return node;
+  }
+
+  function fmtPct(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? (number * 100).toFixed(2) + "%" : "--";
+  }
+
+  function stressSnapshot() {
+    const portfolio = currentPortfolio || {};
+    return {
+      cash: Number(portfolio.cash || 0),
+      positions: (Array.isArray(portfolio.positions) ? portfolio.positions : []).map((item) => ({
+        symbol: item.symbol,
+        market_value: item.market_value,
+        quantity: item.quantity,
+        current_price: item.current_price
+      }))
+    };
+  }
+
+  function renderStressResults(result) {
+    const root = $("stressResults");
+    if (!root) return;
+    root.replaceChildren();
+    if (!result) return;
+    const strategy = $("stressStrategy")?.value || "balanced";
+    const rows = result.results?.[strategy] || {};
+
+    const meta = document.createElement("div");
+    meta.className = "stress-result-meta";
+    appendStressText(meta, "strong", result.strategies?.[strategy]?.label || strategy);
+    appendStressText(meta, "span", `起始基準 ${fmtUSD(result.snapshot?.initial_value)} · ${result.period?.days || 0} 個合成日 · seed ${result.seed}`);
+    root.appendChild(meta);
+
+    const tableWrap = document.createElement("div");
+    tableWrap.className = "table-wrap";
+    const table = document.createElement("table");
+    const thead = document.createElement("thead");
+    const header = document.createElement("tr");
+    ["情境", "總報酬", "年化波動", "最大回撤", "Sharpe-like", "期末值"].forEach((label) => {
+      appendStressText(header, "th", label);
+    });
+    thead.appendChild(header);
+    table.appendChild(thead);
+    const tbody = document.createElement("tbody");
+    ["normal", "bull", "bear", "black_swan"].forEach((scenario) => {
+      const rowData = rows[scenario];
+      if (!rowData) return;
+      const metrics = rowData.metrics || {};
+      const row = document.createElement("tr");
+      appendStressText(row, "td", rowData.scenario_label || scenario);
+      appendStressText(row, "td", fmtPct(metrics.total_return));
+      appendStressText(row, "td", fmtPct(metrics.volatility));
+      appendStressText(row, "td", fmtPct(metrics.max_drawdown));
+      appendStressText(row, "td", Number(metrics.sharpe_like || 0).toFixed(2));
+      appendStressText(row, "td", fmtUSD(metrics.final_value));
+      tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    tableWrap.appendChild(table);
+    root.appendChild(tableWrap);
+
+    if (Array.isArray(result.warnings) && result.warnings.length) {
+      appendStressText(root, "p", `未納入資料：${result.warnings.join("、")}`, "stress-warning");
+    }
+  }
+
+  async function runStressTest() {
+    if (isLocked || !currentPortfolio) return;
+    const horizonDays = Number($("stressHorizon")?.value || 90);
+    const seed = Number($("stressSeed")?.value || 20260820);
+    setStressStatus("正在建立獨立假設快照…", "");
+    try {
+      const data = await request("/api/paper-stress-test", {
+        method: "POST",
+        body: JSON.stringify({
+          snapshot: stressSnapshot(), horizon_days: horizonDays, seed
+        })
+      });
+      lastStressResult = data.stress_test || null;
+      renderStressResults(lastStressResult);
+      setStressStatus("已完成四種情境比較；結果沒有寫回模擬帳本。", "ok");
+    } catch (error) {
+      setStressStatus(error.message || "壓力測試失敗。", "bad");
+    }
   }
 
   function setLockedState(locked) {
@@ -474,13 +575,13 @@
       $("scPriceMult") && ($("scPriceMult").textContent = (sc.price_multiplier || 1).toFixed(1) + "x");
       $("scVolMult") && ($("scVolMult").textContent = (sc.volatility_multiplier || 1).toFixed(1) + "x");
 
-      const adviceMap = {
-        normal: "按照策略正常操作",
-        bull: "可提高風險資產佔比，定期獲利了結",
-        bear: "提高穩定幣佔比，嚴格執行止損",
-        black_swan: "極端風險規避，建議全倉現金為主"
+      const scenarioNoteMap = {
+        normal: "基準終值與起始價值相同",
+        bull: "假設風險資產終值上升",
+        bear: "假設風險資產終值下降並出現衝擊",
+        black_swan: "假設極端下跌與短期衝擊"
       };
-      $("scAdvice") && ($("scAdvice").textContent = adviceMap[scenarioKey] || "正常操作");
+      $("scAdvice") && ($("scAdvice").textContent = scenarioNoteMap[scenarioKey] || "基準假設");
 
       document.querySelectorAll(".scenario-btn").forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.scenario === scenarioKey);
@@ -495,6 +596,10 @@
     });
 
     loadScenarios().then(() => applyScenario("normal"));
+    $("runStressTest")?.addEventListener("click", runStressTest);
+    $("stressStrategy")?.addEventListener("change", () => {
+      renderStressResults(lastStressResult);
+    });
     // —— End Scenario Switcher ——
   });
 })();

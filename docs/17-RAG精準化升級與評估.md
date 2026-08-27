@@ -78,7 +78,7 @@
 ### Dense Retrieval（Embeddings）
 
 - Embedding model：`text-embedding-3-small`（1536 dims）
-- Vector store：ChromaDB persistent（`data/vector_store/`）
+- Vector store：ChromaDB persistent（預設 `data/vector_store_v2/`；可用 `RAG_VECTOR_DB_PATH` 覆寫）
 - 支援 topic filter（`where={"topic": {"$in": [...]}}`）
 - Content-hash cache：相同內容不重複呼叫 API
 
@@ -297,7 +297,7 @@ python scripts/eval_rag.py --output eval_results.json
 | `RAG_TOP_K_FINAL` | `5` | 最終注入 prompt 的 top_k |
 | `RAG_REWRITE_SIM_THRESHOLD` | `0.6` | Rewrite similarity guard 閾值 |
 | `RAG_REWRITE_SIM_THRESHOLD` | `0.6` | Embedding similarity 最低接受值 |
-| `RAG_VECTOR_DB_PATH` | `data/vector_store/` | ChromaDB 持久化路徑 |
+| `RAG_VECTOR_DB_PATH` | `data/vector_store_v2/` | ChromaDB 持久化路徑；舊 `data/vector_store/` 快取不會自動刪除 |
 | `RAG_EMBEDDING_MODEL` | `text-embedding-3-small` | Embedding 模型 |
 | `RAG_DEBUG_LOGGING` | `0` | 啟用 RAG metrics logging |
 | `RAG_ENABLE_LLM_REWRITE` | `0` | 啟用 LLM-based query rewrite（可選） |

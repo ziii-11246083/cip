@@ -790,6 +790,7 @@ label{
 
 .sim-scenario-card{
   padding:28px;
+  grid-column:1 / -1;
 }
 
 .sim-scenario-head{
@@ -895,12 +896,107 @@ label{
   font-weight:950;
 }
 
+.sim-mode-boundary{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+  margin:14px 0;
+}
+
+.sim-mode-boundary span{
+  padding:11px 12px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.5;
+}
+
+.sim-mode-boundary span.active{
+  border-color:#0f766e;
+  background:#f0fdfa;
+  color:#115e59;
+}
+
+.sim-mode-boundary strong{display:block;color:var(--dark)}
+
+.stress-controls{
+  display:grid;
+  grid-template-columns:1.4fr 1fr 1fr auto;
+  gap:12px;
+  align-items:end;
+  margin-top:20px;
+  padding-top:18px;
+  border-top:1px solid var(--line);
+}
+
+.stress-controls label{
+  color:var(--muted);
+  font-size:12px;
+  font-weight:900;
+}
+
+.stress-controls input,
+.stress-controls select{
+  width:100%;
+  margin-top:6px;
+  padding:11px 12px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#fff;
+}
+
+.stress-controls button{
+  min-height:42px;
+  border:0;
+  border-radius:12px;
+  padding:0 16px;
+  background:#0f766e;
+  color:#fff;
+  font-weight:950;
+  cursor:pointer;
+}
+
+#stressStatus{margin-top:12px}
+
+.stress-results{margin-top:14px}
+
+.stress-result-meta{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:10px;
+  color:var(--muted);
+  font-size:13px;
+}
+
+.stress-result-meta strong{color:#115e59}
+
+.stress-results th,
+.stress-results td{white-space:nowrap}
+
+.stress-warning,
+.stress-limitations{
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.65;
+}
+
+.stress-warning{color:#b45309;font-weight:800}
+
 @media(max-width:760px){
   .sim-scenario-selector{
     grid-template-columns:repeat(2,minmax(0,1fr));
   }
   .sim-scenario-info{
     grid-template-columns:1fr;
+  }
+  .sim-mode-boundary,
+  .stress-controls{
+    grid-template-columns:1fr;
+  }
+  .stress-result-meta{
+    flex-direction:column;
   }
 }
 
