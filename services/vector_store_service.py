@@ -11,7 +11,10 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_VECTOR_DB_PATH = Path(__file__).resolve().parent.parent / "data" / "vector_store"
+# Runtime-generated cache.  Keep a schema namespace in the directory name so
+# an older, incompatible Chroma cache cannot disable dense retrieval after an
+# application upgrade.  The old cache is intentionally left untouched.
+DEFAULT_VECTOR_DB_PATH = Path(__file__).resolve().parent.parent / "data" / "vector_store_v2"
 
 _chromadb_available = False
 try:
@@ -30,7 +33,8 @@ class VectorStoreService:
     """
 
     def __init__(self, persist_dir: Optional[Path] = None):
-        self._persist_dir = str(persist_dir or DEFAULT_VECTOR_DB_PATH)
+        configured_dir = os.getenv("RAG_VECTOR_DB_PATH") if persist_dir is None else None
+        self._persist_dir = str(persist_dir or configured_dir or DEFAULT_VECTOR_DB_PATH)
         self._client: Any = None
         self._collection: Any = None
         self._available = _chromadb_available

@@ -42,9 +42,32 @@
         <button type="button" onclick="window.authManager?.openLogin?.()">登入會員</button>
       </div>
 
+      <section class="member-card real-asset-card" data-member-feature="真實資產唯讀同步">
+        <div class="member-card-head">
+          <div>
+            <div class="eyebrow"><i class="fas fa-wallet"></i> Read-only Beta</div>
+            <h2>真實資產</h2>
+            <p>Ethereum Mainnet 公開地址唯讀同步，與下方模擬資產完全分開。</p>
+          </div>
+          <span class="real-asset-safety"><i class="fas fa-shield-alt"></i> 不會代下單</span>
+        </div>
+        <div class="real-asset-notice">
+          只需公開錢包地址；我們永遠不會要求助記詞、私鑰或交易所 API Secret。此功能為 Beta feature flag，不代表已收取訂閱費。
+        </div>
+        <form class="real-asset-connect" id="realAssetForm">
+          <label for="realAssetAddress">Ethereum 公開地址</label>
+          <div>
+            <input id="realAssetAddress" autocomplete="off" spellcheck="false" maxlength="42" placeholder="0x…（40 個十六進位字元）">
+            <button type="submit"><i class="fas fa-link"></i> 連結唯讀錢包</button>
+          </div>
+        </form>
+        <div class="real-asset-status" id="realAssetStatus" role="status" aria-live="polite">登入後可查看是否已開放 Beta。</div>
+        <div class="real-asset-accounts" id="realAssetAccounts"></div>
+      </section>
+
       <section class="member-kpi-grid" data-member-feature="會員資產紀錄">
         <article class="member-kpi">
-          <span>累積投放資金</span>
+          <span>模擬累積投放資金</span>
           <strong id="kpiCapital">TWD 0</strong>
           <small id="kpiCapitalCount">0 筆資金紀錄</small>
         </article>

@@ -23,5 +23,7 @@ markdown
 weasyprint
 # ── RAG Phase 2A: Hybrid Retrieval ──
 chromadb>=0.4.0,<0.6.0
+# ChromaDB 0.5.x still calls posthog.capture with the pre-6 positional API.
+posthog<6
 rank-bm25>=0.2.0
 jieba>=0.42.0

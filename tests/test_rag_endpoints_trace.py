@@ -276,8 +276,9 @@ class ScamScanTraceTests(BaseEndpointTraceTest):
         resp = self._post("/api/scam-scan", self.PAYLOAD)
         self.assertEqual(resp.status_code, 200)
         data = resp.get_json()
-        self.assertEqual(data["risk_level"], "medium")
-        self.assertEqual(data["report"], "測試風險報告")
+        self.assertEqual(data["risk_level"], "high")
+        self.assertIn("保證獲利／固定收益", data["report"])
+        self.assertIn("guaranteed_profit", data["triggered_rules"])
         self.assertRegex(data["trace_id"], r"^[0-9a-f]{32}$")
         r = self._last()
         self.assertEqual(r.endpoint, "scam")
@@ -290,7 +291,7 @@ class ScamScanTraceTests(BaseEndpointTraceTest):
         self.fake_rag.metrics = {"fallback_reason": "", "empty_context": True}
         resp = self._post("/api/scam-scan", self.PAYLOAD)
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.get_json()["risk_level"], "medium")
+        self.assertEqual(resp.get_json()["risk_level"], "high")
         r = self._last()
         self.assertEqual(r.status, "degraded")
 
@@ -306,7 +307,7 @@ class ScamScanTraceTests(BaseEndpointTraceTest):
             store=self.mem, db_store=FailingStore(), hmac_secret=TEST_HMAC_SECRET)
         resp = self._post("/api/scam-scan", self.PAYLOAD)
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.get_json()["risk_level"], "medium")
+        self.assertEqual(resp.get_json()["risk_level"], "high")
 
     def test_llm_exception_fixed_message_no_leak(self):
         app_module.refresh_openai_client = lambda: FakeLLM(
@@ -314,7 +315,8 @@ class ScamScanTraceTests(BaseEndpointTraceTest):
         resp = self._post("/api/scam-scan", self.PAYLOAD)
         self.assertEqual(resp.status_code, 200)
         data = resp.get_json()
-        self.assertEqual(data["report"], "系統錯誤，請稍後再試。")
+        self.assertEqual(data["risk_level"], "high")
+        self.assertIn("AI 文字分析失敗", data["report"])
         self.assertNotIn("sk-leak", json.dumps(data, ensure_ascii=False))
         r = self._last()
         self.assertEqual(r.status, "error")
@@ -325,7 +327,8 @@ class ScamScanTraceTests(BaseEndpointTraceTest):
         resp = self._post("/api/scam-scan", self.PAYLOAD)
         self.assertEqual(resp.status_code, 200)
         data = resp.get_json()
-        self.assertEqual(data["report"], "API Key 未設定，無法連線 AI。")
+        self.assertEqual(data["risk_level"], "high")
+        self.assertIn("AI 文字分析目前不可用", data["report"])
         r = self._last()
         self.assertEqual(r.status, "degraded")
         self.assertEqual(r.fallback_reason, "llm_unavailable")

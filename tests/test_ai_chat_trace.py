@@ -471,8 +471,20 @@ class RewriteFallbackEndpointTests(BaseChatTraceTest):
     def test_rewrite_exception_endpoint_behavior(self):
         from services.rag_service import RAGService
         from services.query_rewrite_service import QueryRewriteService
+        from services.retrieval_service import RetrievalService
+
+        # 端點反例只需真實本地 sparse retrieval；無論開發機
+        # 是否有 parent .env，測試都不得呼叫真實 embedding API。
+        for target in (
+            "services.retrieval_service._ENABLE_EMBEDDINGS",
+            "services.retrieval_service._ENABLE_VECTOR_STORE",
+        ):
+            env_patcher = mock.patch(target, False)
+            env_patcher.start()
+            self.addCleanup(env_patcher.stop)
 
         real_rag = RAGService()
+        real_rag._retrieval = RetrievalService(kb=real_rag._kb)
         # 測試環境適應：venv 無 jieba/dense 時，sparse 檢索的 topic filter
         # 會使結果為 0；此 patch 僅把 filter 移除，檢索引擎本身仍為真實實作。
         real_retrieve = real_rag._retrieval.retrieve_with_meta
@@ -504,6 +516,8 @@ class RewriteFallbackEndpointTests(BaseChatTraceTest):
         self.assertNotIn(fake_token, json.dumps(data, ensure_ascii=False))
 
         record = self.mem.recent(1)[0]
+        self.assertIsNone(real_rag._retrieval._embedding)
+        self.assertFalse(real_rag._retrieval._dense_available)
         self.assertEqual(record.status, "degraded")
         self.assertTrue(record.fallback)
         self.assertEqual(record.fallback_reason, "rewrite_error")
