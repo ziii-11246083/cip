@@ -38,6 +38,7 @@ python run_local.py
 - Password：`Test123456`
 
 Demo 會員只供本機展示，不等於真實 Supabase 使用者、付費會員或正式權限。
+Demo 對話不寫入正式 Supabase conversation UUID 表；重新整理後不保留 Demo 對話紀錄。
 
 ## 環境變數
 

@@ -192,7 +192,7 @@ class NormalChatTraceTests(BaseChatTraceTest):
         self.assertEqual(resp.status_code, 200)
         data = resp.get_json()
         self.assertEqual(data["reply"], "這是 AI 測試回答")
-        self.assertEqual(data["conversation_id"], "conv-1")
+        uuid.UUID(data["conversation_id"])
         self.assertRegex(data["trace_id"], r"^[0-9a-f]{32}$")
         self.assertEqual(data["citations"], ["知識庫: investment_rules.md (投資原則)"])
         self.assertEqual(data["confidence"], "high")
@@ -203,7 +203,7 @@ class NormalChatTraceTests(BaseChatTraceTest):
         self.assertEqual(r.trace_id, data["trace_id"])
         self.assertEqual(r.endpoint, "chat")
         self.assertIsNone(r.user_id)  # demo 使用者不寫 user_id
-        self.assertEqual(r.conversation_id, "conv-1")
+        self.assertEqual(r.conversation_id, data["conversation_id"])
         self.assertEqual(r.status, "success")
         self.assertEqual(r.answer, "這是 AI 測試回答")
         self.assertEqual(r.sanitized_query, "比特幣適合長期持有嗎")
@@ -316,7 +316,7 @@ class TraceStoreFailureTests(BaseChatTraceTest):
         data = resp.get_json()
         # 必須回原本成功回答，不得變成「系統錯誤」
         self.assertEqual(data["reply"], "這是 AI 測試回答")
-        self.assertEqual(data["conversation_id"], "conv-1")
+        uuid.UUID(data["conversation_id"])
         self.assertRegex(data["trace_id"], r"^[0-9a-f]{32}$")
         self.assertTrue(any("trace_store_error" in line for line in cm.output))
 
@@ -443,6 +443,18 @@ class ApiCompatibilityTests(BaseChatTraceTest):
             headers={"Authorization": f"Bearer {DEMO_TOKEN}"})
         self.assertEqual(hist.status_code, 200)
         self.assertEqual(conv.status_code, 200)
+        self.assertEqual(hist.get_json(), {"conversation_id": "conv-1", "messages": []})
+        self.assertEqual(conv.get_json(), {"conversations": []})
+
+    def test_demo_chat_never_calls_supabase_uuid_tables(self):
+        with mock.patch.object(
+                app_module.db, "create_conversation",
+                side_effect=AssertionError("demo must not create DB conversation")), mock.patch.object(
+                app_module.db, "save_message",
+                side_effect=AssertionError("demo must not write DB messages")):
+            resp = self._post("Demo 對話不得污染正式 UUID 表")
+        self.assertEqual(resp.status_code, 200)
+        uuid.UUID(resp.get_json()["conversation_id"])
 
     def test_response_and_logs_contain_no_secret(self):
         records = []
@@ -508,7 +520,7 @@ class RewriteFallbackEndpointTests(BaseChatTraceTest):
         data = resp.get_json()
         # Chat 原回答與既有欄位不變
         self.assertEqual(data["reply"], "這是 AI 測試回答")
-        self.assertEqual(data["conversation_id"], "conv-1")
+        uuid.UUID(data["conversation_id"])
         self.assertRegex(data["trace_id"], r"^[0-9a-f]{32}$")
         # citation 保留
         self.assertGreaterEqual(len(data["citations"]), 1)

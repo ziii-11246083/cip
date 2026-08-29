@@ -1792,9 +1792,12 @@ def api_ai_chat():
             app.logger.warning("rag_trace start failed (code=start_failed)")
             trace_run = None
 
-    conversation_id = None
+    # Demo 會員不是 Supabase Auth UUID，不可拿 `demo-member` 查／寫 UUID 欄位。
+    # Demo 對話在當頁由 client_messages 維持；只給一個 ephemeral UUID 讓前端
+    # conversation contract 保持相容，不污染正式 ai_conversations/ai_messages。
+    conversation_id = (incoming_conversation_id or str(uuid.uuid4())) if is_demo else None
     history_rows: List[Dict[str, Any]] = []
-    if db:
+    if db and not is_demo:
         try:
             if incoming_conversation_id:
                 conversation_id = incoming_conversation_id
@@ -1975,7 +1978,7 @@ def api_ai_chat():
                 completion_tokens=completion_tokens_total,
             )
 
-        if db and conversation_id:
+        if db and conversation_id and not is_demo:
             try:
                 if access_token:
                     db.save_message_authed(
@@ -2027,6 +2030,8 @@ def api_ai_chat_history():
     conversation_id = (request.args.get("conversation_id") or "").strip()
     if not conversation_id:
         return jsonify({"error": "conversation_id is required"}), 400
+    if bool(request.user.get("is_demo")):
+        return jsonify({"conversation_id": conversation_id, "messages": []})
     if not db:
         return jsonify({"error": "database unavailable"}), 503
 
@@ -2044,6 +2049,8 @@ def api_ai_chat_history():
 @app.route('/api/ai-chat/conversations', methods=['GET'])
 @token_required
 def api_ai_chat_conversations():
+    if bool(request.user.get("is_demo")):
+        return jsonify({"conversations": []})
     if not db:
         return jsonify({"error": "database unavailable"}), 503
 
