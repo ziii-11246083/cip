@@ -136,6 +136,13 @@
   align-items:start;
 }
 
+/* 未登入時只有會員提示卡可見，讓它跨越雙欄並置中，避免右側留下空欄。 */
+.coach-layout > .member-gate.show{
+  grid-column:1 / -1;
+  width:min(100%,760px);
+  justify-self:center;
+}
+
 .coach-side-stack{
   display:grid;
   gap:24px;

@@ -11,7 +11,9 @@ const vm = require("vm");
 const assert = require("assert");
 
 const JS_PATH = path.join(__dirname, "..", "static", "js", "ai_coach.js");
+const CSS_PATH = path.join(__dirname, "..", "static", "css", "ai_coach.css");
 const source = fs.readFileSync(JS_PATH, "utf8");
+const cssSource = fs.readFileSync(CSS_PATH, "utf8");
 
 let failures = 0;
 let passed = 0;
@@ -71,11 +73,20 @@ function makeEl(tag) {
 
 const streamStub = makeEl("div");
 streamStub.id = "chatStream";
+const memberGateStub = makeEl("section");
+memberGateStub.id = "memberGate";
+const coachAppStub = makeEl("div");
+coachAppStub.id = "aiCoachApp";
 const sandbox = {
   console,
   document: {
     addEventListener() {},
-    getElementById(id) { return id === "chatStream" ? streamStub : null; },
+    getElementById(id) {
+      if (id === "chatStream") return streamStub;
+      if (id === "memberGate") return memberGateStub;
+      if (id === "aiCoachApp") return coachAppStub;
+      return null;
+    },
     createElement: makeEl,
     querySelectorAll() { return []; },
   },
@@ -87,6 +98,8 @@ const sandbox = {
   },
   fetch: () => Promise.reject(new Error("network down")),
   __innerHTMLSets: 0,
+  __windowListeners: {},
+  addEventListener(type, cb) { this.__windowListeners[type] = cb; },
 };
 sandbox.window = sandbox;
 sandbox.globalThis = sandbox;
@@ -115,6 +128,24 @@ function renderWithMeta(metaBody) {
 }
 
 async function main() {
+  await check("locked layout: 會員提示卡跨越桌面雙欄並置中", () => {
+    const rule = cssSource.match(/\.coach-layout\s*>\s*\.member-gate\.show\s*\{([^}]*)\}/)?.[1] || "";
+    assert.match(rule, /grid-column\s*:\s*1\s*\/\s*-1\s*;/);
+    assert.match(rule, /width\s*:\s*min\(100%,\s*760px\)\s*;/);
+    assert.match(rule, /justify-self\s*:\s*center\s*;/);
+  });
+
+  await check("auth-state: 同頁登入後立即解除 AI Coach 鎖定", () => {
+    const listener = sandbox.__windowListeners["smartinvest:auth-state"];
+    assert.strictEqual(typeof listener, "function");
+    listener({ detail: { isMember: false } });
+    assert.strictEqual(memberGateStub.classList.contains("show"), true);
+    assert.strictEqual(coachAppStub.classList.contains("ai-coach-locked"), true);
+    listener({ detail: { isMember: true } });
+    assert.strictEqual(memberGateStub.classList.contains("show"), false);
+    assert.strictEqual(coachAppStub.classList.contains("ai-coach-locked"), false);
+  });
+
   // ── 純函式測試 ─────────────────────────────────────────────────
   await check("citationLines: 字串 citation", () => {
     const lines = JSON.parse(JSON.stringify(hooks.citationLines("知識庫: investment_rules.md (投資原則)")));

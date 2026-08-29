@@ -80,6 +80,22 @@ function activateDemoMember() {
     markAuthReady();
 }
 
+function applyAuthState(session) {
+    // Supabase 會在初始化時送出 INITIAL_SESSION(null)。Demo 會員是本機
+    // session，不能被這個空事件覆寫，否則切頁時 UI 會看起來像自動登出。
+    if (session && !session.user?.is_demo) {
+        localStorage.removeItem(DEMO_MEMBER_KEY);
+        sessionStorage.removeItem(DEMO_MEMBER_KEY);
+    }
+    const effectiveSession = (!session && isDemoMemberActive())
+        ? buildDemoSession()
+        : (session || null);
+    currentSession = effectiveSession;
+    updateMembership(effectiveSession);
+    setAuthUiBySession(effectiveSession);
+    return effectiveSession;
+}
+
 function requireSupabase() {
     if (!supabase) {
         alert("Supabase 設定未完成，請檢查 SUPABASE_URL 與 SUPABASE_ANON_KEY");
@@ -187,7 +203,7 @@ async function applyAuthFromUrl() {
         currentSession = session;
         updateMembership(session);
         setAuthUiBySession(session);
-        console.log("[auth] redirect session", session);
+        console.log("[auth] redirect session restored", Boolean(session));
         clearUrlHashAfterLogin();
     }
 
@@ -292,7 +308,7 @@ async function refreshSession() {
     }
     updateMembership(currentSession);
     setAuthUiBySession(currentSession);
-    console.log("[auth] refresh session", currentSession);
+    console.log("[auth] refresh session restored", Boolean(currentSession));
     return currentSession;
 }
 
@@ -300,6 +316,8 @@ window.authManager = {
     loginWithGoogle: async () => {
         if (!requireSupabase()) return;
         try {
+            localStorage.removeItem(DEMO_MEMBER_KEY);
+            sessionStorage.removeItem(DEMO_MEMBER_KEY);
             localStorage.removeItem(GUEST_MODE_KEY);
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: "google",
@@ -439,11 +457,9 @@ if (supabase) {
             await applyAuthFromUrl();
             await refreshSession();
             supabase.auth.onAuthStateChange((_event, session) => {
-                currentSession = session || null;
-                updateMembership(session || null);
-                setAuthUiBySession(session || null);
-                console.log("[auth] onAuthStateChange", _event, session);
-                if (session) {
+                const effectiveSession = applyAuthState(session);
+                console.log("[auth] onAuthStateChange", _event, Boolean(effectiveSession));
+                if (effectiveSession && !effectiveSession.user?.is_demo) {
                     clearUrlHashAfterLogin();
                 }
             });

@@ -5,6 +5,8 @@
   const newChatBtn = $("aiCoachNewChatBtn");
   let conversationCache = [];
   let isLocked = false;
+  let pageInitialized = false;
+  let memberDataLoaded = false;
 
   function setLockedState(locked) {
     isLocked = locked;
@@ -12,6 +14,19 @@
     $("memberGate")?.classList.toggle("locked", locked);
     const app = $("aiCoachApp");
     if (app) app.classList.toggle("ai-coach-locked", locked);
+  }
+
+  function syncMemberState(loggedIn) {
+    const isMember = Boolean(loggedIn);
+    setLockedState(!isMember);
+    if (!isMember) {
+      memberDataLoaded = false;
+      return;
+    }
+    if (!pageInitialized || memberDataLoaded) return;
+    memberDataLoaded = true;
+    loadConversations();
+    loadHistory();
   }
 
   function escapeHTML(value) {
@@ -567,7 +582,11 @@
       feedbackVisible,
       displayableCitationCount,
       appendChatBubble,
+      syncMemberState,
     };
+    window.addEventListener("smartinvest:auth-state", (event) => {
+      syncMemberState(Boolean(event?.detail?.isMember));
+    });
   }
 
   document.addEventListener("DOMContentLoaded", async () => {
@@ -582,9 +601,7 @@
     initRiskCards();
     initQuickAsk();
     initChatEvents();
-    if (loggedIn) {
-      loadConversations();
-      loadHistory();
-    }
+    pageInitialized = true;
+    syncMemberState(loggedIn);
   });
 })();
