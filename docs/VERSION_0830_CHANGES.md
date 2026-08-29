@@ -1,63 +1,103 @@
-# 0830 版本變更說明
+# 0830 與 0727 版本差異（教授 Demo 版）
 
-> 對象：第一次接手本專案、明天要協助 Demo、或需要快速理解這版價值的人。
+> 比較基準：`origin/0727`（`ca7fa7d`）與 `0830` 分支。本文件只列可由程式、測試或文件證明的差異。
 
-## 一句話摘要
+## 一句話定位
 
-0830 版沒有重寫核心交易或 AI 流程，而是把 08/20 已完成的 RAG 可追溯、風險辨識、資產同步 MVP 與壓力測試成果整理成較穩定、可交接、可展示的版本，並修正登入與行動版顯示問題。
+- 0727 已有市場資訊、AI 教練、初版 RAG、Agent、健康度、可疑文案辨識與模擬交易。
+- 0830 沒有推翻這些核心流程，而是新增「可追溯、可評測、可重現」能力，修正登入與版型問題，並移除會讓人誤以為金流或同步已完成的 Demo 假功能。
 
-## 相對 08/20 的直接變更
+## 教授先看：0830 的 10 個主要差異
 
-### 1. 登入切頁不再偶發失效
+### 1. RAG 回答從「有回答」升級為「可追來源」
 
-- 問題：使用 Demo 會員登入後，切換到健康度、模擬交易或其他功能時，Supabase 初始化送出的空 session 事件可能覆寫 Demo session，畫面又變回未登入。
-- 修正：有效的 Demo session 會受到保護；Supabase 空事件不再把它清掉。真正的 Supabase session 流程、JWT 驗證與登出流程沒有重寫。
-- 使用者感受：登入一次後切換功能，會員導覽與功能鎖定狀態應保持一致。
-- Demo 資料邊界：Demo user id 不是正式 Supabase UUID，因此 Demo 聊天只維持當頁上下文，不查寫正式 conversation tables；避免錯誤 log 與測試資料污染。
+- 0727：已有初版 RAG retrieval，但難以確認某次回答實際用了哪些資料。
+- 0830：每次支援的 AI 回答可產生 `trace_id`，記錄模型、延遲、token、狀態、降級原因與實際注入來源。
+- 0830：AI 教練可顯示 citation 與 confidence；無來源或低信心時會明確提示。
+- Demo 說法：回答現在「可追溯」，不是只看 AI 最後講了什麼。
 
-### 2. AI 投資教練登入後立即解鎖
+### 2. RAG 品質從「憑感覺」升級為「可量測」
 
-- 問題：在 AI 投資教練頁面開啟登入視窗並成功登入後，頁首已顯示會員，但主內容仍停在「請先登入會員」，必須手動重新整理。
-- 修正：AI 投資教練會監聽共用登入狀態事件，成功登入後立即隱藏會員提示、顯示對話介面並載入紀錄。
-- 相容性：既有 `/api/ai-chat`、conversation、citation 與 feedback contract 不變。
+- 0727：沒有完整的版本化評測流程與 regression gate。
+- 0830：新增 15 題離線資料集、deterministic evaluator、JSON／Markdown artifact、baseline 與退步判定契約。
+- 0830：新增回答 👍／👎 feedback 流程；正式寫入需要真實 Supabase 使用者與已部署 migration。
+- 重要限制：15 題仍待人工審核與核准 baseline，因此只能說「可評測、可防退步」，不能說「已證明很準」。
 
-### 3. 顯示問題修正
+### 3. RAG 管理功能補上權限與錯誤保護
 
-- AI 投資教練未登入桌機版：會員提示卡跨越原本的雙欄並置中，不再只卡在左側 360px 欄位。
-- 模擬交易手機版：允許 grid 與 card 在 390px 寬度正常收縮，不再造成整頁橫向捲動。
-- 本次沒有改全站色彩、導覽結構或核心 UI 元件，避免為了「看起來更乾淨」引入大範圍回歸。
+- 0727：RAG stats、eval、rebuild 的管理邊界不足。
+- 0830：公開 stats 只回 aggregate；詳細資料、eval 與 rebuild 改由可信任的 admin metadata 控制。
+- 0830：rebuild 加入鎖定與固定錯誤碼，避免例外、query 或敏感資料直接出現在回應與 log。
 
-### 4. 交接文件
+### 4. 可疑投資文案辨識更結構化、更誠實
 
-- 新增根目錄 `README.md`：快速啟動、環境變數、版本定位與功能紅線。
-- 新增本文件：說明 0830 改了什麼、為什麼改。
-- 新增 `docs/DEMO_AND_TEST_GUIDE_0830.md`：展示前檢查、手動測試清單、Demo 腳本與不可宣稱事項。
+- 0727：已有規則、RAG 與 LLM 判斷，但結果較偏單一報告，provider 例外也可能被直接帶到回應。
+- 0830：新增 deterministic risk floor，不讓明顯的「保證獲利、索取助記詞」被模型判成較低風險。
+- 0830：回傳 `reasons`、`warnings`、`evidence`、`uncertainty`、citation 與 trace，錯誤改為固定安全內容。
+- Demo 說法：這是「可疑投資文案風險辨識」，不是網域、合約、GMGN、WHOIS 或鏈上掃描器。
 
-## 08/20 基礎功能（0830 全部保留）
+### 5. 新增獨立的情境壓力測試
 
-| 功能 | 這版可以展示什麼 | 真實完成狀態 |
-|---|---|---|
-| AI 投資教練 | RAG 回答、引用來源、信心提示、回答回饋 | 核心 runtime 已接；正式 DB migration／人工 accuracy baseline 仍需部署與審核 |
-| RAG 品質治理 | trace、來源紀錄、離線 15 題 evaluator、baseline regression contract | 可量測、可防退步；不能說已證明準確率 |
-| 可疑文案辨識 | 固定規則、RAG、LLM 與結構化 reasons/evidence/uncertainty | 已實作文字風險辨識；不是鏈上／網域／合約掃描器 |
-| AI Agent | 依 goal/profile/budget 產生配置與風險提示 | 已實作規劃與模擬下單；不會送真實交易所訂單 |
-| 投資組合健康度 | 共用風險指標、RAG/LLM 分析與降級內容 | 即時計算；尚未持久化健康報告 |
-| 模擬交易 | 虛擬持倉、交易與資金流程 | Supabase RPC 可用時走遠端，否則 Demo 本地備援；不是實盤 |
-| 情境壓力測試 | 三策略、四情境、固定 seed 可重現結果 | 合成情境已實作；不是歷史回測或預測 |
-| 公開錢包同步 | Ethereum 公開地址唯讀 adapter、last-good／partial 狀態與會員 UI | Beta code/migration ready；尚未完成正式部署、交易所 API 或 scheduler |
-| 商業與競品證據 | 可重算成本模型、競品官方來源、GitHub／成員貢獻證據 | 證據文件已完成；訂閱、Stripe 與實際營收仍未實作 |
+- 0727：已有虛擬下單、持倉與資金紀錄。
+- 0830：額外新增 3 種策略、4 種情境（normal／bull／bear／black_swan）與固定 seed 的可重現壓力測試。
+- 0830：壓力測試使用獨立 snapshot 純計算，不會改寫既有模擬交易帳本。
+- Demo 說法：這是「合成情境壓力測試」，不是歷史回測、價格預測或投資建議。
 
-## 沒有碰的核心流程
+### 6. 新增公開錢包唯讀資產同步 Beta 基礎
 
-- 沒有更改模擬交易下單、入金、重設或帳本計算。
-- 沒有更改 RAG retrieval、rerank、prompt、模型呼叫與 trace 資料契約。
-- 沒有更改點數、金流或訂閱，因為這些 runtime 目前尚未實作。
-- 沒有執行 Supabase migration、刪除資料或重寫既有 Git history。
+- 0727：會員資產主要來自模擬交易資料，另有會回傳 Demo 同步成功的假 external-sync route。
+- 0830：新增公開 Ethereum 地址唯讀 adapter、獨立 real/manual/simulated 資料來源、partial／last-good／idempotency／lock 契約與會員 UI 分區。
+- 0830：不要求私鑰或助記詞，也不把真實資產寫入模擬持倉。
+- 重要限制：目前是 code/migration-ready Beta；必須先部署 Supabase migration、設定 Alchemy 與權限才可展示成功。尚未串交易所 API、付費 entitlement 或自動 scheduler。
 
-## 已知限制與展示說法
+### 7. 移除會誤導成「已完成」的 Demo 假功能
 
-1. AI 回答品質：說「已有可追溯與評測機制」，不要說「已證明非常準」。
-2. 資產同步：說「公開地址唯讀 Beta」，不要說「已接交易所並自動排程」。
-3. 訂閱金流：說「有商業模型與資料規劃」，不要說「已有付費會員或 Stripe」。
-4. 模擬交易：說「虛擬下單與合成壓力測試」，不要說「真實交易或歷史回測」。
-5. Demo 帳號：只用於本機展示；需測真實會員隔離、RLS 與 feedback DB 時必須改用測試 Supabase 使用者。
+- 0727 的 mock checkout 會直接回覆付款完成，Demo subscription 會直接顯示 Premium。
+- 0727 的 external sync 可在沒有真實 provider 時回覆本機 Demo 同步成功。
+- 0727 另有只回空資料或 fallback 的 notifications／health reports route。
+- 0830 移除上述誤導性 route，不再把規劃中的訂閱、金流、同步、通知或報告保存說成已上線。
+- Demo 說法：這不是功能倒退，而是把「已完成、部分完成、尚未完成」分清楚。
+
+### 8. 修正登入後切換功能會掉回未登入
+
+- 0727：Demo 登入可能被 Supabase 初始化的空 session 事件覆寫；AI 教練同頁登入後也可能仍停在會員提示。
+- 0830：保護有效 Demo session；真正 Supabase session 到達時仍會正確接管。
+- 0830：AI 教練監聽共用 auth state，不重新整理即可解鎖。
+- 0830：Demo user 不再查寫需要 UUID 的正式 conversation tables，避免錯誤 log 與測試資料污染。
+
+### 9. 修正 AI 教練與手機版顯示問題
+
+- 0830：AI 教練未登入提示卡在桌機版跨欄置中，不再擠在左側並留下大片空白。
+- 0830：登入後維持原本聊天雙欄，不改 `/api/ai-chat` 核心 contract。
+- 0830：390px 手機版模擬交易 grid 可正常縮小，不再造成整頁水平捲動。
+
+### 10. 補齊測試、安全與交接證據
+
+- 0830：新增 RAG trace、feedback、eval、admin、資產同步、壓力測試、登入與前端顯示等回歸測試。
+- 0830：移除 Git 追蹤中的 service account 檔、Python cache 與本機模擬資料，`.env` 與金鑰不得提交。
+- 0830：新增功能一致性矩陣、複評證據包、版本差異與 Demo 測試文件。
+- 最新完整驗證：pytest 287 項加 43 個 subtests、unittest 287 項、AI Coach Node 25/25、Auth Node 3/3、三組 validator 70/108/28，皆通過。
+
+## 0727 已有、0830 保留且強化的核心流程
+
+- 市場首頁、行情、幣種分析、社群情緒與 Narrative Radar。
+- AI 投資教練、對話、初版 RAG、Agent、Podcast、健康度與可疑文案辨識。
+- 模擬交易下單、持倉、紀錄、入金、資本額與重設流程。
+- 0830 沒有為了整理架構而重寫以上核心流程，也沒有把壓力測試結果寫回交易帳本。
+
+## 0830 仍未完成，Demo 不可講成已上線
+
+- RAG 人工核准的 accuracy baseline 尚未完成，不能宣稱準確率已被證明。
+- Supabase migrations 尚需在目標專案實際部署與做 RLS integration test。
+- 公開錢包同步仍是 Ethereum 單鏈唯讀 Beta；交易所 API、多鏈與自動排程尚未完成。
+- 付費訂閱、Stripe 金流、正式 entitlement 與實際營收尚未完成。
+- 可疑文案辨識沒有做網站、合約或鏈上安全驗證。
+- 情境壓力測試不是歷史回測、預測或實盤交易。
+
+## 建議教授問答的一句話版本
+
+- 問「0830 最大進步是什麼？」：從功能可跑，提升到回答可追溯、品質可評測、結果可重現，並把登入與展示穩定性補好。
+- 問「RAG 現在準嗎？」：現在能記錄來源、接受回饋並用固定資料集比較版本；人工 baseline 尚未核准，所以不誇大準確率。
+- 問「有自動同步資產嗎？」：已有公開 Ethereum 地址唯讀 Beta 與資料契約；交易所、自動排程與正式部署仍是下一階段。
+- 問「有付費會員嗎？」：目前完成商業模型與技術規劃，沒有假裝 Stripe 或訂閱已上線。
+- 問「為什麼刪掉一些 API？」：0727 有些 route 只會回 Demo 成功；0830 移除假完成，讓展示與實際能力一致。
