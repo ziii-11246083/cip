@@ -17,6 +17,7 @@
 1. 到 `/ai-coach`，未登入時會員提示卡應在桌機版置中，右側不應留下像壞掉的空欄。
 2. 點「登入」，輸入 Demo 帳號 `test@smartinvest.local` / `Test123456`。
 3. 登入完成後不重新整理：會員提示應立即消失，AI 教練輸入區與對話紀錄區出現。
+   Demo 的對話清單顯示「尚無對話紀錄」是預期行為；Demo 不寫正式 Supabase conversation UUID 表。
 4. 依序切換 `/health` → `/sim-trade` → `/member` → `/agent` → `/market` → `/ai-coach`。
 5. 每一頁都應保持登入狀態：頁首顯示帳號區、會員功能不重新上鎖、不要求再次輸入帳密。
 6. 主動登出後再切頁，會員功能才應恢復鎖定。

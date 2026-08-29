@@ -13,6 +13,7 @@
 - 問題：使用 Demo 會員登入後，切換到健康度、模擬交易或其他功能時，Supabase 初始化送出的空 session 事件可能覆寫 Demo session，畫面又變回未登入。
 - 修正：有效的 Demo session 會受到保護；Supabase 空事件不再把它清掉。真正的 Supabase session 流程、JWT 驗證與登出流程沒有重寫。
 - 使用者感受：登入一次後切換功能，會員導覽與功能鎖定狀態應保持一致。
+- Demo 資料邊界：Demo user id 不是正式 Supabase UUID，因此 Demo 聊天只維持當頁上下文，不查寫正式 conversation tables；避免錯誤 log 與測試資料污染。
 
 ### 2. AI 投資教練登入後立即解鎖
 
