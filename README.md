@@ -4,18 +4,21 @@
 
 ## 0830 Demo 版
 
-本分支為 `0830`。相對上一個 `08/20` 版本，本次重點是穩定性與交接：
+本分支為 `0830`。相對 `0727` 版本，主要差異如下：
 
-- 修正 Demo 會員登入後切換功能頁，偶發回到未登入狀態的問題。
-- 修正 AI 投資教練在同一頁登入後，畫面仍停在會員提示卡的問題。
-- 修正 AI 投資教練未登入桌機版提示卡偏左、右側留白的版型問題。
-- 修正 390px 手機版模擬交易頁的橫向溢出。
-- 新增給展示人員閱讀的版本說明、測試清單與 Demo 腳本。
+- 0727 已有的市場、AI 教練、初版 RAG、Agent、健康度與模擬交易核心流程全部保留。
+- RAG 新增 trace、citation、confidence、feedback、15 題離線評測與 regression contract，從「有回答」提升為「可追溯、可量測」。
+- 可疑投資文案辨識新增固定高風險下限與 reasons／warnings／evidence／uncertainty 結構化結果。
+- 模擬交易新增 3 策略、4 情境、固定 seed 的獨立壓力測試，不改寫既有帳本。
+- 新增公開 Ethereum 地址唯讀資產同步 Beta 基礎；交易所 API、自動排程與正式付費 entitlement 尚未完成。
+- 移除 0727 會直接回覆付款、Premium 或 external sync 成功的 Demo 假 route，避免把規劃功能說成已上線。
+- 修正 Demo 登入跨頁失效、AI 教練同頁登入未解鎖、未登入版型偏左與 390px 手機橫向溢出。
+- 補齊安全、回歸測試、功能狀態矩陣與明日教授 Demo 文件。
 
 詳細內容：
 
-- [0830 版本變更說明](docs/VERSION_0830_CHANGES.md)
-- [0830 測試與 Demo 操作手冊](docs/DEMO_AND_TEST_GUIDE_0830.md)
+- [0830 與 0727 版本差異（教授 Demo 版）](docs/VERSION_0830_CHANGES.md)
+- [0830 教授 Demo 與測試清單](docs/DEMO_AND_TEST_GUIDE_0830.md)
 - [功能、Route、資料與完成狀態矩陣](docs/18-系統功能與資料一致性矩陣.md)
 - [複評證據包與答辯紅線](docs/19-複評證據包.md)
 
