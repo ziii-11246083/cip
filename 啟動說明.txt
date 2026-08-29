@@ -19,7 +19,7 @@ pip install -r requirements.txt
 
 6. 啟動網站：
 python run_local.py
-
+ 
 或：
 python app.py
 
