@@ -985,6 +985,12 @@ label{
 .stress-warning{color:#b45309;font-weight:800}
 
 @media(max-width:760px){
+  .sim-app,
+  .sim-app > *{
+    min-width:0;
+    width:100%;
+  }
+
   .sim-scenario-selector{
     grid-template-columns:repeat(2,minmax(0,1fr));
   }
