@@ -34,6 +34,21 @@
 
   <section class="section">
     <div class="container wide-container coach-layout">
+<<<<<<< HEAD
+=======
+
+      <div class="member-gate" id="memberGate">
+        <h2>請先登入會員</h2>
+        <p>AI 投資教練會根據你的提問，提供個人化投資建議與風險分析，因此需要會員帳號才能使用。</p>
+        <div class="member-actions">
+          <a class="button primary" href="/register">註冊 / 登入會員</a>
+          <a class="button" href="/market">查看市場總覽</a>
+        </div>
+        <div class="member-helper">登入後可建立對話紀錄、查詢歷史配置建議。</div>
+      </div>
+
+      <div id="aiCoachApp" class="ai-coach-app">
+>>>>>>> origin/0709
       <div class="coach-side-stack">
         <section class="card coach-panel" data-member-feature="AI 投資教練">
           <h2 class="section-title small-title">選擇你的風險偏好</h2>
@@ -74,12 +89,20 @@
         </div>
         <div class="chat-input-row"><input id="chatInput" placeholder="例如：我現在適合買 BTC 嗎？"><button id="btnSend" type="button"><i class="fas fa-paper-plane"></i> 傳送</button></div>
       </section>
+<<<<<<< HEAD
+=======
+      </div><!-- .ai-coach-app -->
+>>>>>>> origin/0709
     </div>
   </section>
 </main>
 
 <div class="float-actions"><a href="/" class="float-btn" title="回首頁"><i class="fas fa-house"></i></a><button class="float-btn" id="backToTopBtn" type="button" title="回到頂部"><i class="fas fa-arrow-up"></i></button></div>
+<<<<<<< HEAD
 <footer class="footer"><div class="container footer-inner"><div>© Smart Invest Crypto · 加密資產風險與市場分析</div><div>Market · Health · Podcast · AI Agent</div></div></footer>
+=======
+{% include "partials/footer.html" %}
+>>>>>>> origin/0709
 <div class="toast" id="toast"><div class="t" id="toastT">提示</div><div class="m" id="toastM">--</div></div>
 <script>window.__SUPABASE_CONFIG__ = { url: '{{ supabase_url | default("https://dummy.supabase.co") }}', anonKey: '{{ supabase_anon_key | default("dummy") }}' };</script>
 <script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=member-nav-lock-20260604"></script>

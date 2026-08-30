@@ -450,5 +450,54 @@
       $(id)?.addEventListener("input", updateQuotePanel);
       $(id)?.addEventListener("change", updateQuotePanel);
     });
+<<<<<<< HEAD
+=======
+
+    // —— Market Scenario Switcher ——
+    let activeScenario = "normal";
+    let scenarioData = {};
+
+    async function loadScenarios() {
+      try {
+        const res = await fetch("/api/market-scenarios");
+        if (!res.ok) return;
+        const data = await res.json();
+        scenarioData = data.scenarios || {};
+      } catch (e) {
+        console.warn("Failed to load market scenarios", e);
+        scenarioData = {};
+      }
+    }
+
+    function applyScenario(scenarioKey) {
+      activeScenario = scenarioKey;
+      const sc = scenarioData[scenarioKey] || { label: "一般市場", price_multiplier: 1.0, volatility_multiplier: 1.0 };
+      $("scenarioBadge") && ($("scenarioBadge").textContent = sc.label || scenarioKey);
+      $("scPriceMult") && ($("scPriceMult").textContent = (sc.price_multiplier || 1).toFixed(1) + "x");
+      $("scVolMult") && ($("scVolMult").textContent = (sc.volatility_multiplier || 1).toFixed(1) + "x");
+
+      const adviceMap = {
+        normal: "按照策略正常操作",
+        bull: "可提高風險資產佔比，定期獲利了結",
+        bear: "提高穩定幣佔比，嚴格執行止損",
+        black_swan: "極端風險規避，建議全倉現金為主"
+      };
+      $("scAdvice") && ($("scAdvice").textContent = adviceMap[scenarioKey] || "正常操作");
+
+      document.querySelectorAll(".scenario-btn").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.scenario === scenarioKey);
+      });
+
+      // placeholder: 展示情境資訊，不修改實際交易數據
+      console.log("[sim-trade] scenario switched to", scenarioKey, sc);
+    }
+
+    document.querySelectorAll(".scenario-btn").forEach((btn) => {
+      btn.addEventListener("click", () => applyScenario(btn.dataset.scenario));
+    });
+
+    loadScenarios().then(() => applyScenario("normal"));
+    // —— End Scenario Switcher ——
+>>>>>>> origin/0709
   });
 })();
