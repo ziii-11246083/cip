@@ -25,6 +25,7 @@ import pandas as pd
 import numpy as np
 import feedparser
 import yfinance as yf
+<<<<<<< HEAD
 try:
     import matplotlib
     matplotlib.use('Agg')
@@ -36,6 +37,19 @@ try:
     from wordcloud import WordCloud
 except Exception:
     WordCloud = None
+=======
+try:
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+except Exception:
+    plt = None
+
+try:
+    from wordcloud import WordCloud
+except Exception:
+    WordCloud = None
+>>>>>>> origin/0709
 from bs4 import BeautifulSoup
 from flask import Flask, request, jsonify, send_file, abort, render_template
 from flask_cors import CORS
@@ -43,6 +57,18 @@ from pydantic import BaseModel, Field, ValidationError
 from openai import OpenAI
 from dotenv import load_dotenv
 
+<<<<<<< HEAD
+=======
+# ── RAG / AI Services ──────────────────────────────────────
+try:
+    from services.rag_service import get_rag
+    _rag = get_rag()
+    _rag_available = _rag.kb_loaded
+except Exception as _rag_exc:
+    _rag = None
+    _rag_available = False
+
+>>>>>>> origin/0709
 # 載入環境變數
 load_dotenv()
 
@@ -63,12 +89,21 @@ SIM_INITIAL_CASH = 100000.0
 SIM_DATA_FILE = DATA_DIR / "sim_trade_local.json"
 SIM_DATA_LOCK = Lock()
 
+<<<<<<< HEAD
 class Config:
     CG_API_KEY: str = os.getenv("CG_API_KEY", "")
     CACHE_TTL: int = 300 
     MARKET_COIN_LIMIT: int = int(os.getenv("MARKET_COIN_LIMIT", "24"))
     SFI_COIN_LIMIT: int = int(os.getenv("SFI_COIN_LIMIT", "20"))
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "").strip().strip('"').strip("'")
+=======
+class Config:
+    CG_API_KEY: str = os.getenv("CG_API_KEY", "")
+    CACHE_TTL: int = 300 
+    MARKET_COIN_LIMIT: int = int(os.getenv("MARKET_COIN_LIMIT", "24"))
+    SFI_COIN_LIMIT: int = int(os.getenv("SFI_COIN_LIMIT", "20"))
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "").strip().strip('"').strip("'")
+>>>>>>> origin/0709
     
     COIN_META = {
         'BTC': {'cn_name': '比特幣'}, 'ETH': {'cn_name': '以太幣'}, 'BNB': {'cn_name': '幣安幣'},
@@ -90,6 +125,37 @@ class Config:
         "https://cryptopotato.com/feed/",
         "https://news.bitcoin.com/feed/"
     ]
+<<<<<<< HEAD
+=======
+    SIM_STRATEGY_PRESETS = {
+        "conservative": {
+            "label": "保守型",
+            "btc_eth_min_pct": 0.70,
+            "single_coin_max_pct": 0.10,
+            "stable_min_pct": 0.30,
+            "max_drawdown_warn": 0.10,
+        },
+        "balanced": {
+            "label": "穩健型",
+            "btc_eth_min_pct": 0.50,
+            "single_coin_max_pct": 0.20,
+            "stable_min_pct": 0.15,
+            "max_drawdown_warn": 0.20,
+        },
+        "aggressive": {
+            "label": "積極型",
+            "btc_eth_min_pct": 0.30,
+            "single_coin_max_pct": 0.35,
+            "stable_min_pct": 0.05,
+            "max_drawdown_warn": 0.35,
+        },
+    }
+    MARKET_SCENARIOS = {
+        "bull": {"price_multiplier": 1.3, "volatility_multiplier": 0.8, "label": "牛市"},
+        "bear": {"price_multiplier": 0.7, "volatility_multiplier": 1.5, "label": "熊市"},
+        "black_swan": {"price_multiplier": 0.4, "volatility_multiplier": 3.0, "label": "黑天鵝"},
+    }
+>>>>>>> origin/0709
 
 CG_ID_MAP = {
     "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana", "XRP": "ripple",
@@ -394,12 +460,21 @@ class DataManager:
         if 'history_prices' in coin: del coin['history_prices']
         return coin
 
+<<<<<<< HEAD
     @staticmethod
     @ttl_cache(ttl_seconds=Config.CACHE_TTL)
     def get_all_tickers() -> List[Dict]:
         tickers = DataManager._cg_get("/coins/markets", {"vs_currency": "usd", "order": "market_cap_desc", "per_page": Config.SFI_COIN_LIMIT, "page": 1, "sparkline": "true"})
         if not tickers: return []
         final_list = []
+=======
+    @staticmethod
+    @ttl_cache(ttl_seconds=Config.CACHE_TTL)
+    def get_all_tickers() -> List[Dict]:
+        tickers = DataManager._cg_get("/coins/markets", {"vs_currency": "usd", "order": "market_cap_desc", "per_page": Config.SFI_COIN_LIMIT, "page": 1, "sparkline": "true"})
+        if not tickers: return []
+        final_list = []
+>>>>>>> origin/0709
         if db:
             crypto_rows, price_rows = [], []
             for idx, t in enumerate(tickers):
@@ -416,6 +491,7 @@ class DataManager:
                     insert_data.append(price_row)
             if insert_data: db.bulk_insert_price_data(insert_data)
         else:
+<<<<<<< HEAD
             for idx, t in enumerate(tickers):
                 final_list.append(DataManager._market_coin_to_entry(t, rank=idx + 1))
         return final_list
@@ -426,6 +502,18 @@ class DataManager:
         tickers = DataManager._cg_get("/coins/markets", {"vs_currency": "usd", "order": "market_cap_desc", "per_page": Config.MARKET_COIN_LIMIT, "page": 1, "sparkline": "false"})
         if not tickers: return []
         return [DataManager._market_coin_to_entry(t, rank=idx + 1) for idx, t in enumerate(tickers)]
+=======
+            for idx, t in enumerate(tickers):
+                final_list.append(DataManager._market_coin_to_entry(t, rank=idx + 1))
+        return final_list
+
+    @staticmethod
+    @ttl_cache(ttl_seconds=Config.CACHE_TTL)
+    def get_market_tickers() -> List[Dict]:
+        tickers = DataManager._cg_get("/coins/markets", {"vs_currency": "usd", "order": "market_cap_desc", "per_page": Config.MARKET_COIN_LIMIT, "page": 1, "sparkline": "false"})
+        if not tickers: return []
+        return [DataManager._market_coin_to_entry(t, rank=idx + 1) for idx, t in enumerate(tickers)]
+>>>>>>> origin/0709
 
     @staticmethod
     def build_historical_df(crypto_list: List[Dict]) -> pd.DataFrame:
@@ -847,6 +935,7 @@ class SocialMediaEngine:
 
             font_path = "C:/Windows/Fonts/msjh.ttc" if os.path.exists("C:/Windows/Fonts/msjh.ttc") else None
             buf = None
+<<<<<<< HEAD
             try:
                 if WordCloud is not None and plt is not None:
                     wc = WordCloud(width=1000, height=450, background_color="#f8fafc", colormap="tab20", font_path=font_path, max_words=60)
@@ -867,6 +956,28 @@ class SocialMediaEngine:
                     buf.close()
                 if plt is not None:
                     plt.close("all")
+=======
+            try:
+                if WordCloud is not None and plt is not None:
+                    wc = WordCloud(width=1000, height=450, background_color="#f8fafc", colormap="tab20", font_path=font_path, max_words=60)
+                    if word_freqs: wc.generate_from_frequencies(word_freqs)
+                    else: wc.generate(text_all)
+                    fig, ax = plt.subplots(figsize=(10, 4.5))
+                    ax.imshow(wc, interpolation="bilinear")
+                    ax.axis("off")
+                    plt.tight_layout(pad=0)
+                    buf = io.BytesIO()
+                    fig.savefig(buf, format="png", bbox_inches="tight", transparent=True)
+                    buf.seek(0)
+                    wc_base64 = base64.b64encode(buf.read()).decode("utf-8")
+            except Exception:
+                pass
+            finally:
+                if buf is not None:
+                    buf.close()
+                if plt is not None:
+                    plt.close("all")
+>>>>>>> origin/0709
 
         top_coins_data = []
         if top_narrative:
@@ -1215,6 +1326,19 @@ def version():
     commit = (os.getenv('RENDER_GIT_COMMIT') or '').strip()
     return jsonify({"version": commit or "本地開發中"})
 
+<<<<<<< HEAD
+=======
+@app.route('/api/market-scenarios', methods=['GET'])
+def market_scenarios():
+    return jsonify({
+        "scenarios": {
+            "normal": {"label": "一般市場", "price_multiplier": 1.0, "volatility_multiplier": 1.0, "advice": "按照策略正常操作"},
+            **{k: {"label": v["label"], "price_multiplier": v["price_multiplier"], "volatility_multiplier": v["volatility_multiplier"]} for k, v in Config.MARKET_SCENARIOS.items()}
+        },
+        "active": "normal"
+    })
+
+>>>>>>> origin/0709
 @app.route('/api/coingecko')
 @ttl_cache(ttl_seconds=Config.CACHE_TTL)
 def live_data():
@@ -1230,8 +1354,13 @@ def live_data():
 
 @app.route('/api/market', methods=['GET'])
 @ttl_cache(ttl_seconds=Config.CACHE_TTL)
+<<<<<<< HEAD
 def api_market():
     crypto_list = DataManager.get_market_tickers()
+=======
+def api_market():
+    crypto_list = DataManager.get_market_tickers()
+>>>>>>> origin/0709
     if not crypto_list:
         return jsonify({"timestamp": "", "data": []})
 
@@ -1480,7 +1609,21 @@ def api_ai_chat():
 
     try:
         system_prompt = build_ai_system_prompt(risk_profile)
+<<<<<<< HEAD
         messages: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}]
+=======
+        # ── RAG injection ──
+        rag_context = ""
+        try:
+            if _rag and _rag_available:
+                rag = _rag.augment_chat(user_msg, risk_profile)
+                ctx = "\n".join(rag.get("context", []))
+                if ctx:
+                    rag_context = f"\n\n【參考知識】\n{ctx}"
+        except Exception:
+            pass  # RAG failure → silent fallback
+        messages: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt + rag_context}]
+>>>>>>> origin/0709
 
         if history_rows:
             messages.extend(map_history_rows(history_rows))
@@ -2060,9 +2203,27 @@ def api_agent_plan():
     if not client:
         return jsonify(fallback)
 
+<<<<<<< HEAD
     try:
         prompt = f"""
 你是 Smart Invest 的加密資產 AI Agent。請把使用者任務拆成新手也看得懂、可以今天執行的行動計畫。
+=======
+    # ── RAG injection ──
+    rag_context = ""
+    try:
+        if _rag and _rag_available:
+            rag = _rag.augment_agent(goal, profile, str(budget))
+            ctx = "\n".join(rag.get("context", []))
+            if ctx:
+                rag_context = f"\n\n參考知識：\n{ctx}"
+    except Exception:
+        pass
+
+    try:
+        prompt = f"""
+你是 Smart Invest 的加密資產 AI Agent。請把使用者任務拆成新手也看得懂、可以今天執行的行動計畫。
+{rag_context}
+>>>>>>> origin/0709
 
 使用者任務：{goal}
 投資風格：{profile}
@@ -2166,13 +2327,32 @@ def api_scam_scan():
         return jsonify({"risk_level": "unknown", "report": "API Key 未設定，無法連線 AI。"})
     if not text:
         return jsonify({"risk_level": "unknown", "report": "請提供要檢測的內容。"})
+<<<<<<< HEAD
+=======
+    # ── RAG: scam pattern knowledge supplement ──
+    rag_supplement = ""
+    try:
+        if _rag and _rag_available:
+            rag = _rag.augment_scam(text)
+            snippets = rag.get("rag_snippets", [])
+            if snippets:
+                rag_supplement = "\n參考詐騙模式知識：\n" + "\n".join(snippets[:2])
+    except Exception:
+        pass
+
+>>>>>>> origin/0709
     try:
         system_prompt = (
             "你是金融反詐騙專家。請只輸出 JSON，格式為 "
             "{\"risk_level\": \"high|medium|low\", \"report\": \"...\"}。"
             "risk_level 必須是 high、medium 或 low。report 請用中文整理："
             "1.風險等級 2.疑點解析 3.防範建議。"
+<<<<<<< HEAD
         )
+=======
+            "不要用模糊語句降低風險警示，若有不確定處請明確標示。"
+        ) + rag_supplement
+>>>>>>> origin/0709
         completion = scam_client.beta.chat.completions.parse(
             model=os.getenv("OPENAI_MODEL", "gpt-5.4"),
             messages=[
@@ -2196,12 +2376,31 @@ def generate_podcast():
     if req.market == "PERSONAL" and req.portfolio_summary:
         personal_summary = f"\n會員模擬資產摘要={json.dumps(req.portfolio_summary, ensure_ascii=False)[:1800]}\n請在開場自然唸出會員目前總資產、現金與已投入的幣種市值摘要。"
     prompt = f"市場={req.market}\n風險={req.profile.risk_level}\n關注清單={req.watchlist}\n事件={req.events}{personal_summary}\n請用口語播報市場與配置重點。"
+<<<<<<< HEAD
+=======
+    # ── RAG injection ──
+    rag_context = ""
+    try:
+        if _rag and _rag_available:
+            rag = _rag.augment_podcast(req.market, market_context=f"市場={req.market} 風險={req.profile.risk_level}")
+            ctx = "\n".join(rag.get("context", []))
+            if ctx:
+                rag_context = f"\n風格參考：\n{ctx}"
+    except Exception:
+        pass
+    system_msg = "你是加密貨幣晨報 Podcast 主持人與分析師。請遵循 Podcast 風格指南，開場含日期與市場概覽，結尾含投資提醒。輸出 JSON。" + rag_context
+>>>>>>> origin/0709
     try:
         podcast_client = refresh_openai_client()
         if not podcast_client: return jsonify(build_fallback_podcast(req))
         completion = podcast_client.beta.chat.completions.parse(
+<<<<<<< HEAD
             model=os.getenv("OPENAI_MODEL", "gpt-5.4"), 
             messages=[{"role": "system", "content": "你是加密貨幣晨報 Podcast 主持人與分析師。輸出 JSON。"}, {"role": "user", "content": prompt}],
+=======
+            model=os.getenv("OPENAI_MODEL", "gpt-5.4"),
+            messages=[{"role": "system", "content": system_msg}, {"role": "user", "content": prompt}],
+>>>>>>> origin/0709
             response_format=PodcastLLMOut
         )
         out = completion.choices[0].message.parsed
@@ -2273,10 +2472,17 @@ def create_dialogue_wav(podcast_client: OpenAI, req: TTSRequest, model: str, out
             segment_path.unlink(missing_ok=True)
 
 @app.route("/podcast/tts", methods=["POST"])
+<<<<<<< HEAD
 def podcast_tts():
     podcast_client = refresh_openai_client()
     if not podcast_client:
         return jsonify({"detail": "尚未設定 OPENAI_API_KEY，因此無法生成雲端語音。請在專案根目錄建立 .env，加入 OPENAI_API_KEY=你的_key，然後重啟 Flask。"}), 503
+=======
+def podcast_tts():
+    podcast_client = refresh_openai_client()
+    if not podcast_client:
+        return jsonify({"detail": "尚未設定 OPENAI_API_KEY，因此無法生成雲端語音。請在專案根目錄建立 .env，加入 OPENAI_API_KEY=你的_key，然後重啟 Flask。"}), 503
+>>>>>>> origin/0709
     try: req = TTSRequest(**(request.get_json(silent=True) or {}))
     except ValidationError as e: return jsonify({"detail": str(e)}), 422
     if not req.lines and not req.text.strip():
@@ -2314,6 +2520,10 @@ def api_podcast_tts_alias():
 
 
 @app.route("/portfolio/risk-health", methods=["POST"])
+<<<<<<< HEAD
+=======
+@token_required
+>>>>>>> origin/0709
 def portfolio_risk_health():
     try:
         req = RiskHealthRequest(**(request.get_json(silent=True) or {}))
@@ -2323,17 +2533,38 @@ def portfolio_risk_health():
     return jsonify({"risk_health": calculate_portfolio_risk_health(req)})
 
 @app.route("/portfolio/analyze-llm", methods=["POST"])
+<<<<<<< HEAD
+=======
+@token_required
+>>>>>>> origin/0709
 def analyze_portfolio_llm():
     try: req = RiskHealthRequest(**(request.get_json(silent=True) or {}))
     except ValidationError as e: return jsonify({"detail": str(e)}), 422
     rh_dict = calculate_portfolio_risk_health(req)
     if client is None: return jsonify({"risk_health": rh_dict, "narrative": "未設定金鑰，改用規則摘要。請注意波動風險。", "highlights": ["提醒：無 AI 金鑰"]})
     holdings_text = ", ".join([f"{h.ticker}({h.weight:.2f})" for h in req.holdings])
+<<<<<<< HEAD
+=======
+    # ── RAG: health education supplement ──
+    rag_context = ""
+    try:
+        if _rag and _rag_available:
+            rag = _rag.augment_health(rh_dict, holdings_text)
+            ctx = "\n".join(rag.get("context", []))
+            if ctx:
+                rag_context = f"\n參考配置原則：\n{ctx}"
+    except Exception:
+        pass
+>>>>>>> origin/0709
     prompt = f"請用非常白話的中文分析配置：\n【持幣】{holdings_text}\n【指標】Top1={rh_dict['top1_weight']:.2f}, 年化波動={rh_dict['annual_vol']:.2f}, 最大回撤={rh_dict['max_drawdown']:.2f}"
     try:
         completion = client.beta.chat.completions.parse(
             model=os.getenv("OPENAI_MODEL_PORTFOLIO", "gpt-5.4"),
+<<<<<<< HEAD
             messages=[{"role": "system", "content": "你是專業的加密貨幣財富管理顧問。"}, {"role": "user", "content": prompt}],
+=======
+            messages=[{"role": "system", "content": "你是專業的加密貨幣財富管理顧問。請根據配置原則給出分析。" + rag_context}, {"role": "user", "content": prompt}],
+>>>>>>> origin/0709
             response_format=PortfolioLLMOut
         )
         out = completion.choices[0].message.parsed
@@ -2341,6 +2572,10 @@ def analyze_portfolio_llm():
     except Exception as e: return jsonify({"risk_health": rh_dict, "narrative": "LLM 分析連線失敗，請檢查金鑰。", "highlights": ["連線異常"]})
 
 @app.route("/api/portfolio/analyze", methods=["POST"])
+<<<<<<< HEAD
+=======
+@token_required
+>>>>>>> origin/0709
 def api_portfolio_analyze_alias():
     req = request.get_json(silent=True) or {}
     amount = parse_budget_amount(req.get("amount"), 10000.0)

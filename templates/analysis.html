@@ -1,8 +1,15 @@
 <!doctype html>
+<<<<<<< HEAD
 <html lang="zh-Hant"> 
 <head>
   <style> 
     html.js-enabled body{opacity:0;transition:opacity .5s ease;} 
+=======
+<html lang="zh-Hant">
+<head>
+  <style>
+    html.js-enabled body{opacity:0;transition:opacity .5s ease;}
+>>>>>>> origin/0709
     html.js-enabled body.page-ready{opacity:1;}
   </style>
   <script>document.documentElement.classList.add('js-enabled');</script>
@@ -105,12 +112,16 @@
   <a href="/" class="float-btn" title="回首頁"><i class="fas fa-house"></i></a>
   <button class="float-btn" id="backToTopBtn" type="button" title="回到頂部"><i class="fas fa-arrow-up"></i></button>
 </div>
+<<<<<<< HEAD
 <footer class="footer">
   <div class="container footer-inner">
     <div>© Smart Invest Crypto · 加密資產風險與市場分析</div>
     <div>Market · Health · Podcast · AI Agent</div>
   </div>
 </footer>
+=======
+{% include "partials/footer.html" %}
+>>>>>>> origin/0709
 <div class="toast" id="toast"><div class="t" id="toastT">提示</div><div class="m" id="toastM">--</div></div>
 <script>
   window.__SUPABASE_CONFIG__ = {

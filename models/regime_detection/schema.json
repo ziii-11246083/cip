@@ -1,0 +1,40 @@
+{
+  "model_name": "regime_detection",
+  "version": "0.1.0-placeholder",
+  "task": "multi-class_time_series_classification",
+  "input": {
+    "price_series": "array[float] (日收盤價, 90d window)",
+    "volume_series": "array[float] (日交易量)",
+    "macro_indicators": {
+      "vix": "float (optional)",
+      "fed_rate": "float (optional)",
+      "dxy": "float (optional)"
+    }
+  },
+  "output": {
+    "regime": "bull|bear|neutral|black_swan",
+    "confidence": "float (0–1)",
+    "transition_probability": "float (regime change prob within 7d)",
+    "indicators": {
+      "trend_strength": "float",
+      "volatility_percentile": "float",
+      "drawdown_from_peak": "float"
+    }
+  },
+  "training": {
+    "framework": "pytorch|tensorflow (TBD)",
+    "candidate_models": ["LSTM", "TFT (Temporal Fusion Transformer)", "HMM"],
+    "data_requirements": {
+      "min_history_days": 365,
+      "recommended_history_days": 1095,
+      "features": ["price", "volume", "volatility", "drawdown"]
+    },
+    "evaluation": {
+      "primary_metric": "accuracy",
+      "secondary_metrics": ["f1_per_class", "confusion_matrix"],
+      "backtest_method": "rolling_window (90d train / 30d test / 7d step)"
+    }
+  },
+  "mvp_alternative": "Config.MARKET_SCENARIOS manual labels + CoinGecko price data + user-selected scenario in sim_trade UI",
+  "status": "architecture_ready"
+}

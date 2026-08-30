@@ -1,0 +1,32 @@
+{
+  "model_name": "scam_classifier",
+  "version": "0.1.0-placeholder",
+  "task": "binary_classification",
+  "input": {
+    "text": "string (使用者輸入的可疑內容)",
+    "language": "zh|en|mixed"
+  },
+  "output": {
+    "prediction": "scam|not_scam",
+    "confidence": "float (0–1)",
+    "scam_type": "honeypot|phishing|fake_exchange|fake_customer_service|rug_pull|ponzi|other|null",
+    "explanation": "string (重要特徵詞/規則觸發)"
+  },
+  "training": {
+    "framework": "scikit-learn|transformers (TBD)",
+    "data_requirements": {
+      "min_samples": 500,
+      "recommended_samples": 2000,
+      "label_distribution": "balanced preferred",
+      "sources": ["manual_labeling", "known_scam_databases", "community_reports"]
+    },
+    "evaluation": {
+      "primary_metric": "recall (scam class)",
+      "secondary_metrics": ["precision", "f1", "auc_roc"],
+      "test_split": 0.2,
+      "cross_validation": 5
+    }
+  },
+  "mvp_alternative": "GPT-4o-mini + GMGN API + WHOIS + PTT cross-validation + scam_patterns.md RAG",
+  "status": "architecture_ready"
+}

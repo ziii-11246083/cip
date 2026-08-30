@@ -97,7 +97,11 @@
   </section>
 </main>
 <div class="float-actions"><a href="/" class="float-btn" title="回首頁"><i class="fas fa-house"></i></a><button class="float-btn" id="backToTopBtn" type="button" title="回到頂部"><i class="fas fa-arrow-up"></i></button></div>
+<<<<<<< HEAD
 <footer class="footer"><div class="container footer-inner"><div>© Smart Invest Crypto · 加密資產風險與市場分析</div><div>Market · Health · Podcast · AI Agent</div></div></footer>
+=======
+{% include "partials/footer.html" %}
+>>>>>>> origin/0709
 <div class="toast" id="toast"><div class="t">提示</div><div class="m">--</div></div>
 <script>window.__SUPABASE_CONFIG__ = { url: '{{ supabase_url | default("https://dummy.supabase.co") }}', anonKey: '{{ supabase_anon_key | default("dummy") }}' };</script>
 <script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=member-nav-lock-20260604"></script>

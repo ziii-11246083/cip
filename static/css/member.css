@@ -2,7 +2,11 @@
   min-height: 100vh;
   padding: 36px 0 56px;
   background:
+<<<<<<< HEAD
     radial-gradient(circle at 8% 0%, rgba(255, 184, 107, .28), transparent 32%), 
+=======
+    radial-gradient(circle at 8% 0%, rgba(255, 184, 107, .28), transparent 32%),
+>>>>>>> origin/0709
     linear-gradient(135deg, #fff8ef 0%, #fffdf9 54%, #fff2e3 100%);
 }
 

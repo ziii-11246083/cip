@@ -575,6 +575,14 @@
   40%{transform:translateY(-4px);opacity:1}
 }
 
+<<<<<<< HEAD
+=======
+/* Member gate: hide app when locked */
+.ai-coach-locked {
+  display: none !important;
+}
+
+>>>>>>> origin/0709
 @media(max-width:1120px){
   .coach-layout{
     grid-template-columns:1fr;

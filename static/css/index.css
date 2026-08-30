@@ -658,6 +658,26 @@
   color:var(--dark);
   font-size:23px;
   font-weight:950;
+<<<<<<< HEAD
+=======
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.member-tag{
+  display:inline-block;
+  font-style:normal;
+  font-size:10px;
+  font-weight:950;
+  color:var(--brand);
+  background:#FFF7ED;
+  border:1px solid var(--brand-2);
+  border-radius:999px;
+  padding:3px 10px;
+  letter-spacing:.5px;
+>>>>>>> origin/0709
 }
 
 .feature-card p{

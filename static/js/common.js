@@ -216,4 +216,42 @@ function initCommonUI() {
   }
 }
 
+<<<<<<< HEAD
 document.addEventListener("DOMContentLoaded", initCommonUI);
+=======
+function applyMemberFeatureGating() {
+    const features = document.querySelectorAll("[data-member-feature]");
+    if (!features.length) return;
+
+    const loggedIn = Boolean(
+      window.authManager?.isLoggedIn?.() ||
+      window.smartInvestMembership?.isMember
+    );
+
+    features.forEach((el) => {
+      if (loggedIn) {
+        el.classList.remove("member-feature-locked");
+        const overlay = el.querySelector(".member-lock-overlay");
+        if (overlay) overlay.remove();
+      } else {
+        el.classList.add("member-feature-locked");
+        if (!el.querySelector(".member-lock-overlay")) {
+          const overlay = document.createElement("div");
+          overlay.className = "member-lock-overlay";
+          overlay.setAttribute("data-open-login", "");
+          overlay.innerHTML = '<i class="fas fa-lock"></i><strong>會員限定功能</strong>';
+          overlay.addEventListener("click", () => {
+            window.authManager?.openLogin?.();
+          });
+          el.appendChild(overlay);
+        }
+      }
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    initCommonUI();
+    window.waitForSmartInvestAuth?.().then(applyMemberFeatureGating);
+    window.addEventListener("smartinvest:auth-state", applyMemberFeatureGating);
+  });
+>>>>>>> origin/0709

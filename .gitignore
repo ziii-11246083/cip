@@ -7,3 +7,28 @@ __pycache__/
 .env
 .venv/
 venv/
+<<<<<<< HEAD
+=======
+
+# Sensitive files
+serviceAccountKey.json
+
+# Data directory — track knowledge base, exclude runtime data
+data/*
+!data/knowledge/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# ZIP / archives (don't commit zips)
+*.zip
+*.tar.gz
+*.rar
+>>>>>>> origin/0709

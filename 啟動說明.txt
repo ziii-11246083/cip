@@ -3,7 +3,11 @@ Smart Invest 專案啟動方式
 1. 請先確認這個資料夾裡有 .env，且 .env 跟 app.py 在同一層。
 
 2. 開啟 PowerShell，進入本資料夾：
+<<<<<<< HEAD
 cd 這個資料夾的路徑
+=======
+cd 這個資料夾的路徑 
+>>>>>>> origin/0709
 
 3. 建立虛擬環境：
 py -3 -m venv .venv
@@ -19,7 +23,11 @@ pip install -r requirements.txt
 
 6. 啟動網站：
 python run_local.py
+<<<<<<< HEAD
  
+=======
+
+>>>>>>> origin/0709
 或：
 python app.py
 

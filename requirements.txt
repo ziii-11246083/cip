@@ -19,3 +19,8 @@ sqlalchemy==2.0.25
 psycopg2-binary==2.9.9
 pydub
 websockets>=15,<16
+<<<<<<< HEAD
+=======
+markdown
+weasyprint
+>>>>>>> origin/0709
