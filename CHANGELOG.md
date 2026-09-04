@@ -67,4 +67,4 @@
 - 知識庫自動更新 pipeline（爬蟲 → 清洗 → chunk → embed → upsert）
 - 訓練 scam_classifier + regime_detection 第一版模型
 - RAG retrieval hit-rate 監控 + A/B 測試
-- RAG retrieval hit-rate 監控 + A/B 測試
+
