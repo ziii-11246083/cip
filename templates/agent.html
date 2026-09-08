@@ -1,6 +1,21 @@
 ﻿<!doctype html>
 <html lang="zh-Hant">
-
+<head>
+  <style>
+    html.js-enabled body{opacity:0;transition:opacity .5s ease;}
+    html.js-enabled body.page-ready{opacity:1;}
+  </style>
+  <script>document.documentElement.classList.add('js-enabled');</script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AI Agent | Smart Invest Crypto</title>
+  <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo.jpg') }}">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/iansui@1.0/dist/iansui.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=member-overlay-20260604">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/agent.css') }}?v=agent-member-20260514">
+</head>
 <body class="ai-coach-page">
 
 {% include "partials/header.html" %}
