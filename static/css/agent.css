@@ -3,7 +3,7 @@
 }
 
 .agent-hero-actions{
-  display:flex;
+  display:flex; 
   flex-wrap:wrap;
   gap:14px;
   margin-top:28px;
