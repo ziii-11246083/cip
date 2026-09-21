@@ -58,10 +58,10 @@
 
           <div class="login-form">
             <label for="emailInput">Email</label>
-            <input type="text" id="emailInput" placeholder="請輸入 Email">
+            <input type="email" id="emailInput" name="email" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="請輸入 Email">
 
             <label for="passwordInput">密碼</label>
-            <input type="password" id="passwordInput" placeholder="請輸入密碼">
+            <input type="password" id="passwordInput" name="password" autocomplete="current-password" placeholder="請輸入密碼">
 
             <button class="login-submit" type="button" onclick="if(window.authManager) window.authManager.loginWithEmail(document.getElementById('emailInput').value, document.getElementById('passwordInput').value)">登入會員</button>
 

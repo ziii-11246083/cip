@@ -130,8 +130,8 @@
       
     <div class="right">
         <div id="login-section" style="display: flex; gap: 8px; align-items: center; flex-wrap: nowrap;">
-            <input type="text" id="emailInput" class="login-input" placeholder="信箱">
-            <input type="password" id="passwordInput" class="login-input" placeholder="密碼">
+            <input type="email" id="emailInput" name="email" class="login-input" autocomplete="username" autocapitalize="none" spellcheck="false" aria-label="電子郵件" placeholder="信箱">
+            <input type="password" id="passwordInput" name="password" class="login-input" autocomplete="current-password" aria-label="密碼" placeholder="密碼">
             
             <button class="btn-auth btn-auth-light" onclick="authManager.loginWithEmail(document.getElementById('emailInput').value, document.getElementById('passwordInput').value)">登入</button>
             
