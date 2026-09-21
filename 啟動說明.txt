@@ -2,8 +2,8 @@ Smart Invest 專案啟動方式
 
 1. 請先確認這個資料夾裡有 .env，且 .env 跟 app.py 在同一層。
 
-2. 開啟 PowerShell，進入本資料夾：
-cd 這個資料夾的路徑 
+2. 開啟 PowerShell，進入本資料夾（將引號內替換成實際路徑）：
+cd "C:\你的專案路徑\cip"
 
 3. 建立虛擬環境：
 py -3 -m venv .venv
@@ -11,20 +11,19 @@ py -3 -m venv .venv
 如果 py -3 不能用，改用：
 python -m venv .venv
 
-4. 啟用虛擬環境：
-.\.venv\Scripts\Activate.ps1
+4. 使用虛擬環境的 Python 安裝套件：
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 
-5. 安裝套件：
-pip install -r requirements.txt
+5. 啟動網站：
+.\.venv\Scripts\python.exe run_local.py
 
-6. 啟動網站：
-python run_local.py
+以上指令不需要執行 Activate.ps1，也不需要調整 PowerShell 執行原則。
+之後重新開啟 PowerShell，只要進入專案資料夾並執行第 5 步即可啟動。
 
-或：
-python app.py
-
-7. 打開瀏覽器：
+6. 打開瀏覽器：
 http://127.0.0.1:5000
+
+網站運作期間請保持 PowerShell 開啟；要停止網站時按 Ctrl+C。
 
 測試會員帳號：
 Email: test@smartinvest.local
