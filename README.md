@@ -26,12 +26,24 @@
 
 建議使用 Python 3.12：
 
+macOS / Linux：
+
 ```bash
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python run_local.py
 ```
+
+Windows PowerShell（在專案根目錄執行）：
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe run_local.py
+```
+
+Windows 指令直接使用虛擬環境中的 Python，不需要先執行 `Activate.ps1`。
 
 瀏覽器開啟：`http://127.0.0.1:5000`
 
