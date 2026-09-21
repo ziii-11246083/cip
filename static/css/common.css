@@ -258,9 +258,6 @@ label{display:block;margin-bottom:8px;color:var(--dark);font-size:14px;font-weig
 .float-btn:hover{transform:translateY(-4px);background:var(--brand);color:#fff;border-color:transparent}
 
 .footer{padding:36px 0;margin-top:70px;background:var(--dark);color:#EED7BE}
-<<<<<<< HEAD
-.footer-inner{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;font-size:14px;font-weight:760}
-=======
 .footer-inner{display:flex;flex-direction:column;gap:14px;font-size:14px;font-weight:760}
 .footer-main{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;width:100%}
 .footer-brand strong{display:block;color:#fff;font-size:16px;font-weight:950}
@@ -271,7 +268,6 @@ label{display:block;margin-bottom:8px;color:var(--dark);font-size:14px;font-weig
 .footer-disclaimer{margin:4px 0;padding-top:12px;border-top:1px solid rgba(255,255,255,.12);width:100%}
 .footer-disclaimer p{color:#A68B6F;font-size:11px;line-height:1.65;margin:0}
 .footer-bottom{display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;color:#A68B6F;font-size:11px}
->>>>>>> origin/0709
 
 .toast{position:fixed;right:26px;bottom:26px;min-width:280px;background:var(--dark);color:#fff;padding:16px 20px;border-radius:18px;display:none;z-index:9999;box-shadow:0 26px 60px rgba(43,33,24,.22)}
 .toast .t{font-weight:950;margin-bottom:5px}.toast .m{color:#EED7BE;font-size:13px;line-height:1.55}
@@ -792,8 +788,6 @@ label{
   height:240px;
 }
 
-<<<<<<< HEAD
-=======
 .sim-scenario-card{
   padding:28px;
 }
@@ -910,7 +904,6 @@ label{
   }
 }
 
->>>>>>> origin/0709
 .order-grid{
   display:grid;
   grid-template-columns:repeat(2,minmax(0,1fr));

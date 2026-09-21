@@ -450,8 +450,6 @@
       $(id)?.addEventListener("input", updateQuotePanel);
       $(id)?.addEventListener("change", updateQuotePanel);
     });
-<<<<<<< HEAD
-=======
 
     // —— Market Scenario Switcher ——
     let activeScenario = "normal";
@@ -498,6 +496,5 @@
 
     loadScenarios().then(() => applyScenario("normal"));
     // —— End Scenario Switcher ——
->>>>>>> origin/0709
   });
 })();

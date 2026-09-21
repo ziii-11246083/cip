@@ -658,8 +658,6 @@
   color:var(--dark);
   font-size:23px;
   font-weight:950;
-<<<<<<< HEAD
-=======
   display:flex;
   align-items:center;
   gap:8px;
@@ -677,7 +675,6 @@
   border-radius:999px;
   padding:3px 10px;
   letter-spacing:.5px;
->>>>>>> origin/0709
 }
 
 .feature-card p{

@@ -4,8 +4,6 @@
   const messageHistory = [];
   const newChatBtn = $("aiCoachNewChatBtn");
   let conversationCache = [];
-<<<<<<< HEAD
-=======
   let isLocked = false;
 
   function setLockedState(locked) {
@@ -15,7 +13,6 @@
     const app = $("aiCoachApp");
     if (app) app.classList.toggle("ai-coach-locked", locked);
   }
->>>>>>> origin/0709
 
   function escapeHTML(value) {
     return String(value ?? "")
@@ -150,13 +147,10 @@
 
   async function selectConversation(conversationId) {
     if (!conversationId) return;
-<<<<<<< HEAD
-=======
     if (isLocked) {
       window.authManager?.requireMember?.("AI 投資教練");
       return;
     }
->>>>>>> origin/0709
     await window.waitForSmartInvestAuth?.();
     if (window.authManager && !window.authManager.isLoggedIn?.()) {
       window.authManager.requireMember?.("AI 投資教練");
@@ -298,13 +292,10 @@
   }
 
   async function sendMessage() {
-<<<<<<< HEAD
-=======
     if (isLocked) {
       window.authManager?.requireMember?.("AI 投資教練");
       return;
     }
->>>>>>> origin/0709
     await window.waitForSmartInvestAuth?.();
     if (window.authManager && !window.authManager.isLoggedIn?.()) {
       window.authManager.requireMember?.("AI 投資教練");
@@ -382,22 +373,16 @@
       sendMessage();
     });
     newChatBtn?.addEventListener("click", () => {
-<<<<<<< HEAD
-=======
       if (isLocked) {
         window.authManager?.requireMember?.("AI 投資教練");
         return;
       }
->>>>>>> origin/0709
       localStorage.removeItem(CONVERSATION_KEY);
       resetChat(true);
       loadConversations();
     });
   }
 
-<<<<<<< HEAD
-  document.addEventListener("DOMContentLoaded", () => {
-=======
   document.addEventListener("DOMContentLoaded", async () => {
     await window.waitForSmartInvestAuth?.();
     const loggedIn = Boolean(window.authManager?.isLoggedIn?.() || window.smartInvestMembership?.isMember);
@@ -406,19 +391,13 @@
     } else {
       setLockedState(false);
     }
->>>>>>> origin/0709
     initPageMotion();
     initRiskCards();
     initQuickAsk();
     initChatEvents();
-<<<<<<< HEAD
-    loadConversations();
-    loadHistory();
-=======
     if (loggedIn) {
       loadConversations();
       loadHistory();
     }
->>>>>>> origin/0709
   });
 })();

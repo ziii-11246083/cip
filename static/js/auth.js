@@ -187,10 +187,7 @@ async function applyAuthFromUrl() {
         currentSession = session;
         updateMembership(session);
         setAuthUiBySession(session);
-<<<<<<< HEAD
-=======
         console.log("[auth] redirect session", session);
->>>>>>> origin/0709
         clearUrlHashAfterLogin();
     }
 
@@ -215,10 +212,7 @@ function updateMembership(session) {
     document.body?.classList.toggle("is-logged-in", Boolean(user));
     document.body?.classList.toggle("is-guest", !user);
     document.body?.classList.toggle("is-guest-mode", !user && isGuest);
-<<<<<<< HEAD
-=======
     document.body?.classList.toggle("is-member-locked", !Boolean(user));
->>>>>>> origin/0709
     document.querySelectorAll(".member-nav i").forEach((icon) => {
         icon.classList.toggle("fa-lock", !user);
         icon.classList.toggle("fa-unlock", Boolean(user));
@@ -298,10 +292,7 @@ async function refreshSession() {
     }
     updateMembership(currentSession);
     setAuthUiBySession(currentSession);
-<<<<<<< HEAD
-=======
     console.log("[auth] refresh session", currentSession);
->>>>>>> origin/0709
     return currentSession;
 }
 
@@ -451,10 +442,7 @@ if (supabase) {
                 currentSession = session || null;
                 updateMembership(session || null);
                 setAuthUiBySession(session || null);
-<<<<<<< HEAD
-=======
                 console.log("[auth] onAuthStateChange", _event, session);
->>>>>>> origin/0709
                 if (session) {
                     clearUrlHashAfterLogin();
                 }

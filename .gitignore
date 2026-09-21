@@ -7,8 +7,6 @@ __pycache__/
 .env
 .venv/
 venv/
-<<<<<<< HEAD
-=======
 
 # Sensitive files
 serviceAccountKey.json
@@ -31,4 +29,3 @@ Thumbs.db
 *.zip
 *.tar.gz
 *.rar
->>>>>>> origin/0709

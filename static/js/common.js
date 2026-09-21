@@ -216,9 +216,6 @@ function initCommonUI() {
   }
 }
 
-<<<<<<< HEAD
-document.addEventListener("DOMContentLoaded", initCommonUI);
-=======
 function applyMemberFeatureGating() {
     const features = document.querySelectorAll("[data-member-feature]");
     if (!features.length) return;
@@ -254,4 +251,3 @@ function applyMemberFeatureGating() {
     window.waitForSmartInvestAuth?.().then(applyMemberFeatureGating);
     window.addEventListener("smartinvest:auth-state", applyMemberFeatureGating);
   });
->>>>>>> origin/0709
