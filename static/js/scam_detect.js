@@ -173,6 +173,11 @@ function initReportButtons() {
         return;
       }
 
+      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
+        alert("此瀏覽器目前無法使用剪貼簿，請選取報告內容後手動複製。");
+        return;
+      }
+
       navigator.clipboard.writeText(text).then(function() {
         alert("分析報告已複製。");
       }).catch(function() {
