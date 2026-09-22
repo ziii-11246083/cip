@@ -92,6 +92,12 @@
     };
   }
 
+  function hasStressablePositions(snapshot) {
+    return (Array.isArray(snapshot?.positions) ? snapshot.positions : []).some((item) => (
+      Number.isFinite(Number(item?.market_value)) && Number(item.market_value) > 0
+    ));
+  }
+
   function renderStressResults(result) {
     const root = $("stressResults");
     if (!root) return;
@@ -111,7 +117,7 @@
     const table = document.createElement("table");
     const thead = document.createElement("thead");
     const header = document.createElement("tr");
-    ["情境", "總報酬", "年化波動", "最大回撤", "Sharpe-like", "期末值"].forEach((label) => {
+    ["情境", "總報酬", "合成年化波動", "最大回撤", "Sharpe-like", "期末值"].forEach((label) => {
       appendStressText(header, "th", label);
     });
     thead.appendChild(header);
@@ -143,12 +149,23 @@
     if (isLocked || !currentPortfolio) return;
     const horizonDays = Number($("stressHorizon")?.value || 90);
     const seed = Number($("stressSeed")?.value || 20260820);
+    const snapshot = stressSnapshot();
+    if (!hasStressablePositions(snapshot)) {
+      lastStressResult = null;
+      $("stressResults")?.replaceChildren();
+      setStressStatus(
+        "目前組合只有現金，沒有可進行情境測試的持倉。請先建立一筆模擬買入訂單。",
+        "bad"
+      );
+      $("orderPanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
     setStressStatus("正在建立獨立假設快照…", "");
     try {
       const data = await request("/api/paper-stress-test", {
         method: "POST",
         body: JSON.stringify({
-          snapshot: stressSnapshot(), horizon_days: horizonDays, seed
+          snapshot, horizon_days: horizonDays, seed
         })
       });
       lastStressResult = data.stress_test || null;

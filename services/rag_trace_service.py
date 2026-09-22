@@ -416,7 +416,9 @@ class SupabaseTraceStore(TraceStore):
         self.disabled_reason: Optional[str] = None
         self._client: Any = None
 
-        self._url = (url or os.getenv("SUPABASE_URL", "")).strip()
+        self._url = (
+            url if url is not None else os.getenv("SUPABASE_URL", "")
+        ).strip()
         self._sr_key = (
             service_role_key if service_role_key is not None
             else os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")

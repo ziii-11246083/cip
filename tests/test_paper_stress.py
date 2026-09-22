@@ -79,6 +79,68 @@ class DeterministicStressTests(unittest.TestCase):
             abs(balanced["normal"]["metrics"]["max_drawdown"]),
         )
 
+    def test_terminal_targets_hold_for_every_strategy_seed_and_horizon(self):
+        snapshot = {
+            "cash": 0,
+            "positions": [{"symbol": "BTC", "market_value": 100000}],
+        }
+        for seed in (1, 7, 42, 20260820):
+            for days in (7, 30, 90, 180, 365):
+                result = self._run_case(snapshot=snapshot, seed=seed, days=days)
+                for strategy, strategy_data in STRATEGIES.items():
+                    risk_weight = strategy_data["risk_weight"]
+                    for scenario, scenario_data in SCENARIOS.items():
+                        expected = 100000 * (
+                            (1 - risk_weight)
+                            + risk_weight * scenario_data["terminal_multiplier"]
+                        )
+                        actual = result["results"][strategy][scenario]["metrics"]["final_value"]
+                        self.assertAlmostEqual(
+                            actual,
+                            expected,
+                            places=2,
+                            msg=f"{seed=} {days=} {strategy=} {scenario=}",
+                        )
+
+    def test_black_swan_never_becomes_profit_for_seed_matrix(self):
+        for seed in range(1, 101):
+            result = self._run_case(seed=seed, days=90)
+            for strategy in STRATEGIES:
+                normal = result["results"][strategy]["normal"]["metrics"]
+                black = result["results"][strategy]["black_swan"]["metrics"]
+                self.assertLess(black["total_return"], 0, msg=f"{seed=} {strategy=}")
+                self.assertGreater(black["volatility"], normal["volatility"])
+                self.assertGreater(
+                    abs(black["max_drawdown"]),
+                    abs(normal["max_drawdown"]),
+                )
+
+    def test_seed_changes_path_but_not_terminal_value(self):
+        first = self._run_case(seed=101, days=90)
+        second = self._run_case(seed=202, days=90)
+        first_black = first["results"]["balanced"]["black_swan"]
+        second_black = second["results"]["balanced"]["black_swan"]
+        self.assertNotEqual(first_black["path"][1:-1], second_black["path"][1:-1])
+        self.assertEqual(first_black["metrics"]["final_value"], second_black["metrics"]["final_value"])
+
+    def test_zero_terminal_return_is_positive_zero(self):
+        result = self._run_case(seed=20260820, days=90)
+        for strategy in STRATEGIES:
+            total_return = result["results"][strategy]["normal"]["metrics"]["total_return"]
+            self.assertEqual(total_return, 0.0)
+            self.assertEqual(str(total_return), "0.0")
+
+    def test_annualized_volatility_may_legitimately_exceed_one(self):
+        result = self._run_case(
+            snapshot={"cash": 0, "positions": [{"symbol": "BTC", "market_value": 100000}]},
+            seed=20260820,
+            days=90,
+        )
+        self.assertGreater(
+            result["results"]["aggressive"]["black_swan"]["metrics"]["volatility"],
+            1.0,
+        )
+
     def test_empty_portfolio_has_flat_metrics(self):
         result = self._run_case(snapshot={"cash": 0, "positions": []})
         for strategy in STRATEGIES:
@@ -224,6 +286,25 @@ class EndpointTests(unittest.TestCase):
         renderer = js.split("function renderStressResults", 1)[1].split(
             "async function runStressTest", 1)[0]
         self.assertNotIn("innerHTML", renderer)
+
+    def test_ui_explains_volatility_and_blocks_cash_only_snapshot(self):
+        html = (PROJECT_ROOT / "templates/sim_trade.html").read_text(encoding="utf-8-sig")
+        for text in (
+            "風險資產期末目標",
+            "日波動假設",
+            "合成年化波動",
+            "不是虧損比例或發生機率",
+        ):
+            self.assertIn(text, html)
+
+        js = (PROJECT_ROOT / "static/js/sim_trade.js").read_text(encoding="utf-8")
+        self.assertIn("function hasStressablePositions", js)
+        self.assertIn("目前組合只有現金", js)
+        guard = js.split("async function runStressTest", 1)[1].split(
+            'request("/api/paper-stress-test"', 1
+        )[0]
+        self.assertIn("hasStressablePositions", guard)
+        self.assertIn("replaceChildren", guard)
 
 
 if __name__ == "__main__":

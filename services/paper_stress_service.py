@@ -162,13 +162,27 @@ def _metrics(path: List[float]) -> Dict[str, float]:
         peak = max(peak, value)
         if peak > 0:
             max_drawdown = min(max_drawdown, value / peak - 1)
+    total_return = final / initial - 1
+    if abs(total_return) < 0.000000005:
+        total_return = 0.0
     return {
-        "total_return": round(final / initial - 1, 8),
+        "total_return": round(total_return, 8),
         "volatility": round(volatility, 8),
         "max_drawdown": round(max_drawdown, 8),
         "sharpe_like": round(sharpe, 8),
         "final_value": round(final, 2),
     }
+
+
+def _centered_gaussian_series(
+    rng: random.Random,
+    sigma: float,
+    count: int,
+) -> List[float]:
+    """Return deterministic noise whose cumulative log effect is exactly zero."""
+    raw = [rng.gauss(0.0, sigma) for _ in range(count)]
+    center = statistics.fmean(raw) if raw else 0.0
+    return [value - center for value in raw]
 
 
 def _simulate(
@@ -183,32 +197,69 @@ def _simulate(
     shock_day = scenario["shock_day"]
     shock = float(scenario["shock_return"])
     multiplier = float(scenario["terminal_multiplier"])
-    residual_multiplier = multiplier / (1 + shock) if shock_day is not None else multiplier
-    daily_log_drift = math.log(max(residual_multiplier, 0.000001)) / horizon_days
     daily_vol = 0.025 * float(scenario["volatility_multiplier"])
+    effective_shock_day = (
+        int(shock_day)
+        if shock_day is not None and 1 <= int(shock_day) <= horizon_days
+        else None
+    )
+    shock_log_return = math.log1p(shock) if effective_shock_day is not None else 0.0
+    daily_log_drift = (
+        math.log(max(multiplier, 0.000001)) - shock_log_return
+    ) / horizon_days
 
     # The same seed/scenario produces the same market path for every strategy;
-    # only the documented allocation rule changes. This keeps comparison fair.
-    rng = random.Random(f"{seed}|{scenario_key}")
+    # only the documented allocation rule changes. Centering log-noise keeps the
+    # configured terminal multiplier true while preserving an irregular path.
+    market_noise = _centered_gaussian_series(
+        random.Random(f"{seed}|{scenario_key}|market"),
+        daily_vol,
+        horizon_days,
+    )
+    risky_symbols = [
+        symbol for symbol in sorted(asset_values)
+        if symbol != "CASH" and symbol not in STABLECOINS
+    ]
+    stable_symbols = [
+        symbol for symbol in sorted(asset_values) if symbol in STABLECOINS
+    ]
+    idiosyncratic_noise = {
+        symbol: _centered_gaussian_series(
+            random.Random(f"{seed}|{scenario_key}|{symbol}|idiosyncratic"),
+            daily_vol * 0.25,
+            horizon_days,
+        )
+        for symbol in risky_symbols
+    }
+    stable_noise = {
+        symbol: _centered_gaussian_series(
+            random.Random(f"{seed}|{scenario_key}|{symbol}|stable"),
+            0.0004,
+            horizon_days,
+        )
+        for symbol in stable_symbols
+    }
+
     for day in range(1, horizon_days + 1):
-        market_noise = rng.gauss(0.0, daily_vol)
+        day_index = day - 1
         for symbol in sorted(asset_values):
             current = asset_values[symbol]
             if symbol == "CASH":
                 continue
             if symbol in STABLECOINS:
-                stable_noise = rng.gauss(0.0, 0.0004)
-                stable_shock = -0.03 if scenario_key == "black_swan" and day == shock_day else 0.0
-                daily_return = max(-0.99, stable_noise + stable_shock)
+                stable_log_return = stable_noise[symbol][day_index]
+                if scenario_key == "black_swan" and day == effective_shock_day:
+                    stable_log_return += math.log1p(-0.03)
+                daily_return = math.exp(stable_log_return) - 1
             else:
-                idiosyncratic = rng.gauss(0.0, daily_vol * 0.25)
-                daily_return = math.exp(
-                    daily_log_drift + market_noise + idiosyncratic
-                    - 0.5 * (daily_vol ** 2)
-                ) - 1
-                if shock_day is not None and day == shock_day:
-                    daily_return = (1 + daily_return) * (1 + shock) - 1
-                daily_return = max(-0.99, daily_return)
+                daily_log_return = (
+                    daily_log_drift
+                    + market_noise[day_index]
+                    + idiosyncratic_noise[symbol][day_index]
+                )
+                if day == effective_shock_day:
+                    daily_log_return += shock_log_return
+                daily_return = math.exp(daily_log_return) - 1
             asset_values[symbol] = current * (1 + daily_return)
         path.append(sum(asset_values.values()))
 
