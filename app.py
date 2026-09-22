@@ -371,10 +371,18 @@ def ttl_cache(ttl_seconds: int):
         def wrapper(*args, **kwargs):
             now = time.time()
             key = str(args) + str(kwargs)
+            
             if key in cache and 'timestamp' in cache[key] and now - cache[key]['timestamp'] < ttl_seconds:
                 return copy.deepcopy(cache[key]['data'])
             result = func(*args, **kwargs)
-            if result: cache[key] = {'data': result, 'timestamp': now}
+            
+            if result: 
+                cache[key] = {'data': result, 'timestamp': now}
+                return copy.deepcopy(result)
+                
+            if key in cache and 'data' in cache[key]:
+                return copy.deepcopy(cache[key]['data'])
+                
             return copy.deepcopy(result)
         return wrapper
     return decorator
