@@ -44,6 +44,10 @@
   padding:0;
   overflow:hidden;
   border-radius:28px;
+  /* 👇 修正點：加入高度與 Flex 排版來修復聊天室跑版 */
+  height: 750px; 
+  display: flex;
+  flex-direction: column;
 }
 
 .chat-input-row{
@@ -129,18 +133,23 @@
   font-weight:950;
 }
 
+/* 👇 修正點：取消原本寫在 coach-layout 的 grid，因為它包錯層了 */
 .coach-layout{
-  display:grid;
-  grid-template-columns:360px minmax(0,1fr);
-  gap:28px;
-  align-items:start;
+  display:block; 
 }
 
-/* 未登入時只有會員提示卡可見，讓它跨越雙欄並置中，避免右側留下空欄。 */
+/* 👇 修正點：把左右並排的 grid 交給真正的外層容器 ai-coach-app */
+.ai-coach-app {
+  display: grid;
+  grid-template-columns: 360px minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+
+/* 未登入時的會員提示卡，讓它維持置中 */
 .coach-layout > .member-gate.show{
-  grid-column:1 / -1;
   width:min(100%,760px);
-  justify-self:center;
+  margin: 0 auto;
 }
 
 .coach-side-stack{
@@ -588,7 +597,8 @@
 }
 
 @media(max-width:1120px){
-  .coach-layout{
+  /* 👇 修正點：原本這裡寫 .coach-layout，改成 .ai-coach-app 以支援手機版自適應 */
+  .ai-coach-app{
     grid-template-columns:1fr;
   }
 }
