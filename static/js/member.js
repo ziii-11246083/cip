@@ -144,7 +144,7 @@
             }).join("")}
           </tbody>
         </table>
-      ` : '<div class="member-record-empty">目前沒有模擬持倉。你可以在這裡建立，或到 AI Agent 用一句話下單。</div>';
+      ` : '<div class="member-record-empty">目前沒有模擬持倉。你可以在這裡建立，或前往模擬交易頁下單。</div>';
     }
   }
 

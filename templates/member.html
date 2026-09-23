@@ -25,7 +25,7 @@
         <div>
           <div class="eyebrow"><i class="fas fa-user-shield"></i> Member Center</div>
           <h1>會員中心</h1>
-          <p>記錄資金投放、模擬下單與持倉，讓 AI Agent 可以用一句話幫你建立模擬交易。</p>
+          <p>記錄資金投放、模擬下單與持倉；可在本頁或模擬交易頁建立交易，再向 AI Agent 諮詢配置思路。</p>
         </div>
         <div class="member-profile-mini">
           <img src="{{ url_for('static', filename='images/agent-cat-happy.png') }}" alt="" onerror="this.style.display='none';">
@@ -79,7 +79,7 @@
         <article class="member-kpi">
           <span>模擬下單次數</span>
           <strong id="kpiOrders">0</strong>
-          <small>AI Agent 與手動下單共用紀錄</small>
+          <small>會員中心與模擬交易頁共用紀錄</small>
         </article>
       </section>
 
@@ -105,7 +105,7 @@
           <div class="member-card-head">
             <div>
               <h2>模擬下單</h2>
-              <p>這裡的紀錄會同步給 AI Agent 讀取與分析。</p>
+              <p>下單後會更新模擬帳本，也可在 AI Agent 側欄查看資產摘要。</p>
             </div>
             <a href="/agent">去 AI Agent <i class="fas fa-arrow-right"></i></a>
           </div>

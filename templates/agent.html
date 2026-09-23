@@ -43,7 +43,7 @@
             <span class="online-dot"></span>
             <strong>線上</strong>
           </div>
-          <p>先跟我打聲招呼，我會開始幫你整理資金、持倉與模擬下單。</p>
+          <p>先跟我打聲招呼，我會幫你整理投資問題、配置思路與風險提示。</p>
         </div>
         <div class="chat-head-lines" aria-hidden="true">
           <span></span><span></span><span></span><span></span>
@@ -69,17 +69,17 @@
 
       <div class="coach-chip-row" aria-label="快捷指令">
         <button type="button" data-coach-prompt="嗨，請開始今天的投資巡檢"><i class="fas fa-hand-sparkles"></i> 打招呼</button>
-        <button type="button" data-coach-prompt="幫我查看會員中心的資金與下單紀錄"><i class="fas fa-wallet"></i> 會員紀錄</button>
-        <button type="button" data-coach-prompt="幫我分析我的投資組合"><i class="fas fa-box-open"></i> 投資組合分析</button>
-        <button type="button" data-coach-prompt="用 5000 TWD 模擬買入 BTC"><i class="fas fa-paper-plane"></i> 一句話下單</button>
+        <button type="button" onclick="location.href='/member'"><i class="fas fa-wallet"></i> 會員紀錄</button>
+        <button type="button" data-coach-prompt="請告訴我分析投資組合時應提供哪些持倉資料"><i class="fas fa-box-open"></i> 投資組合分析</button>
+        <button type="button" onclick="location.href='/sim-trade'"><i class="fas fa-paper-plane"></i> 前往模擬下單</button>
       </div>
 
       <form class="coach-input-bar" id="coachChatForm">
         <button class="attach-btn" type="button" aria-label="附件"><i class="fas fa-paperclip"></i></button>
-        <textarea id="coachMessageInput" rows="1" placeholder="先打聲招呼，或輸入：用 5000 TWD 模擬買入 BTC"></textarea>
+        <textarea id="coachMessageInput" rows="1" placeholder="例如：配置 5000 TWD 到 BTC，需要留意哪些風險？"></textarea>
         <button class="send-btn" type="submit" aria-label="送出"><i class="fas fa-paper-plane"></i></button>
       </form>
-      <p class="coach-note">AI 內容僅供參考，投資有風險，請謹慎評估。模擬下單會同步到模擬交易帳戶。</p>
+      <p class="coach-note">AI 對話提供分析建議；建立交易請至<a href="/sim-trade">模擬交易頁</a>確認下單。投資有風險，請謹慎評估。</p>
     </section>
 
     <aside class="portfolio-summary" aria-label="投資摘要" data-member-feature="個人化投資紀錄">
