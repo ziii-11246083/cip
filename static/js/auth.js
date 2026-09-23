@@ -430,7 +430,6 @@ window.authManager = {
         if (localStorage.getItem(GUEST_MODE_KEY) === "1") return null;
         if (isDemoMemberActive()) {
             currentSession = buildDemoSession();
-            updateMembership(currentSession);
             return DEMO_MEMBER_TOKEN;
         }
         if (!supabase) return null;
@@ -440,7 +439,6 @@ window.authManager = {
             const session = data?.session;
             if (session?.access_token) {
                 currentSession = session;
-                updateMembership(session);
                 return session.access_token;
             }
         } catch (error) {
