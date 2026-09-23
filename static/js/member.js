@@ -106,18 +106,29 @@
     const capitalList = $("capitalList");
     if (capitalList) {
       const records = capitalRecords.length ? capitalRecords.slice(0, 8) : equityCurve.slice(-8).reverse();
-      capitalList.innerHTML = records.length ? records.map((item) => {
+      capitalList.replaceChildren();
+      if (!records.length) {
+        appendText(capitalList, "div", "尚未產生資產曲線紀錄。", "member-record-empty");
+      }
+      records.forEach((item) => {
         const recordId = item.id || item.timestamp || item.ts || "";
-        return `
-        <div class="member-list-item">
-          <div><strong>${fmtTwdFromUsd(item.amount_usd || item.total_value_usd)}</strong><span>${item.note || "資金紀錄"}</span></div>
-          <div class="member-list-actions">
-            <time>${dateText(item.timestamp || item.ts)}</time>
-            ${isDemo && recordId ? `<button class="capital-delete-btn" type="button" data-capital-id="${recordId}">刪除</button>` : ""}
-          </div>
-        </div>
-      `;
-      }).join("") : '<div class="member-record-empty">尚未產生資產曲線紀錄。</div>';
+        const row = document.createElement("div");
+        row.className = "member-list-item";
+        const info = document.createElement("div");
+        appendText(info, "strong", fmtTwdFromUsd(item.amount_usd || item.total_value_usd));
+        appendText(info, "span", item.note || "資金紀錄");
+        row.appendChild(info);
+        const actions = document.createElement("div");
+        actions.className = "member-list-actions";
+        appendText(actions, "time", dateText(item.timestamp || item.ts));
+        if (isDemo && recordId) {
+          const button = appendText(actions, "button", "刪除", "capital-delete-btn");
+          button.type = "button";
+          button.dataset.capitalId = recordId;
+        }
+        row.appendChild(actions);
+        capitalList.appendChild(row);
+      });
     }
 
     const holdingTable = $("holdingTable");
