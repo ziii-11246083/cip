@@ -6,6 +6,8 @@
   let currentPortfolio = null;
   let lastStressResult = null;
   let isLocked = false;
+  let initialAuthState = null;
+  let authReloadPending = false;
   const DEFAULT_COINS = [
     { symbol: "BTC", name: "Bitcoin" },
     { symbol: "ETH", name: "Ethereum" },
@@ -619,8 +621,17 @@
     }
   }
 
+  window.addEventListener("smartinvest:auth-state", (event) => {
+    if (initialAuthState === null || authReloadPending) return;
+    if (Boolean(event.detail?.isMember) !== initialAuthState) {
+      authReloadPending = true;
+      window.location.reload();
+    }
+  });
+
   document.addEventListener("DOMContentLoaded", async function () {
     const token = await waitForAuthToken();
+    initialAuthState = Boolean(token);
     if (!token) {
       setLockedState(true);
       setStatus("目前是訪客模式，請先登入會員。", "bad");
