@@ -2347,12 +2347,22 @@ def execute_sim_order(
 ) -> Dict[str, Any]:
     symbol = symbol.upper()
     side = side.lower()
-    price = get_coin_price_usd(symbol)
-    if amount_usd and not quantity:
-        quantity = float(amount_usd) / price
+    price = float(get_coin_price_usd(symbol))
+    if not math.isfinite(price) or price <= 0:
+        raise ValueError("目前價格無效，請稍後再試。")
+
     quantity = float(quantity or 0)
-    amount = float(amount_usd or (quantity * price))
-    if quantity <= 0 or amount <= 0:
+    if amount_usd is not None:
+        amount_usd = float(amount_usd)
+        if not math.isfinite(amount_usd) or amount_usd <= 0:
+            raise ValueError("請輸入有效的下單數量或金額。")
+        if not quantity:
+            quantity = amount_usd / price
+
+    # Client amounts are estimates; settle quantity orders at the server price.
+    amount = quantity * price
+    if (not math.isfinite(quantity) or not math.isfinite(amount)
+            or quantity <= 0 or amount <= 0):
         raise ValueError("請輸入有效的下單數量或金額。")
 
     use_local = local_sim_preferred(access_token)
