@@ -972,6 +972,69 @@ label{
 
 .stress-result-meta strong{color:#115e59}
 
+.stress-interpretation{
+  position:relative;
+  display:grid;
+  gap:6px;
+  margin:0 0 12px;
+  padding:16px 18px;
+  border:1px solid rgba(15,118,110,.2);
+  border-radius:18px;
+  background:#f0fdfa;
+  color:#115e59;
+}
+
+.stress-interpretation h3{
+  margin:0;
+  color:#0f3f3a;
+  font-size:18px;
+}
+
+.stress-interpretation p{
+  margin:0;
+  font-size:13px;
+  line-height:1.7;
+}
+
+.stress-risk-label{
+  justify-self:start;
+  min-height:28px;
+  padding:4px 10px;
+  border-radius:999px;
+  background:#fff;
+  border:1px solid rgba(15,118,110,.22);
+  font-size:12px;
+  font-weight:950;
+}
+
+.stress-interpretation.risk-medium{
+  background:#fff7ed;
+  border-color:rgba(245,158,11,.28);
+  color:#92400e;
+}
+
+.stress-interpretation.risk-medium h3{color:#78350f}
+
+.stress-interpretation.risk-medium .stress-risk-label{
+  border-color:rgba(245,158,11,.32);
+}
+
+.stress-interpretation.risk-high{
+  background:#fef2f2;
+  border-color:rgba(220,38,38,.24);
+  color:#991b1b;
+}
+
+.stress-interpretation.risk-high h3{color:#7f1d1d}
+
+.stress-interpretation.risk-high .stress-risk-label{
+  border-color:rgba(220,38,38,.28);
+}
+
+.stress-next-action{
+  font-weight:900;
+}
+
 .stress-results th,
 .stress-results td{white-space:nowrap}
 

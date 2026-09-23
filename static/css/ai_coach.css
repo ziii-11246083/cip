@@ -670,6 +670,28 @@
   border-radius:.5rem;
   padding:.4rem .6rem;
 }
+.next-step-box{
+  margin-top:.65rem;
+  border:1px solid rgba(15,118,110,.18);
+  background:#f0fdfa;
+  border-radius:.65rem;
+  padding:.62rem .72rem;
+  color:#115e59;
+}
+.next-step-box strong{
+  display:block;
+  font-size:.88rem;
+  font-weight:900;
+}
+.next-step-box ul{
+  margin:.35rem 0 0;
+  padding-left:1.05rem;
+}
+.next-step-box li{
+  margin:.2rem 0;
+  font-size:.85rem;
+  line-height:1.55;
+}
 .feedback-bar{
   margin-top:.7rem;
   display:flex;

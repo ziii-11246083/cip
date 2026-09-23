@@ -107,13 +107,52 @@
     return details;
   }
 
+  function nextStepsFor(meta) {
+    if (!meta || typeof meta !== "object") return [];
+    const citations = Array.isArray(meta.citations) ? meta.citations : [];
+    const hasCitations = displayableCitationCount(citations) > 0;
+    const steps = [];
+    if (hasCitations) {
+      steps.push("先展開參考來源，確認這次回答引用的資料是否符合你的問題。");
+    } else {
+      steps.push("補充目前持倉、現金比例或投資期限後再問一次，AI 才能給更貼近情境的建議。");
+    }
+    if (meta.confidence === "low") {
+      steps.push("此回答信心較低，建議先用模擬交易或壓力測試交叉檢查，不要直接當成操作依據。");
+    } else {
+      steps.push("把建議轉成一筆小額模擬單，或到模擬交易頁跑黑天鵝壓力測試。");
+    }
+    if (feedbackVisible(meta.trace_id)) {
+      steps.push("如果回答不準，請用下方 👍／👎 回饋，這會用來檢查 RAG 回答品質。");
+    }
+    return steps;
+  }
+
+  function buildNextStepsBlock(meta) {
+    const steps = nextStepsFor(meta);
+    if (!steps.length) return null;
+    const block = document.createElement("div");
+    block.className = "next-step-box";
+    const title = document.createElement("strong");
+    title.textContent = "下一步建議";
+    const list = document.createElement("ul");
+    steps.forEach((step) => {
+      const item = document.createElement("li");
+      item.textContent = step;
+      list.appendChild(item);
+    });
+    block.appendChild(title);
+    block.appendChild(list);
+    return block;
+  }
+
   function buildFeedbackBar(traceId) {
     if (!feedbackVisible(traceId)) return null;
     const bar = document.createElement("div");
     bar.className = "feedback-bar";
     const label = document.createElement("span");
     label.className = "feedback-label";
-    label.textContent = "這個回答有幫助嗎？";
+    label.textContent = "RAG 回饋：這個回答有幫助嗎？";
     const up = document.createElement("button");
     up.type = "button";
     up.className = "feedback-btn";
@@ -219,6 +258,8 @@
       });
       const citeBlock = buildCitationBlock(citations);
       if (citeBlock) bubble.appendChild(citeBlock);
+      const nextStepBlock = buildNextStepsBlock(meta);
+      if (nextStepBlock) bubble.appendChild(nextStepBlock);
       const feedbackBar = buildFeedbackBar(meta.trace_id);
       if (feedbackBar) bubble.appendChild(feedbackBar);
     }
@@ -580,6 +621,7 @@
       citationLines,
       hintsFor,
       feedbackVisible,
+      nextStepsFor,
       displayableCitationCount,
       appendChatBubble,
       syncMemberState,

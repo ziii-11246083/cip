@@ -236,6 +236,26 @@ async function main() {
     assert.ok(!bubble.children.some((c) => c.className === "cite-details"));
     assert.ok(!bubble.children.some((c) => c.className === "feedback-bar"));
     assert.ok(!bubble.children.some((c) => c.className === "confidence-note"));
+    assert.ok(!bubble.children.some((c) => c.className === "next-step-box"));
+  });
+
+  await check("nextStepsFor: 有來源、低信心與 trace_id 產生可 demo 的下一步", () => {
+    const steps = hooks.nextStepsFor({
+      citations: ["知識庫: investment_rules.md"],
+      confidence: "low",
+      trace_id: "a".repeat(32),
+    });
+    assert.strictEqual(steps.length, 3);
+    assert.ok(steps[0].includes("展開參考來源"));
+    assert.ok(steps[1].includes("壓力測試"));
+    assert.ok(steps[2].includes("RAG 回答品質"));
+  });
+
+  await check("nextStepsFor: 無來源時要求補充持倉或期限", () => {
+    const steps = hooks.nextStepsFor({ citations: [], confidence: "high" });
+    assert.strictEqual(steps.length, 2);
+    assert.ok(steps[0].includes("持倉"));
+    assert.ok(steps[0].includes("投資期限"));
   });
 
   await check("appendChatBubble: 有 citations/confidence/trace_id 顯示新 UI", () => {
@@ -254,7 +274,12 @@ async function main() {
     assert.strictEqual(listItems[0].children[1].textContent, "知識庫: investment_rules.md (投資原則)");
     const bar = bubble.children.find((c) => c.className === "feedback-bar");
     assert.ok(bar);
+    assert.ok(bar.children[0].textContent.includes("RAG 回饋"));
     assert.strictEqual(bar.children.filter((c) => c.className === "feedback-btn").length, 2);
+    const next = bubble.children.find((c) => c.className === "next-step-box");
+    assert.ok(next);
+    assert.strictEqual(next.children[0].textContent, "下一步建議");
+    assert.ok(next.children[1].children.length >= 2);
   });
 
   await check("appendChatBubble: 無 citations → 提示但不顯示來源區塊", () => {

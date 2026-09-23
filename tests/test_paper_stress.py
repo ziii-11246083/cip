@@ -306,6 +306,27 @@ class EndpointTests(unittest.TestCase):
         self.assertIn("hasStressablePositions", guard)
         self.assertIn("replaceChildren", guard)
 
+    def test_ui_has_plain_language_interpretation_and_demo_loader(self):
+        html = (PROJECT_ROOT / "templates/sim_trade.html").read_text(encoding="utf-8-sig")
+        for text in (
+            "載入示範投資組合（僅供展示）",
+            "btnLoadDemoPortfolio",
+        ):
+            self.assertIn(text, html)
+
+        js = (PROJECT_ROOT / "static/js/sim_trade.js").read_text(encoding="utf-8")
+        for text in (
+            "function stressInterpretation",
+            "結果解讀",
+            "建議下一步",
+            "DEMO_PORTFOLIO_ORDERS",
+            "這只影響模擬交易帳本",
+        ):
+            self.assertIn(text, js)
+        self.assertIn('request("/api/sim-trade/order"', js)
+        self.assertNotIn("/api/real-assets", js)
+        self.assertNotIn("/api/external-accounts", js)
+
 
 if __name__ == "__main__":
     unittest.main()

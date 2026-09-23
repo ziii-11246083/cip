@@ -26,6 +26,11 @@
     USDT: 1,
     USDC: 1
   };
+  const DEMO_PORTFOLIO_ORDERS = [
+    { symbol: "BTC", amount_usd: 50000 },
+    { symbol: "ETH", amount_usd: 15000 },
+    { symbol: "USDC", amount_usd: 10000 }
+  ];
 
   function fmtUSD(value) {
     const n = Number(value || 0);
@@ -98,6 +103,54 @@
     ));
   }
 
+  function stressInterpretation(result, strategy) {
+    const rows = result?.results?.[strategy || "balanced"] || {};
+    const black = rows.black_swan?.metrics || null;
+    const initial = Number(result?.snapshot?.initial_value || 0);
+    if (!black || initial <= 0) return null;
+
+    const totalReturn = Number(black.total_return || 0);
+    const maxDrawdown = Number(black.max_drawdown || 0);
+    const finalValue = Number(black.final_value || 0);
+    const drawdownAbs = Math.abs(maxDrawdown);
+    let level = "low";
+    let label = "風險低";
+    if (drawdownAbs >= 0.35 || totalReturn <= -0.3) {
+      level = "high";
+      label = "風險高";
+    } else if (drawdownAbs >= 0.18 || totalReturn <= -0.15) {
+      level = "medium";
+      label = "風險中";
+    }
+
+    const reason = `黑天鵝情境下，總報酬約 ${fmtPct(totalReturn)}，最大回撤約 ${fmtPct(maxDrawdown)}，期末值約 ${fmtUSD(finalValue)}。`;
+    const actionMap = {
+      high: "建議降低單一幣種或風險資產集中度，保留更多現金，再用同一個 seed 重跑比較。",
+      medium: "建議檢查持倉比例，評估是否增加穩定幣或分批調整，再觀察熊市與黑天鵝差距。",
+      low: "目前組合在此假設下相對穩定，可再測更長期間或積極型策略，確認風險承受度。"
+    };
+    return {
+      level,
+      label,
+      headline: `${label}：極端情境下的下跌幅度${level === "low" ? "相對可控" : "需要留意"}`,
+      reason,
+      action: actionMap[level]
+    };
+  }
+
+  function renderStressInterpretation(root, result, strategy) {
+    const summary = stressInterpretation(result, strategy);
+    if (!summary) return;
+    const box = document.createElement("section");
+    box.className = `stress-interpretation risk-${summary.level}`;
+    appendStressText(box, "span", summary.label, "stress-risk-label");
+    appendStressText(box, "h3", "結果解讀");
+    appendStressText(box, "p", summary.headline);
+    appendStressText(box, "p", summary.reason);
+    appendStressText(box, "p", `建議下一步：${summary.action}`, "stress-next-action");
+    root.appendChild(box);
+  }
+
   function renderStressResults(result) {
     const root = $("stressResults");
     if (!root) return;
@@ -111,6 +164,7 @@
     appendStressText(meta, "strong", result.strategies?.[strategy]?.label || strategy);
     appendStressText(meta, "span", `起始基準 ${fmtUSD(result.snapshot?.initial_value)} · ${result.period?.days || 0} 個合成日 · seed ${result.seed}`);
     root.appendChild(meta);
+    renderStressInterpretation(root, result, strategy);
 
     const tableWrap = document.createElement("div");
     tableWrap.className = "table-wrap";
@@ -531,6 +585,40 @@
     }
   }
 
+  async function loadDemoPortfolio() {
+    if (isLocked) return;
+    if (hasStressablePositions(stressSnapshot())) {
+      setStatus("目前已有模擬持倉，可直接進行情境壓力測試；如需重做示範，請先重置帳戶。", "ok");
+      $("runStressTest")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    const requiredCash = DEMO_PORTFOLIO_ORDERS.reduce((sum, order) => sum + order.amount_usd, 0);
+    const cash = Number(currentPortfolio?.cash || 0);
+    if (cash < requiredCash) {
+      setStatus(`示範組合需要至少 ${fmtUSD(requiredCash)} 模擬現金；目前可用 ${fmtUSD(cash)}。`, "bad");
+      return;
+    }
+    try {
+      setStatus("正在載入示範投資組合（僅供展示，不是真實資產）...", "");
+      for (const order of DEMO_PORTFOLIO_ORDERS) {
+        await request("/api/sim-trade/order", {
+          method: "POST",
+          body: JSON.stringify({
+            symbol: order.symbol,
+            side: "buy",
+            quantity: null,
+            amount_usd: order.amount_usd
+          })
+        });
+      }
+      setStatus("已載入示範投資組合：BTC / ETH / USDC。這只影響模擬交易帳本。", "ok");
+      await Promise.all([refreshPortfolio(), refreshTrades()]);
+      $("runStressTest")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    } catch (error) {
+      setStatus(error.message || "示範投資組合載入失敗。", "bad");
+    }
+  }
+
   document.addEventListener("DOMContentLoaded", async function () {
     const token = await waitForAuthToken();
     if (!token) {
@@ -562,6 +650,10 @@
     $("btnReset")?.addEventListener("click", function () {
       if (isLocked) return;
       resetPortfolio();
+    });
+    $("btnLoadDemoPortfolio")?.addEventListener("click", function () {
+      if (isLocked) return;
+      loadDemoPortfolio();
     });
 
     ["orderSymbol", "orderSide", "orderQty", "orderAmt"].forEach((id) => {
