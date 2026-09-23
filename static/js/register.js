@@ -86,10 +86,14 @@ async function registerUser(e) {
 
   try {
     if (window.authManager && typeof window.authManager.signUpWithEmail === "function") {
-      await window.authManager.signUpWithEmail(email, password, {
+      const success = await window.authManager.signUpWithEmail(email, password, {
         display_name: name
       });
-      showMessage("success", "註冊成功，請到信箱收驗證信，或直接登入開始使用。");
+      if (success) {
+        showMessage("success", "註冊成功，請到信箱收驗證信，或直接登入開始使用。");
+      } else {
+        showMessage("error", "註冊失敗，請確認登入服務或後端設定。");
+      }
     } else {
       showMessage("error", "註冊服務尚未初始化，請稍後再試。");
     }

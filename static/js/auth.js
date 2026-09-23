@@ -351,8 +351,11 @@ window.authManager = {
         }
     },
     signUpWithEmail: async (email, password, metadata = {}) => {
-        if (!requireSupabase()) return;
-        if (!email || !password) return alert("請輸入信箱與密碼");
+        if (!requireSupabase()) return false;
+        if (!email || !password) {
+            alert("請輸入信箱與密碼");
+            return false;
+        }
         try {
             localStorage.removeItem(DEMO_MEMBER_KEY);
             sessionStorage.removeItem(DEMO_MEMBER_KEY);
@@ -366,8 +369,10 @@ window.authManager = {
             if (error) throw error;
             alert("註冊成功，請檢查信箱完成驗證（若已關閉驗證則會直接登入）");
             window.location.reload();
+            return true;
         } catch (error) {
             alert(`註冊失敗: ${error.message}`);
+            return false;
         }
     },
     logoutUser: async () => {
