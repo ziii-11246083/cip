@@ -2418,14 +2418,11 @@ def api_sim_trade_history():
     access_token, error = require_sim_trade_token()
     if error:
         return error
-    if access_token == DEMO_MEMBER_TOKEN:
+    if local_sim_preferred(access_token):
         _, state, _ = get_local_sim_state(access_token)
         trades = state.get("trades") or []
     else:
         trades = db.sim_list_transactions(access_token, limit=limit) if db else []
-        if not trades:
-            _, state, _ = get_local_sim_state(access_token)
-            trades = state.get("trades") or []
     return jsonify({"trades": [normalize_trade(row) for row in trades]})
 
 
@@ -2455,10 +2452,12 @@ def api_sim_trade_reset():
     access_token, error = require_sim_trade_token()
     if error:
         return error
-    if access_token == DEMO_MEMBER_TOKEN or not db:
+    if local_sim_preferred(access_token) or not db:
         user_key = sim_user_key(access_token)
         store = load_local_sim_store()
-        store.setdefault("users", {})[user_key] = default_local_sim_state(user_key, SIM_INITIAL_CASH)
+        state = default_local_sim_state(user_key, SIM_INITIAL_CASH)
+        state["prefer_local"] = True
+        store.setdefault("users", {})[user_key] = state
         save_local_sim_store(store)
     else:
         db.sim_reset_portfolio(access_token, SIM_INITIAL_CASH, SIM_INITIAL_CASH)
