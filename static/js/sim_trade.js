@@ -4,6 +4,7 @@
   let allocChart = null;
   let coinOptions = [];
   let currentPortfolio = null;
+  let lastStressResult = null;
   let isLocked = false;
   const DEFAULT_COINS = [
     { symbol: "BTC", name: "Bitcoin" },
@@ -25,6 +26,11 @@
     USDT: 1,
     USDC: 1
   };
+  const DEMO_PORTFOLIO_ORDERS = [
+    { symbol: "BTC", amount_usd: 50000 },
+    { symbol: "ETH", amount_usd: 15000 },
+    { symbol: "USDC", amount_usd: 10000 }
+  ];
 
   function fmtUSD(value) {
     const n = Number(value || 0);
@@ -56,6 +62,172 @@
     if (!el) return;
     el.textContent = message;
     el.className = "status " + (type || "");
+  }
+
+  function setStressStatus(message, type) {
+    const el = $("stressStatus");
+    if (!el) return;
+    el.textContent = message;
+    el.className = "status " + (type || "");
+  }
+
+  function appendStressText(parent, tag, text, className) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    node.textContent = text;
+    parent.appendChild(node);
+    return node;
+  }
+
+  function fmtPct(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? (number * 100).toFixed(2) + "%" : "--";
+  }
+
+  function stressSnapshot() {
+    const portfolio = currentPortfolio || {};
+    return {
+      cash: Number(portfolio.cash || 0),
+      positions: (Array.isArray(portfolio.positions) ? portfolio.positions : []).map((item) => ({
+        symbol: item.symbol,
+        market_value: item.market_value,
+        quantity: item.quantity,
+        current_price: item.current_price
+      }))
+    };
+  }
+
+  function hasStressablePositions(snapshot) {
+    return (Array.isArray(snapshot?.positions) ? snapshot.positions : []).some((item) => (
+      Number.isFinite(Number(item?.market_value)) && Number(item.market_value) > 0
+    ));
+  }
+
+  function stressInterpretation(result, strategy) {
+    const rows = result?.results?.[strategy || "balanced"] || {};
+    const black = rows.black_swan?.metrics || null;
+    const initial = Number(result?.snapshot?.initial_value || 0);
+    if (!black || initial <= 0) return null;
+
+    const totalReturn = Number(black.total_return || 0);
+    const maxDrawdown = Number(black.max_drawdown || 0);
+    const finalValue = Number(black.final_value || 0);
+    const drawdownAbs = Math.abs(maxDrawdown);
+    let level = "low";
+    let label = "風險低";
+    if (drawdownAbs >= 0.35 || totalReturn <= -0.3) {
+      level = "high";
+      label = "風險高";
+    } else if (drawdownAbs >= 0.18 || totalReturn <= -0.15) {
+      level = "medium";
+      label = "風險中";
+    }
+
+    const reason = `黑天鵝情境下，總報酬約 ${fmtPct(totalReturn)}，最大回撤約 ${fmtPct(maxDrawdown)}，期末值約 ${fmtUSD(finalValue)}。`;
+    const actionMap = {
+      high: "建議降低單一幣種或風險資產集中度，保留更多現金，再用同一個 seed 重跑比較。",
+      medium: "建議檢查持倉比例，評估是否增加穩定幣或分批調整，再觀察熊市與黑天鵝差距。",
+      low: "目前組合在此假設下相對穩定，可再測更長期間或積極型策略，確認風險承受度。"
+    };
+    return {
+      level,
+      label,
+      headline: `${label}：極端情境下的下跌幅度${level === "low" ? "相對可控" : "需要留意"}`,
+      reason,
+      action: actionMap[level]
+    };
+  }
+
+  function renderStressInterpretation(root, result, strategy) {
+    const summary = stressInterpretation(result, strategy);
+    if (!summary) return;
+    const box = document.createElement("section");
+    box.className = `stress-interpretation risk-${summary.level}`;
+    appendStressText(box, "span", summary.label, "stress-risk-label");
+    appendStressText(box, "h3", "結果解讀");
+    appendStressText(box, "p", summary.headline);
+    appendStressText(box, "p", summary.reason);
+    appendStressText(box, "p", `建議下一步：${summary.action}`, "stress-next-action");
+    root.appendChild(box);
+  }
+
+  function renderStressResults(result) {
+    const root = $("stressResults");
+    if (!root) return;
+    root.replaceChildren();
+    if (!result) return;
+    const strategy = $("stressStrategy")?.value || "balanced";
+    const rows = result.results?.[strategy] || {};
+
+    const meta = document.createElement("div");
+    meta.className = "stress-result-meta";
+    appendStressText(meta, "strong", result.strategies?.[strategy]?.label || strategy);
+    appendStressText(meta, "span", `起始基準 ${fmtUSD(result.snapshot?.initial_value)} · ${result.period?.days || 0} 個合成日 · seed ${result.seed}`);
+    root.appendChild(meta);
+    renderStressInterpretation(root, result, strategy);
+
+    const tableWrap = document.createElement("div");
+    tableWrap.className = "table-wrap";
+    const table = document.createElement("table");
+    const thead = document.createElement("thead");
+    const header = document.createElement("tr");
+    ["情境", "總報酬", "合成年化波動", "最大回撤", "Sharpe-like", "期末值"].forEach((label) => {
+      appendStressText(header, "th", label);
+    });
+    thead.appendChild(header);
+    table.appendChild(thead);
+    const tbody = document.createElement("tbody");
+    ["normal", "bull", "bear", "black_swan"].forEach((scenario) => {
+      const rowData = rows[scenario];
+      if (!rowData) return;
+      const metrics = rowData.metrics || {};
+      const row = document.createElement("tr");
+      appendStressText(row, "td", rowData.scenario_label || scenario);
+      appendStressText(row, "td", fmtPct(metrics.total_return));
+      appendStressText(row, "td", fmtPct(metrics.volatility));
+      appendStressText(row, "td", fmtPct(metrics.max_drawdown));
+      appendStressText(row, "td", Number(metrics.sharpe_like || 0).toFixed(2));
+      appendStressText(row, "td", fmtUSD(metrics.final_value));
+      tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    tableWrap.appendChild(table);
+    root.appendChild(tableWrap);
+
+    if (Array.isArray(result.warnings) && result.warnings.length) {
+      appendStressText(root, "p", `未納入資料：${result.warnings.join("、")}`, "stress-warning");
+    }
+  }
+
+  async function runStressTest() {
+    if (isLocked || !currentPortfolio) return;
+    const horizonDays = Number($("stressHorizon")?.value || 90);
+    const seed = Number($("stressSeed")?.value || 20260820);
+    const snapshot = stressSnapshot();
+    if (!hasStressablePositions(snapshot)) {
+      lastStressResult = null;
+      $("stressResults")?.replaceChildren();
+      setStressStatus(
+        "目前組合只有現金，沒有可進行情境測試的持倉。請先建立一筆模擬買入訂單。",
+        "bad"
+      );
+      $("orderPanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    setStressStatus("正在建立獨立假設快照…", "");
+    try {
+      const data = await request("/api/paper-stress-test", {
+        method: "POST",
+        body: JSON.stringify({
+          snapshot, horizon_days: horizonDays, seed
+        })
+      });
+      lastStressResult = data.stress_test || null;
+      renderStressResults(lastStressResult);
+      setStressStatus("已完成四種情境比較；結果沒有寫回模擬帳本。", "ok");
+    } catch (error) {
+      setStressStatus(error.message || "壓力測試失敗。", "bad");
+    }
   }
 
   function setLockedState(locked) {
@@ -413,6 +585,40 @@
     }
   }
 
+  async function loadDemoPortfolio() {
+    if (isLocked) return;
+    if (hasStressablePositions(stressSnapshot())) {
+      setStatus("目前已有模擬持倉，可直接進行情境壓力測試；如需重做示範，請先重置帳戶。", "ok");
+      $("runStressTest")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    const requiredCash = DEMO_PORTFOLIO_ORDERS.reduce((sum, order) => sum + order.amount_usd, 0);
+    const cash = Number(currentPortfolio?.cash || 0);
+    if (cash < requiredCash) {
+      setStatus(`示範組合需要至少 ${fmtUSD(requiredCash)} 模擬現金；目前可用 ${fmtUSD(cash)}。`, "bad");
+      return;
+    }
+    try {
+      setStatus("正在載入示範投資組合（僅供展示，不是真實資產）...", "");
+      for (const order of DEMO_PORTFOLIO_ORDERS) {
+        await request("/api/sim-trade/order", {
+          method: "POST",
+          body: JSON.stringify({
+            symbol: order.symbol,
+            side: "buy",
+            quantity: null,
+            amount_usd: order.amount_usd
+          })
+        });
+      }
+      setStatus("已載入示範投資組合：BTC / ETH / USDC。這只影響模擬交易帳本。", "ok");
+      await Promise.all([refreshPortfolio(), refreshTrades()]);
+      $("runStressTest")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    } catch (error) {
+      setStatus(error.message || "示範投資組合載入失敗。", "bad");
+    }
+  }
+
   document.addEventListener("DOMContentLoaded", async function () {
     const token = await waitForAuthToken();
     if (!token) {
@@ -445,6 +651,10 @@
       if (isLocked) return;
       resetPortfolio();
     });
+    $("btnLoadDemoPortfolio")?.addEventListener("click", function () {
+      if (isLocked) return;
+      loadDemoPortfolio();
+    });
 
     ["orderSymbol", "orderSide", "orderQty", "orderAmt"].forEach((id) => {
       $(id)?.addEventListener("input", updateQuotePanel);
@@ -474,13 +684,13 @@
       $("scPriceMult") && ($("scPriceMult").textContent = (sc.price_multiplier || 1).toFixed(1) + "x");
       $("scVolMult") && ($("scVolMult").textContent = (sc.volatility_multiplier || 1).toFixed(1) + "x");
 
-      const adviceMap = {
-        normal: "按照策略正常操作",
-        bull: "可提高風險資產佔比，定期獲利了結",
-        bear: "提高穩定幣佔比，嚴格執行止損",
-        black_swan: "極端風險規避，建議全倉現金為主"
+      const scenarioNoteMap = {
+        normal: "基準終值與起始價值相同",
+        bull: "假設風險資產終值上升",
+        bear: "假設風險資產終值下降並出現衝擊",
+        black_swan: "假設極端下跌與短期衝擊"
       };
-      $("scAdvice") && ($("scAdvice").textContent = adviceMap[scenarioKey] || "正常操作");
+      $("scAdvice") && ($("scAdvice").textContent = scenarioNoteMap[scenarioKey] || "基準假設");
 
       document.querySelectorAll(".scenario-btn").forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.scenario === scenarioKey);
@@ -495,6 +705,10 @@
     });
 
     loadScenarios().then(() => applyScenario("normal"));
+    $("runStressTest")?.addEventListener("click", runStressTest);
+    $("stressStrategy")?.addEventListener("change", () => {
+      renderStressResults(lastStressResult);
+    });
     // —— End Scenario Switcher ——
   });
 })();

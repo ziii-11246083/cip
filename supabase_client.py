@@ -1,7 +1,7 @@
 import logging
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
 from supabase import Client, create_client
@@ -78,8 +78,9 @@ class SupabaseDB:
         client = create_client(self.url, api_key)
         try:
             client.postgrest.auth(access_token)
-        except Exception as exc:
-            logger.exception("Failed to apply access token to Supabase client: %s", exc)
+        except Exception:
+            # 固定 code 記錄（TASK 04 Codex R1）：exception text 可能含 token，不得進 log
+            logger.warning("Failed to apply access token (code=rag_authed_client_failed)")
             raise
         return client
 
@@ -539,6 +540,58 @@ class SupabaseDB:
         except Exception as exc:
             logger.exception("get_conversation_history_authed failed: %s", exc)
             return []
+
+    def rag_find_run_id_by_trace(
+        self,
+        access_token: str,
+        user_id: str,
+        trace_id: str,
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """以使用者 JWT 查詢「自己的」rag_runs.trace_id → internal run id（TASK 04）。
+
+        使用 authed client，讓 RLS 實際過濾所有權（他人／不存在的 trace 皆查無）。
+        回傳 (run_id or None, error_code or None)。
+        """
+        try:
+            response = self._authed_table(access_token, "rag_runs")\
+                .select("id")\
+                .eq("user_id", user_id)\
+                .eq("trace_id", trace_id)\
+                .limit(1)\
+                .execute()
+            data = getattr(response, "data", None) or []
+            if data:
+                return data[0].get("id"), None
+            return None, None
+        except Exception:
+            # 固定 code 記錄：exception text 可能含 token，不得進 log（TASK 04 Codex R1）
+            logger.warning("rag_find_run_id_by_trace failed (code=rag_run_lookup_failed)")
+            return None, "rag_run_lookup_failed"
+
+    def rag_upsert_feedback(
+        self,
+        access_token: str,
+        run_id: str,
+        user_id: str,
+        vote: str,
+    ) -> Tuple[bool, Optional[str]]:
+        """以使用者 JWT 對 rag_feedback 做 upsert（TASK 04）。
+
+        採 authed client，由 RLS 的 INSERT/UPDATE policy 驗證 run 所有權；
+        不使用 service-role client 寫 feedback。(run_id, user_id) 唯一 →
+        重複／改票皆只保留一列。
+        """
+        try:
+            self._authed_table(access_token, "rag_feedback").upsert({
+                "run_id": run_id,
+                "user_id": user_id,
+                "vote": vote,
+            }, on_conflict="run_id,user_id").execute()
+            return True, None
+        except Exception:
+            # 固定 code 記錄：exception text 可能含 token，不得進 log（TASK 04 Codex R1）
+            logger.warning("rag_upsert_feedback failed (code=feedback_upsert_failed)")
+            return False, "feedback_upsert_failed"
 
     def insert_data(self, table_name: str, data: Dict[str, Any]) -> bool:
         try:

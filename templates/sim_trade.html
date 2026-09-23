@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/iansui@1.0/dist/iansui.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=member-overlay-20260604">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=mobile-fit-20260830">
 </head>
 <body>
 {% include "partials/header.html" %}
@@ -55,40 +55,65 @@
 
         <section class="card sim-scenario-card" data-member-feature="市場情境模擬">
           <div class="sim-scenario-head">
-            <h2 class="sim-title">市場情境模擬</h2>
+            <h2 class="sim-title">情境壓力測試（假設式）</h2>
             <span class="sim-scenario-badge" id="scenarioBadge">一般市場</span>
           </div>
-          <p class="sim-scenario-desc">切換不同市場情境，觀察參數變化對模擬交易的潛在影響（本功能為情境展示，不影響實際下單價格）。</p>
+          <p class="sim-scenario-desc">以相同起始資金與持倉快照，比較 normal / bull / bear / black swan。這是可重現的合成假設，<strong>不是歷史回測或價格預測</strong>，也不會改動即時模擬交易帳本。</p>
+          <div class="sim-mode-boundary">
+            <span><strong>即時模擬交易</strong>會記錄虛擬下單</span>
+            <span class="active"><strong>情境壓力測試</strong>只讀取一次快照</span>
+            <span><strong>歷史回測</strong>本頁未提供</span>
+          </div>
           <div class="sim-scenario-selector">
             <button class="scenario-btn active" data-scenario="normal" type="button">
               <i class="fas fa-balance-scale"></i>
               <strong>一般市場</strong>
-              <small>實際即時價格</small>
+              <small>風險資產期末目標 ×1.0 · 日波動假設 ×1.0</small>
             </button>
             <button class="scenario-btn" data-scenario="bull" type="button">
               <i class="fas fa-chart-line"></i>
               <strong>牛市</strong>
-              <small>價格 ×1.3 · 波動 ×0.8</small>
+              <small>風險資產期末目標 ×1.3 · 日波動假設 ×0.8</small>
             </button>
             <button class="scenario-btn" data-scenario="bear" type="button">
               <i class="fas fa-arrow-trend-down"></i>
               <strong>熊市</strong>
-              <small>價格 ×0.7 · 波動 ×1.5</small>
+              <small>風險資產期末目標 ×0.7 · 日波動假設 ×1.5</small>
             </button>
             <button class="scenario-btn" data-scenario="black_swan" type="button">
               <i class="fas fa-bolt"></i>
               <strong>黑天鵝</strong>
-              <small>價格 ×0.4 · 波動 ×3.0</small>
+              <small>風險資產期末目標 ×0.4 · 日波動假設 ×3.0</small>
             </button>
           </div>
           <div class="sim-scenario-info" id="scenarioInfo">
-            <div><span>價格乘數</span><strong id="scPriceMult">1.0x</strong></div>
-            <div><span>波動乘數</span><strong id="scVolMult">1.0x</strong></div>
-            <div><span>建議動作</span><strong id="scAdvice">正常操作</strong></div>
+            <div><span>風險資產期末目標</span><strong id="scPriceMult">1.0x</strong></div>
+            <div><span>日波動假設乘數</span><strong id="scVolMult">1.0x</strong></div>
+            <div><span>情境說明</span><strong id="scAdvice">基準假設</strong></div>
           </div>
+          <div class="stress-controls">
+            <label for="stressStrategy">策略
+              <select id="stressStrategy">
+                <option value="conservative">保守型（風險資產 35%）</option>
+                <option value="balanced" selected>平衡型（風險資產 65%）</option>
+                <option value="aggressive">積極型（風險資產 90%）</option>
+              </select>
+            </label>
+            <label for="stressHorizon">假設期間（天）
+              <input id="stressHorizon" type="number" min="7" max="365" step="1" value="90">
+            </label>
+            <label for="stressSeed">Seed
+              <input id="stressSeed" type="number" min="0" max="2147483647" step="1" value="20260820">
+            </label>
+            <button type="button" id="runStressTest">比較四種情境</button>
+          </div>
+          <div class="status" id="stressStatus" role="status" aria-live="polite">等待執行；基準為目前模擬組合總值。</div>
+          <div class="stress-results" id="stressResults"></div>
+          <p class="stress-limitations"><strong>合成年化波動</strong>是合成日報酬標準差年化後的風險指標，可能超過 100%；它不是虧損比例或發生機率。</p>
+          <p class="stress-limitations">限制：未模擬手續費、稅負、流動性與成交滑價；期末目標是風險資產的情境假設，不是實際歷史價格。</p>
         </section>
 
-        <section class="card order-panel" data-member-feature="建立模擬訂單">
+        <section class="card order-panel" id="orderPanel" data-member-feature="建立模擬訂單">
           <div class="order-workspace">
             <div class="order-form-area">
               <h2 class="sim-title">建立模擬訂單</h2>
@@ -115,6 +140,7 @@
               </div>
               <div class="order-actions">
                 <button class="btn-main" id="btnPlaceOrder">送出模擬單</button>
+                <button class="btn-ghost" id="btnLoadDemoPortfolio" type="button">載入示範投資組合（僅供展示）</button>
                 <button class="btn-ghost" id="btnReload">重新整理</button>
                 <button class="btn-danger" id="btnReset">重置帳戶</button>
               </div>
@@ -182,8 +208,8 @@
     anonKey: '{{ supabase_anon_key | default("dummy") }}'
   };
 </script>
-<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=member-nav-lock-20260604"></script>
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=auth-state-20260830"></script>
 <script src="{{ url_for('static', filename='js/common.js') }}?v=member-nav-lock-20260604"></script>
-<script src="{{ url_for('static', filename='js/sim_trade.js') }}?v=sim-split-20260604"></script>
+<script src="{{ url_for('static', filename='js/sim_trade.js') }}?v=ux-demo-20260922"></script>
 </body>
 </html>
