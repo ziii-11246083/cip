@@ -30,22 +30,28 @@ class VectorStoreServiceTests(unittest.TestCase):
         ]
         embeddings = [[1.0, 0.0], [0.0, 1.0]]
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            with self.assertNoLogs(level=logging.ERROR):
-                store = VectorStoreService(Path(temp_dir))
-                self.assertTrue(store.available)
-                self.assertEqual(store.rebuild_index(chunks, embeddings), 2)
-                hits = store.query([1.0, 0.0], top_k=1)
+        temp_dir = self.enterContext(tempfile.TemporaryDirectory())
+        with self.assertNoLogs(level=logging.ERROR):
+            store = VectorStoreService(Path(temp_dir))
+            if store._client is not None:
+                # Chroma 0.5 owns SQLite/index handles that Windows cannot unlink.
+                # Cleanups run in reverse order: stop the client before the directory.
+                self.addCleanup(store._client._system.stop)
+            self.assertTrue(store.available)
+            self.assertEqual(store.rebuild_index(chunks, embeddings), 2)
+            hits = store.query([1.0, 0.0], top_k=1)
 
-            self.assertEqual([hit["chunk_id"] for hit in hits], ["bitcoin"])
+        self.assertEqual([hit["chunk_id"] for hit in hits], ["bitcoin"])
 
     def test_environment_path_is_used_when_no_explicit_path_is_given(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            with patch.dict(os.environ, {"RAG_VECTOR_DB_PATH": temp_dir}):
-                store = VectorStoreService()
+        temp_dir = self.enterContext(tempfile.TemporaryDirectory())
+        with patch.dict(os.environ, {"RAG_VECTOR_DB_PATH": temp_dir}):
+            store = VectorStoreService()
+        if store._client is not None:
+            self.addCleanup(store._client._system.stop)
 
-            self.assertTrue(store.available)
-            self.assertEqual(Path(store._persist_dir), Path(temp_dir))
+        self.assertTrue(store.available)
+        self.assertEqual(Path(store._persist_dir), Path(temp_dir))
 
 
 if __name__ == "__main__":
