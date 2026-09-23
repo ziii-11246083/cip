@@ -75,12 +75,24 @@
 
 建議使用 Python 3.12：
 
+macOS / Linux：
+
 ```bash
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python run_local.py
 ```
+
+Windows PowerShell（在專案根目錄執行）：
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe run_local.py
+```
+
+Windows 指令直接使用虛擬環境中的 Python，不需要先執行 `Activate.ps1`。
 
 瀏覽器開啟：`http://127.0.0.1:5000`
 
@@ -123,9 +135,18 @@ RAG_TRACE_HMAC_SECRET=at_least_32_random_bytes
 python -m pytest -q
 node tests/test_ai_coach_frontend.test.js
 node tests/test_auth_frontend.test.js
+node tests/test_member_rendering.test.js
+node tests/test_registration_frontend.test.js
+node tests/test_sim_trade_auth.test.js
 python scripts/validate_rag_trace_migration.py
 python scripts/validate_asset_sync_migration.py
 python scripts/validate_asset_sync_mvp.py
+```
+
+模擬交易下單與帳本回歸可單獨執行（UTF-8 模式避免 Windows 預設編碼差異）：
+
+```bash
+python -X utf8 -B -m unittest discover -s tests -p "test_sim_*.py" -v
 ```
 
 完整人工驗收順序與預期結果請直接照 [0830 測試與 Demo 操作手冊](docs/DEMO_AND_TEST_GUIDE_0830.md) 執行。
