@@ -128,11 +128,10 @@ function renderWithMeta(metaBody) {
 }
 
 async function main() {
-  await check("locked layout: 會員提示卡跨越桌面雙欄並置中", () => {
+  await check("locked layout: 會員提示卡在應用程式雙欄外置中", () => {
     const rule = cssSource.match(/\.coach-layout\s*>\s*\.member-gate\.show\s*\{([^}]*)\}/)?.[1] || "";
-    assert.match(rule, /grid-column\s*:\s*1\s*\/\s*-1\s*;/);
     assert.match(rule, /width\s*:\s*min\(100%,\s*760px\)\s*;/);
-    assert.match(rule, /justify-self\s*:\s*center\s*;/);
+    assert.match(rule, /margin\s*:\s*0\s+auto\s*;/);
   });
 
   await check("auth-state: 同頁登入後立即解除 AI Coach 鎖定", () => {
