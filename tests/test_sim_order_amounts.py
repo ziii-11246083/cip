@@ -3,6 +3,7 @@
 import copy
 import os
 import socket
+from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
@@ -123,6 +124,7 @@ class SimOrderAmountTests(unittest.TestCase):
 
     def test_remote_rpc_receives_server_calculated_amount(self):
         db = Mock()
+        db.client.auth.get_user.return_value = SimpleNamespace(user=SimpleNamespace(id="member-1"))
         db.sim_get_or_create_portfolio.return_value = {
             "cash_balance": 100000, "initial_cash": 100000,
         }

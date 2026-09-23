@@ -1,5 +1,6 @@
 """Ensure member history and reset operate on the active simulated ledger."""
 
+import hashlib
 import os
 import socket
 from types import SimpleNamespace
@@ -83,6 +84,51 @@ class LocalLedgerTests(unittest.TestCase):
         response = self.client.post("/api/sim-trade/reset", headers=self.headers)
         self.assertEqual(response.status_code, 200)
         self.db.sim_reset_portfolio.assert_called_once_with(self.token, 100000, 100000)
+        self.save.assert_not_called()
+
+    def test_refreshed_token_keeps_same_member_cash_and_positions(self):
+        for token in (self.token, "synthetic-refreshed-token"):
+            with self.subTest(token=token):
+                self.db.client.auth.get_user.reset_mock()
+                response = self.client.get(
+                    "/api/sim-trade/portfolio", headers={"Authorization": f"Bearer {token}"},
+                )
+                self.assertEqual(response.status_code, 200)
+                portfolio = response.get_json()["portfolio"]
+                self.assertEqual(portfolio["cash"], 35000)
+                self.assertEqual(portfolio["positions"][0]["quantity"], 1)
+                self.db.client.auth.get_user.assert_called_once_with(token)
+        self.assertEqual(list(self.store["users"]), [self.key])
+        self.db.sim_get_or_create_portfolio.assert_not_called()
+
+    def test_different_member_cannot_read_first_members_local_ledger(self):
+        self.db.client.auth.get_user.return_value.user.id = "member-2"
+        self.db.sim_get_or_create_portfolio.return_value = {"cash_balance": 77000, "initial_cash": 100000}
+        self.db.sim_list_positions.return_value = []
+        self.db.sim_list_equity_curve.return_value = []
+        response = self.client.get("/api/sim-trade/portfolio", headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["portfolio"]["cash"], 77000)
+        self.assertEqual(response.get_json()["portfolio"]["positions"], [])
+        self.assertEqual(self.state["portfolio"]["cash_balance"], 35000)
+
+    def test_current_tokens_legacy_ledger_is_migrated_without_losing_assets(self):
+        legacy_key = "user-" + hashlib.sha256(self.token.encode()).hexdigest()[:24]
+        self.store["users"] = {legacy_key: self.state}
+        response = self.client.get("/api/sim-trade/portfolio", headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["portfolio"]["cash"], 35000)
+        self.assertEqual(response.get_json()["portfolio"]["positions"][0]["quantity"], 1)
+        self.assertNotIn(legacy_key, self.store["users"])
+        self.assertIs(self.store["users"][self.key], self.state)
+        self.assertEqual(self.state["portfolio"]["user_id"], self.key)
+        self.assertEqual(len(self.state["trades"]), 1)
+        self.save.assert_called_once()
+
+    def test_unverified_user_cannot_create_a_local_ledger_key(self):
+        self.db.client.auth.get_user.return_value.user = None
+        with self.assertRaises(ValueError):
+            self.module.sim_user_key("unverified-token")
         self.save.assert_not_called()
 
 

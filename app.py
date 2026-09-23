@@ -37,7 +37,7 @@ try:
 except Exception:
     WordCloud = None
 from bs4 import BeautifulSoup
-from flask import Flask, request, jsonify, send_file, abort, render_template
+from flask import Flask, request, jsonify, send_file, abort, render_template, has_request_context
 from flask_cors import CORS
 from pydantic import BaseModel, Field, ValidationError
 from openai import OpenAI
@@ -363,8 +363,17 @@ DEMO_MEMBER_USER = {
 def sim_user_key(access_token: str) -> str:
     if access_token == DEMO_MEMBER_TOKEN:
         return "demo-member"
-    digest = hashlib.sha256(str(access_token).encode("utf-8")).hexdigest()
-    return f"user-{digest[:24]}"
+    if has_request_context():
+        user = getattr(request, "user", {})
+        if user.get("token") == access_token and user.get("uid"):
+            return f"user-{user['uid']}"
+    if not db:
+        raise ValueError("無法驗證模擬帳戶使用者，請重新登入。")
+    response = db.client.auth.get_user(access_token)
+    uid = getattr(getattr(response, "user", None), "id", None)
+    if not isinstance(uid, str) or not uid:
+        raise ValueError("無法驗證模擬帳戶使用者，請重新登入。")
+    return f"user-{uid}"
 
 def load_local_sim_store() -> Dict[str, Any]:
     with SIM_DATA_LOCK:
@@ -381,6 +390,24 @@ def save_local_sim_store(store: Dict[str, Any]) -> None:
     with SIM_DATA_LOCK:
         SIM_DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
         SIM_DATA_FILE.write_text(json.dumps(store, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def load_local_sim_store_for_user(access_token: str) -> Tuple[str, Dict[str, Any]]:
+    user_key = sim_user_key(access_token)
+    store = load_local_sim_store()
+    users = store.setdefault("users", {})
+    if access_token != DEMO_MEMBER_TOKEN and user_key not in users:
+        digest = hashlib.sha256(str(access_token).encode("utf-8")).hexdigest()
+        legacy_key = f"user-{digest[:24]}"
+        if legacy_key in users:
+            state = users.pop(legacy_key)
+            portfolio = state.get("portfolio") or {}
+            portfolio["id"] = f"local-{user_key}"
+            portfolio["user_id"] = user_key
+            state["portfolio"] = portfolio
+            users[user_key] = state
+            save_local_sim_store(store)
+    return user_key, store
 
 def default_local_sim_state(user_key: str, initial_cash: float = SIM_INITIAL_CASH) -> Dict[str, Any]:
     now = datetime.utcnow().isoformat()
@@ -408,8 +435,7 @@ def default_local_sim_state(user_key: str, initial_cash: float = SIM_INITIAL_CAS
     }
 
 def get_local_sim_state(access_token: str, initial_cash: float = SIM_INITIAL_CASH) -> Tuple[str, Dict[str, Any], Dict[str, Any]]:
-    user_key = sim_user_key(access_token)
-    store = load_local_sim_store()
+    user_key, store = load_local_sim_store_for_user(access_token)
     users = store.setdefault("users", {})
     if user_key not in users:
         users[user_key] = default_local_sim_state(user_key, initial_cash)
@@ -419,8 +445,7 @@ def get_local_sim_state(access_token: str, initial_cash: float = SIM_INITIAL_CAS
 def local_sim_preferred(access_token: str) -> bool:
     if access_token == DEMO_MEMBER_TOKEN:
         return True
-    user_key = sim_user_key(access_token)
-    store = load_local_sim_store()
+    user_key, store = load_local_sim_store_for_user(access_token)
     state = (store.get("users") or {}).get(user_key) or {}
     return bool(state.get("prefer_local"))
 
