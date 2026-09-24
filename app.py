@@ -2439,13 +2439,19 @@ def api_sim_trade_portfolio():
 @app.route("/api/sim-trade/history", methods=["GET"])
 @token_required
 def api_sim_trade_history():
-    limit = int(request.args.get("limit", 50))
     access_token, error = require_sim_trade_token()
     if error:
         return error
+    try:
+        limit = int(request.args.get("limit", 50))
+    except (TypeError, ValueError):
+        return jsonify({"error": "limit 必須是正整數。"}), 400
+    if limit <= 0:
+        return jsonify({"error": "limit 必須是正整數。"}), 400
+    limit = min(limit, 100)
     if local_sim_preferred(access_token):
         _, state, _ = get_local_sim_state(access_token)
-        trades = state.get("trades") or []
+        trades = (state.get("trades") or [])[:limit]
     else:
         trades = db.sim_list_transactions(access_token, limit=limit) if db else []
     return jsonify({"trades": [normalize_trade(row) for row in trades]})

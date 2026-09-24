@@ -76,6 +76,27 @@ class LocalLedgerTests(unittest.TestCase):
         self.assertEqual(response.get_json()["trades"], [])
         self.db.sim_list_transactions.assert_called_once_with(self.token, limit=50)
 
+    def test_invalid_history_limits_return_bad_request(self):
+        for limit in ("abc", "", "1.5", "0", "-1"):
+            with self.subTest(limit=limit):
+                response = self.client.get("/api/sim-trade/history", query_string={"limit": limit}, headers=self.headers)
+                self.assertEqual(response.status_code, 400)
+        self.db.sim_list_transactions.assert_not_called()
+
+    def test_local_history_respects_limit_without_deleting_trades(self):
+        self.state["trades"] *= 3
+        response = self.client.get("/api/sim-trade/history?limit=2", headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.get_json()["trades"]), 2)
+        self.assertEqual(len(self.state["trades"]), 3)
+
+    def test_remote_history_caps_limit(self):
+        self.state["prefer_local"] = False
+        self.db.sim_list_transactions.return_value = []
+        response = self.client.get("/api/sim-trade/history?limit=999999", headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        self.db.sim_list_transactions.assert_called_once_with(self.token, limit=100)
+
     def test_remote_member_reset_still_uses_remote_ledger(self):
         self.state["prefer_local"] = False
         self.db.sim_get_or_create_portfolio.return_value = {"cash_balance": 100000, "initial_cash": 100000}
