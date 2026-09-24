@@ -1723,7 +1723,12 @@ def get_coin_details(symbol):
 @app.route("/crypto/popular", methods=["GET"])
 def crypto_popular():
     vs_currency = request.args.get("vs_currency", "usd")
-    per_page = int(request.args.get("per_page", 20))
+    try:
+        per_page = int(request.args.get("per_page", 20))
+    except (TypeError, ValueError):
+        return jsonify({"error": "per_page 必須是 1 到 250 的整數。"}), 400
+    if not 1 <= per_page <= 250:
+        return jsonify({"error": "per_page 必須是 1 到 250 的整數。"}), 400
     params = {"vs_currency": vs_currency, "order": "market_cap_desc", "per_page": per_page, "page": 1, "sparkline": "false"}
     data = DataManager._cg_get("/coins/markets", params) or []
     return jsonify([{"id": c.get("id"), "symbol": (c.get("symbol") or "").upper(), "name": c.get("name"), "current_price": c.get("current_price"), "market_cap": c.get("market_cap"), "price_change_percentage_24h": c.get("price_change_percentage_24h"), "market_cap_rank": c.get("market_cap_rank")} for c in data])
