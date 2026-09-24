@@ -9,7 +9,7 @@ const authSource = fs.readFileSync(path.join(__dirname, "../static/js/auth.js"),
   .replace(/^import\s+\{\s*createClient\s*\}[^;]+;\s*/, "const createClient = globalThis.__createClient;\n");
 const registerSource = fs.readFileSync(path.join(__dirname, "../static/js/register.js"), "utf8");
 
-async function runRegistration({ configured = true, error = null, throws = false } = {}) {
+async function runRegistration({ configured = true, error = null, throws = false, duplicate = false } = {}) {
   const elements = {
     displayName: { value: "Test Member" },
     registerEmail: { value: "member@example.invalid" },
@@ -53,7 +53,9 @@ async function runRegistration({ configured = true, error = null, throws = false
   vm.runInContext(authSource, sandbox);
   await new Promise((resolve) => setImmediate(resolve));
   vm.runInContext(registerSource, sandbox);
-  await sandbox.registerUser({ preventDefault() {} });
+  const pending = sandbox.registerUser({ preventDefault() {} });
+  if (duplicate) await sandbox.registerUser({ preventDefault() {} });
+  await pending;
   return { elements, payloads, alerts, reloads };
 }
 
@@ -77,7 +79,12 @@ async function main() {
   assert.equal(result.reloads, 1);
   assert.equal(result.elements.btnRegister.disabled, false);
   console.log("PASS 真正註冊成功才顯示成功，暱稱仍傳給 Supabase");
-  console.log("ALL PASS 4/4");
+  const duplicate = await runRegistration({ duplicate: true });
+  assert.equal(duplicate.payloads.length, 1, "pending registration must not submit twice");
+  assert.equal(duplicate.reloads, 1);
+  assert.equal(duplicate.elements.btnRegister.disabled, false);
+  console.log("PASS 等待註冊回應期間不重複送出請求");
+  console.log("ALL PASS 5/5");
 }
 
 main().catch((error) => { console.error(error); process.exitCode = 1; });

@@ -47,6 +47,7 @@ function validatePassword() {
 
 async function registerUser(e) {
   e.preventDefault();
+  if (document.getElementById("btnRegister")?.disabled) return;
   clearMessage();
 
   const name = document.getElementById("displayName").value.trim();
