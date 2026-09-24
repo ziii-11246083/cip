@@ -316,9 +316,6 @@ window.authManager = {
     loginWithGoogle: async () => {
         if (!requireSupabase()) return;
         try {
-            localStorage.removeItem(DEMO_MEMBER_KEY);
-            sessionStorage.removeItem(DEMO_MEMBER_KEY);
-            localStorage.removeItem(GUEST_MODE_KEY);
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: "google",
                 options: {
@@ -339,11 +336,9 @@ window.authManager = {
         }
         if (!requireSupabase()) return;
         try {
-            localStorage.removeItem(DEMO_MEMBER_KEY);
-            sessionStorage.removeItem(DEMO_MEMBER_KEY);
-            localStorage.removeItem(GUEST_MODE_KEY);
-            const { error } = await supabase.auth.signInWithPassword({ email, password });
+            const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
             if (error) throw error;
+            if (data?.session) applyAuthState(data.session);
             alert("登入成功！");
             window.location.reload();
         } catch (error) {
@@ -357,16 +352,14 @@ window.authManager = {
             return false;
         }
         try {
-            localStorage.removeItem(DEMO_MEMBER_KEY);
-            sessionStorage.removeItem(DEMO_MEMBER_KEY);
-            localStorage.removeItem(GUEST_MODE_KEY);
             const safeMeta = metadata && typeof metadata === "object" ? metadata : {};
             const payload = { email, password };
             if (Object.keys(safeMeta).length) {
                 payload.options = { data: safeMeta };
             }
-            const { error } = await supabase.auth.signUp(payload);
+            const { data, error } = await supabase.auth.signUp(payload);
             if (error) throw error;
+            if (data?.session) applyAuthState(data.session);
             alert("註冊成功，請檢查信箱完成驗證（若已關閉驗證則會直接登入）");
             window.location.reload();
             return true;
@@ -377,19 +370,21 @@ window.authManager = {
     },
     logoutUser: async () => {
         try {
+            if (supabase) {
+                const { error } = await supabase.auth.signOut();
+                if (error) throw error;
+            }
             localStorage.removeItem(DEMO_MEMBER_KEY);
             sessionStorage.removeItem(DEMO_MEMBER_KEY);
             localStorage.removeItem(GUEST_MODE_KEY);
             localStorage.removeItem(AI_COACH_CONVERSATION_KEY);
             localStorage.removeItem("conversation_id");
-            if (supabase) {
-                const { error } = await supabase.auth.signOut();
-                if (error) throw error;
-            }
+            applyAuthState(null);
             alert("已登出");
             window.location.reload();
         } catch (error) {
             console.error("登出失敗", error);
+            alert(`登出失敗，請重試：${error.message}`);
         }
     },
     resetPassword: async (email) => {

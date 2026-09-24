@@ -43,6 +43,7 @@ async function main() {
     },
   };
   const events = [];
+  const alerts = [];
   const listeners = new Map();
   const requests = [];
   const sandbox = {
@@ -54,7 +55,7 @@ async function main() {
     },
     localStorage,
     sessionStorage: makeStorage(),
-    alert() {},
+    alert(message) { alerts.push(message); },
     document: {
       body,
       getElementById() { return null; },
@@ -97,6 +98,29 @@ async function main() {
   assert.strictEqual(sandbox.authManager.isLoggedIn(), true, "Supabase null event 不得覆寫 Demo session");
   assert.strictEqual(body.classList.contains("is-member-locked"), false);
   assert.ok(events.some((event) => event.type === "smartinvest:auth-state" && event.detail.isMember));
+
+  // Failed attempts must not remove the active Demo identity or its token.
+  fakeSupabase.auth.signInWithPassword = async () => ({ error: new Error("wrong password") });
+  fakeSupabase.auth.signUp = async () => ({ error: new Error("signup rejected") });
+  fakeSupabase.auth.signInWithOAuth = async () => { throw new Error("offline"); };
+  fakeSupabase.auth.signOut = async () => ({ error: new Error("offline") });
+  for (const attempt of [
+    () => sandbox.authManager.loginWithEmail("member@example.invalid", "wrong"),
+    () => sandbox.authManager.signUpWithEmail("member@example.invalid", "test-password"),
+    () => sandbox.authManager.loginWithGoogle(),
+    () => sandbox.authManager.logoutUser(),
+  ]) {
+    await attempt();
+    assert.strictEqual(sandbox.authManager.isDemoMember(), true);
+    assert.strictEqual(sandbox.authManager.isLoggedIn(), true);
+    assert.strictEqual(await sandbox.authManager.getToken(), "smartinvest-demo-member-token");
+  }
+  assert.ok(alerts.some(message => message.includes("登出失敗")));
+  // Signup awaiting email confirmation must also retain the existing identity.
+  fakeSupabase.auth.signUp = async () => ({ data: { session: null }, error: null });
+  sandbox.location.reload = () => {};
+  assert.strictEqual(await sandbox.authManager.signUpWithEmail("member@example.invalid", "test-password"), true);
+  assert.strictEqual(sandbox.authManager.isDemoMember(), true);
 
   // Exercise the real member page listener, not a stand-in for its refresh logic.
   const memberPath = path.join(__dirname, "..", "static", "js", "member.js");
