@@ -107,6 +107,26 @@ class LocalLedgerTests(unittest.TestCase):
         self.db.sim_reset_portfolio.assert_called_once_with(self.token, 100000, 100000)
         self.save.assert_not_called()
 
+    def test_remote_reset_failure_is_not_reported_as_success(self):
+        self.state["prefer_local"] = False
+        self.db.sim_reset_portfolio.side_effect = RuntimeError("synthetic-private-error")
+        response = self.client.post("/api/sim-trade/reset", headers=self.headers)
+        self.assertEqual(response.status_code, 503)
+        self.assertFalse(response.get_json()["success"])
+        self.assertNotIn("synthetic-private-error", response.get_data(as_text=True))
+        self.assertEqual(self.state["portfolio"]["cash_balance"], 35000)
+        self.assertFalse(self.state["prefer_local"])
+        self.save.assert_not_called()
+
+    def test_database_reset_propagates_failure_without_logging_credentials(self):
+        from supabase_client import SupabaseDB
+        database = object.__new__(SupabaseDB)
+        with patch.object(database, "_authed_client", side_effect=RuntimeError("synthetic-secret-token")):
+            with self.assertLogs("supabase_client", level="WARNING") as logs:
+                with self.assertRaisesRegex(RuntimeError, "^sim_reset_failed$"):
+                    database.sim_reset_portfolio("test-token")
+        self.assertNotIn("synthetic-secret-token", " ".join(logs.output))
+
     def test_refreshed_token_keeps_same_member_cash_and_positions(self):
         for token in (self.token, "synthetic-refreshed-token"):
             with self.subTest(token=token):

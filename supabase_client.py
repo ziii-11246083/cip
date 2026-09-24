@@ -395,8 +395,8 @@ class SupabaseDB:
                 return response.data if isinstance(response.data, dict) else response.data[0]
             return {}
         except Exception as exc:
-            logger.exception("sim_reset_portfolio failed: %s", exc)
-            return {}
+            logger.warning("sim_reset_portfolio failed (code=sim_reset_failed)")
+            raise RuntimeError("sim_reset_failed") from None
 
     def create_conversation(self, user_id: str, title: Optional[str] = None, ai_model: str = "gpt-4o-mini") -> Optional[str]:
         try:

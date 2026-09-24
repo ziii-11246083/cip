@@ -2423,7 +2423,7 @@ def execute_sim_order(
 
     trade = normalize_trade(result.get("trade") if isinstance(result, dict) else {})
     if not trade:
-        return local_execute_sim_order(access_token, symbol, side, price, quantity, amount)
+        raise ValueError("無法確認遠端成交結果，請先重新整理交易紀錄確認，勿立即重複下單。")
     return trade
 
 
@@ -2491,7 +2491,10 @@ def api_sim_trade_reset():
         store.setdefault("users", {})[user_key] = state
         save_local_sim_store(store)
     else:
-        db.sim_reset_portfolio(access_token, SIM_INITIAL_CASH, SIM_INITIAL_CASH)
+        try:
+            db.sim_reset_portfolio(access_token, SIM_INITIAL_CASH, SIM_INITIAL_CASH)
+        except Exception:
+            return jsonify({"success": False, "error": "無法確認遠端重置結果，請重新整理帳本確認。"}), 503
     return jsonify({"success": True, "portfolio": sim_snapshot(access_token)})
 
 

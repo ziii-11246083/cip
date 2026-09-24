@@ -165,6 +165,20 @@ class SimOrderAmountTests(unittest.TestCase):
         self.assertEqual(values["total_value_usd"], 100000)
         self.save.assert_not_called()
 
+    def test_unconfirmed_remote_order_never_creates_local_trade(self):
+        db = Mock()
+        db.client.auth.get_user.return_value = SimpleNamespace(user=SimpleNamespace(id="member-1"))
+        db.sim_get_or_create_portfolio.return_value = {"cash_balance": 100000, "initial_cash": 100000}
+        db.sim_list_positions.return_value = []
+        original = copy.deepcopy(self.store)
+        for result in ({}, None, {"trade": None}):
+            with self.subTest(result=result), patch.object(self.module, "db", db):
+                db.sim_execute_order.return_value = result
+                with self.assertRaisesRegex(ValueError, "無法確認遠端成交"):
+                    self.module.execute_sim_order("test-member-token", "BTC", "buy", 1)
+                self.assertEqual(self.store, original)
+                self.save.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
