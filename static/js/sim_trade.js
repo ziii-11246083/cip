@@ -5,6 +5,7 @@
   let coinOptions = [];
   let currentPortfolio = null;
   let lastStressResult = null;
+  let stressRequestVersion = 0;
   let isLocked = false;
   let initialAuthState = null;
   let authReloadPending = false;
@@ -125,11 +126,11 @@
       label = "風險中";
     }
 
-    const reason = `黑天鵝情境下，總報酬約 ${fmtPct(totalReturn)}，最大回撤約 ${fmtPct(maxDrawdown)}，期末值約 ${fmtUSD(finalValue)}。`;
+    const reason = `所選策略重新配置後，在黑天鵝假設下總報酬約 ${fmtPct(totalReturn)}，最大回撤約 ${fmtPct(maxDrawdown)}，期末值約 ${fmtUSD(finalValue)}。這不是原持倉的直接測試結果。`;
     const actionMap = {
-      high: "建議降低單一幣種或風險資產集中度，保留更多現金，再用同一個 seed 重跑比較。",
-      medium: "建議檢查持倉比例，評估是否增加穩定幣或分批調整，再觀察熊市與黑天鵝差距。",
-      low: "目前組合在此假設下相對穩定，可再測更長期間或積極型策略，確認風險承受度。"
+      high: "比較較低風險資產比例的策略，觀察此模型下的差異。",
+      medium: "使用同一份快照比較其他策略與情境。",
+      low: "所選策略在此假設下跌幅較小；可比較不同期間與 seed，不能據此推論實際投資風險低。"
     };
     return {
       level,
@@ -166,6 +167,10 @@
     appendStressText(meta, "strong", result.strategies?.[strategy]?.label || strategy);
     appendStressText(meta, "span", `起始基準 ${fmtUSD(result.snapshot?.initial_value)} · ${result.period?.days || 0} 個合成日 · seed ${result.seed}`);
     root.appendChild(meta);
+    const allocation = rows.black_swan?.initial_allocation;
+    if (allocation) {
+      appendStressText(root, "p", `測試起始配置：${Object.entries(allocation).map(([symbol, value]) => `${symbol === "CASH" ? "現金" : symbol} ${fmtUSD(value)}`).join("、")}；實際風險資產比例 ${fmtPct(rows.black_swan.actual_risk_weight)}。`);
+    }
     renderStressInterpretation(root, result, strategy);
 
     const tableWrap = document.createElement("div");
@@ -203,6 +208,9 @@
 
   async function runStressTest() {
     if (isLocked || !currentPortfolio) return;
+    const requestVersion = ++stressRequestVersion;
+    lastStressResult = null;
+    $("stressResults")?.replaceChildren();
     const horizonDays = Number($("stressHorizon")?.value || 90);
     const seed = Number($("stressSeed")?.value || 20260820);
     const snapshot = stressSnapshot();
@@ -224,10 +232,12 @@
           snapshot, horizon_days: horizonDays, seed
         })
       });
+      if (requestVersion !== stressRequestVersion) return;
       lastStressResult = data.stress_test || null;
       renderStressResults(lastStressResult);
       setStressStatus("已完成四種情境比較；結果沒有寫回模擬帳本。", "ok");
     } catch (error) {
+      if (requestVersion !== stressRequestVersion) return;
       setStressStatus(error.message || "壓力測試失敗。", "bad");
     }
   }
@@ -530,6 +540,10 @@
   async function refreshPortfolio() {
     const data = await request("/api/sim-trade/portfolio");
     currentPortfolio = data.portfolio || null;
+    stressRequestVersion++;
+    lastStressResult = null;
+    $("stressResults")?.replaceChildren();
+    setStressStatus("組合已更新，請重新執行情境測試以取得此快照的結果。", "");
     updateKpis(data.portfolio);
     renderPositions(data.portfolio);
     drawEquity(data.portfolio);

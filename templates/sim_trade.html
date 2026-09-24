@@ -110,6 +110,7 @@
           <div class="status" id="stressStatus" role="status" aria-live="polite">等待執行；基準為目前模擬組合總值。</div>
           <div class="stress-results" id="stressResults"></div>
           <p class="stress-limitations"><strong>合成年化波動</strong>是合成日報酬標準差年化後的風險指標，可能超過 100%；它不是虧損比例或發生機率。</p>
+          <p class="stress-limitations">計算方式：先依策略重新配置風險資產，保留各風險幣種之間的相對比例；不是直接測試原持倉比例。若沒有風險資產，則保留現金與穩定幣配置。黑天鵝假設風險資產期末下跌 60%、穩定幣期末下跌 3%、現金不變；第 5 日另有衝擊，已包含在期末目標中。最大回撤是路徑中從高點至低點的跌幅，可能大於期末虧損。Seed 改變中間路徑，不改變期末目標。</p>
           <p class="stress-limitations">限制：未模擬手續費、稅負、流動性與成交滑價；期末目標是風險資產的情境假設，不是實際歷史價格。</p>
         </section>
 

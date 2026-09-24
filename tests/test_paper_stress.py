@@ -33,6 +33,19 @@ BASE = {
 
 
 class DeterministicStressTests(unittest.TestCase):
+    def test_displayed_allocation_explains_black_swan_final_value(self):
+        for snapshot in (BASE, {"cash": 25000, "positions": [{"symbol": "USDC", "market_value": 75000}]}):
+            result = self._run_case(snapshot=snapshot)
+            for strategy in STRATEGIES:
+                row = result["results"][strategy]["black_swan"]
+                allocation = row["initial_allocation"]
+                cash = allocation.get("CASH", 0)
+                stable = allocation.get("USDC", 0)
+                risky = sum(allocation.values()) - cash - stable
+                self.assertAlmostEqual(sum(allocation.values()), 100000)
+                self.assertAlmostEqual(row["actual_risk_weight"], risky / 100000)
+                self.assertAlmostEqual(row["metrics"]["final_value"], cash + stable * .97 + risky * .4, places=2)
+
     def _run_case(self, snapshot=None, seed=42, days=90):
         return run_stress_test({
             "snapshot": snapshot if snapshot is not None else copy.deepcopy(BASE),

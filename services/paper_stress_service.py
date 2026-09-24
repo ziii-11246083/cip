@@ -268,6 +268,12 @@ def _simulate(
         "scenario_label": scenario["label"],
         "strategy": strategy_key,
         "strategy_label": STRATEGIES[strategy_key]["label"],
+        "initial_allocation": allocation,
+        "actual_risk_weight": (
+            sum(value for symbol, value in allocation.items()
+                if symbol != "CASH" and symbol not in STABLECOINS) / initial
+            if initial > 0 else 0.0
+        ),
         "metrics": _metrics(path),
         "path": [round(value, 2) for value in path],
     }
