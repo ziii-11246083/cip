@@ -1371,6 +1371,13 @@ def _fetch_yfinance_series(symbol: str, days: int) -> List[List[float]]:
 
 def calculate_portfolio_risk_health(req: RiskHealthRequest) -> Dict[str, float]:
     holdings = [holding for holding in (req.holdings or []) if str(holding.ticker or "").strip()]
+    combined_weights = {}
+    for holding in holdings:
+        symbol = str(holding.ticker).strip().upper()
+        combined_weights[symbol] = combined_weights.get(symbol, 0.0) + holding.weight
+    combined_total = sum(combined_weights.values())
+    holdings = [Holding(ticker=symbol, weight=weight / combined_total if combined_total else 0)
+                for symbol, weight in combined_weights.items()]
     if not holdings:
         return {
             "top1_weight": 0.0,
@@ -1425,7 +1432,7 @@ def calculate_portfolio_risk_health(req: RiskHealthRequest) -> Dict[str, float]:
         }
         portfolio_returns = returns_df.mul(pd.Series(weight_lookup), axis=1).sum(axis=1)
         portfolio_value = (1.0 + portfolio_returns).cumprod()
-        running_max = portfolio_value.cummax()
+        running_max = portfolio_value.cummax().clip(lower=1.0)
         drawdowns = portfolio_value / running_max - 1.0
         annual_vol = float(portfolio_returns.std(ddof=0) * math.sqrt(365)) if len(portfolio_returns) else 0.0
         max_drawdown = float(abs(drawdowns.min())) if len(drawdowns) else 0.0
@@ -1770,7 +1777,7 @@ def get_ta(symbol):
         gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
         rs = gain / loss
-        rsi = 100 - (100 / (1 + rs)).iloc[-1]
+        rsi = 50.0 if gain.iloc[-1] == 0 and loss.iloc[-1] == 0 else 100 - (100 / (1 + rs)).iloc[-1]
         sma = df['price'].rolling(window=50).mean().iloc[-1]
         ema = df['price'].ewm(span=20, adjust=False).mean().iloc[-1]
         current = prices[-1]
@@ -1778,7 +1785,7 @@ def get_ta(symbol):
         if rsi < 30: score += 1
         elif rsi > 70: score -= 1
         if current > sma: score += 1
-        else: score -= 1
+        elif current < sma: score -= 1
         signal = "強買" if score >= 2 else "買入" if score == 1 else "賣出" if score == -1 else "強賣" if score <= -2 else "中立"
         return jsonify({"rsi": round(rsi, 2), "sma": round(sma, 2), "ema": round(ema, 2), "signal": signal})
     except Exception: return jsonify({"rsi": "--", "sma": "--", "ema": "--", "signal": "--"})
