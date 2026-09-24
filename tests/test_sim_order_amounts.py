@@ -51,6 +51,30 @@ class SimOrderAmountTests(unittest.TestCase):
         self.assertEqual(result["portfolio"]["positions"][0]["quantity"], 1)
         self.assertEqual(result["portfolio"]["total_value_usd"], 100000)
 
+    def test_nonfinite_deposits_leave_ledger_unchanged(self):
+        original = copy.deepcopy(self.state)
+        for currency in ("amount_usd", "amount_twd"):
+            for amount in ("NaN", "Infinity", "-Infinity", "1e309"):
+                with self.subTest(currency=currency, amount=amount):
+                    response = self.client.post("/api/sim-trade/deposit", headers=self.headers, json={currency: amount})
+                    self.assertEqual(response.status_code, 400)
+                    self.assertEqual(self.state, original)
+        self.save.assert_not_called()
+
+    def test_deposit_overflow_leaves_ledger_unchanged(self):
+        self.state["portfolio"]["cash_balance"] = 1e308
+        original = copy.deepcopy(self.state)
+        response = self.client.post("/api/sim-trade/deposit", headers=self.headers, json={"amount_usd": 1e308})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.state, original)
+        self.save.assert_not_called()
+
+    def test_valid_twd_deposit_updates_cash(self):
+        response = self.client.post("/api/sim-trade/deposit", headers=self.headers, json={"amount_twd": 3200})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["portfolio"]["cash"], 100100)
+        self.save.assert_called_once()
+
     def test_sell_cannot_inflate_proceeds_with_client_amount(self):
         self.state["portfolio"]["cash_balance"] = 35000
         self.state["positions"]["BTC"] = {"quantity": 1, "avg_price": 65000}

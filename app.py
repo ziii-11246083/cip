@@ -2508,14 +2508,18 @@ def api_sim_trade_deposit():
         if amount_usd is None and amount_twd is not None:
             amount_usd = float(amount_twd) / 32.0
         amount = float(amount_usd or 0)
-        if amount <= 0:
+        if not math.isfinite(amount) or amount <= 0:
             return jsonify({"error": "請輸入大於 0 的新增資金。"}), 400
 
         _, state, store = get_local_sim_state(access_token)
-        state["prefer_local"] = True
         portfolio = state.get("portfolio") or {}
-        portfolio["cash_balance"] = float(portfolio.get("cash_balance") or 0) + amount
-        portfolio["initial_cash"] = float(portfolio.get("initial_cash") or 0) + amount
+        new_cash = float(portfolio.get("cash_balance") or 0) + amount
+        new_initial_cash = float(portfolio.get("initial_cash") or 0) + amount
+        if not math.isfinite(new_cash) or not math.isfinite(new_initial_cash):
+            return jsonify({"error": "新增資金超出可處理範圍。"}), 400
+        state["prefer_local"] = True
+        portfolio["cash_balance"] = new_cash
+        portfolio["initial_cash"] = new_initial_cash
         snapshot_total = portfolio["cash_balance"]
         for row in local_position_rows(state):
             snapshot_total += float(row.get("quantity") or 0) * get_coin_price_usd(str(row.get("symbol") or ""))
