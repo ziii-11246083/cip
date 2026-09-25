@@ -1,6 +1,7 @@
 (function () {
   const USD_TO_TWD = 32;
   const $ = (id) => document.getElementById(id);
+  let depositPending = false;
 
   function fmtTwdFromUsd(valueUsd) {
     const value = Number(valueUsd || 0) * USD_TO_TWD;
@@ -284,9 +285,13 @@
 
     $("capitalForm")?.addEventListener("submit", (event) => {
       event.preventDefault();
+      if (depositPending) return;
       if (!requireMember()) return;
       const amountTwd = Number($("capitalAmount")?.value || 0);
-      if (amountTwd <= 0) return alert("請輸入大於 0 的新增資金。");
+      if (!Number.isFinite(amountTwd) || amountTwd <= 0) return alert("請輸入大於 0 的新增資金。");
+      depositPending = true;
+      const submitButton = $("capitalForm")?.querySelector('[type="submit"]');
+      if (submitButton) submitButton.disabled = true;
       request("/api/sim-trade/deposit", {
         method: "POST",
         body: JSON.stringify({
@@ -299,6 +304,9 @@
         return refreshData();
       }).catch((error) => {
         alert(error.message || "新增資金失敗");
+      }).finally(() => {
+        depositPending = false;
+        if (submitButton) submitButton.disabled = false;
       });
     });
 

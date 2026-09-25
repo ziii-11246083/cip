@@ -9,6 +9,7 @@
   let isLocked = false;
   let initialAuthState = null;
   let authReloadPending = false;
+  let orderPending = false;
   const DEFAULT_COINS = [
     { symbol: "BTC", name: "Bitcoin" },
     { symbol: "ETH", name: "Ethereum" },
@@ -557,6 +558,7 @@
   }
 
   async function placeOrder() {
+    if (orderPending) return;
     const symbol = $("orderSymbol")?.value || "BTC";
     const side = $("orderSide")?.value || "buy";
     const quantityRaw = $("orderQty")?.value.trim();
@@ -568,6 +570,8 @@
     }
 
     try {
+      orderPending = true;
+      if ($("btnPlaceOrder")) $("btnPlaceOrder").disabled = true;
       setStatus("委託送出中...", "");
       await request("/api/sim-trade/order", {
         method: "POST",
@@ -584,6 +588,9 @@
       await Promise.all([refreshPortfolio(), refreshTrades()]);
     } catch (error) {
       setStatus(error.message || "下單失敗", "bad");
+    } finally {
+      orderPending = false;
+      if ($("btnPlaceOrder")) $("btnPlaceOrder").disabled = false;
     }
   }
 
