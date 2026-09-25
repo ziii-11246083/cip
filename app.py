@@ -2532,6 +2532,9 @@ def api_sim_trade_deposit():
         if not math.isfinite(amount) or amount <= 0:
             return jsonify({"error": "請輸入大於 0 的新增資金。"}), 400
 
+        if not local_sim_preferred(access_token):
+            return jsonify({"error": "遠端模擬帳本目前尚未支援新增資金；原有現金與持倉已保留，未切換帳本。", "code": "remote_deposit_unavailable"}), 409
+
         _, state, store = get_local_sim_state(access_token)
         portfolio = state.get("portfolio") or {}
         new_cash = float(portfolio.get("cash_balance") or 0) + amount

@@ -118,6 +118,24 @@ class LocalLedgerTests(unittest.TestCase):
         self.assertFalse(self.state["prefer_local"])
         self.save.assert_not_called()
 
+    def test_remote_deposit_does_not_switch_or_create_local_ledger(self):
+        import copy
+        for users in ({self.key: {**self.state, "prefer_local": False}}, {}):
+            with self.subTest(existing=bool(users)):
+                self.store["users"] = users
+                original = copy.deepcopy(self.store)
+                response = self.client.post("/api/sim-trade/deposit", headers=self.headers, json={"amount_usd": 100})
+                self.assertEqual(response.status_code, 409)
+                self.assertEqual(response.get_json()["code"], "remote_deposit_unavailable")
+                self.assertEqual(self.store, original)
+                self.save.assert_not_called()
+
+    def test_active_local_member_can_still_deposit(self):
+        response = self.client.post("/api/sim-trade/deposit", headers=self.headers, json={"amount_usd": 100})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.state["portfolio"]["cash_balance"], 35100)
+        self.assertEqual(self.state["positions"]["BTC"]["quantity"], 1)
+
     def test_database_reset_propagates_failure_without_logging_credentials(self):
         from supabase_client import SupabaseDB
         database = object.__new__(SupabaseDB)
