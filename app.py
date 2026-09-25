@@ -1369,7 +1369,7 @@ def _fetch_yfinance_series(symbol: str, days: int) -> List[List[float]]:
     return prices
 
 
-def calculate_portfolio_risk_health(req: RiskHealthRequest) -> Dict[str, float]:
+def calculate_portfolio_risk_health(req: RiskHealthRequest) -> Dict[str, Any]:
     holdings = [holding for holding in (req.holdings or []) if str(holding.ticker or "").strip()]
     combined_weights = {}
     for holding in holdings:
@@ -1382,8 +1382,9 @@ def calculate_portfolio_risk_health(req: RiskHealthRequest) -> Dict[str, float]:
         return {
             "top1_weight": 0.0,
             "top3_weight": 0.0,
-            "annual_vol": 0.0,
-            "max_drawdown": 0.0,
+            "annual_vol": None,
+            "max_drawdown": None,
+            "market_data_available": False,
             "herfindahl": 0.0,
         }
 
@@ -1414,7 +1415,8 @@ def calculate_portfolio_risk_health(req: RiskHealthRequest) -> Dict[str, float]:
         if history is None or history.empty or "Close" not in history:
             continue
 
-        close_prices = pd.to_numeric(history["Close"], errors="coerce").dropna()
+        close_prices = pd.to_numeric(history["Close"], errors="coerce")
+        close_prices = close_prices.where(np.isfinite(close_prices) & (close_prices > 0)).dropna()
         if len(close_prices) < 2:
             continue
 
@@ -1424,8 +1426,11 @@ def calculate_portfolio_risk_health(req: RiskHealthRequest) -> Dict[str, float]:
 
         aligned_returns[str(holding.ticker).strip().upper()] = returns.tail(period_days)
 
-    if aligned_returns:
-        returns_df = pd.DataFrame(aligned_returns).sort_index().fillna(0.0)
+    required_symbols = {holding.ticker for holding in holdings if holding.weight > 0}
+    returns_df = pd.DataFrame({symbol: values for symbol, values in aligned_returns.items()
+                               if symbol in required_symbols}).sort_index().dropna()
+    market_data_available = bool(required_symbols) and required_symbols.issubset(aligned_returns) and not returns_df.empty
+    if market_data_available:
         weight_lookup = {
             str(holding.ticker).strip().upper(): float(weight)
             for holding, weight in zip(holdings, weights)
@@ -1437,14 +1442,15 @@ def calculate_portfolio_risk_health(req: RiskHealthRequest) -> Dict[str, float]:
         annual_vol = float(portfolio_returns.std(ddof=0) * math.sqrt(365)) if len(portfolio_returns) else 0.0
         max_drawdown = float(abs(drawdowns.min())) if len(drawdowns) else 0.0
     else:
-        annual_vol = 0.0
-        max_drawdown = 0.0
+        annual_vol = None
+        max_drawdown = None
 
     return {
         "top1_weight": round(top1, 6),
         "top3_weight": round(top3, 6),
-        "annual_vol": round(max(0.0, annual_vol), 6),
-        "max_drawdown": round(max(0.0, max_drawdown), 6),
+        "annual_vol": round(max(0.0, annual_vol), 6) if annual_vol is not None else None,
+        "max_drawdown": round(max(0.0, max_drawdown), 6) if max_drawdown is not None else None,
+        "market_data_available": market_data_available,
         "herfindahl": round(herfindahl, 6),
     }
 
@@ -3182,6 +3188,8 @@ def analyze_portfolio_llm():
     try: req = RiskHealthRequest(**(request.get_json(silent=True) or {}))
     except ValidationError as e: return jsonify({"detail": str(e)}), 422
     rh_dict = calculate_portfolio_risk_health(req)
+    if rh_dict.get("market_data_available") is False:
+        return jsonify({"risk_health": rh_dict, "narrative": "行情資料不足，無法計算完整組合的波動與回撤；目前僅能檢查配置集中度。", "highlights": ["請稍後重試，缺少行情不代表零風險。"]})
     holdings_text = ", ".join([f"{h.ticker}({h.weight:.2f})" for h in req.holdings])
 
     # ── RAG trace (TASK 03)：驗證已通過 → 建立 trace；demo 使用者 user_id=NULL；

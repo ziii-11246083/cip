@@ -348,7 +348,7 @@ function renderAiReport(narrative, highlights, metrics){
   ];
   const top1 = Number(metrics?.top1_weight || 0);
   const top3 = Number(metrics?.top3_weight || 0);
-  const vol = Number(metrics?.annual_vol || 0);
+  const vol = metrics?.annual_vol == null ? null : Number(metrics.annual_vol);
   const riskTone = top3 >= 0.8 || top1 >= 0.5 ? "集中偏高" : top3 >= 0.65 ? "中等集中" : "相對分散";
 
   if(!$("aiReport")) return;
@@ -369,7 +369,7 @@ function renderAiReport(narrative, highlights, metrics){
       <div class="report-stat-strip">
         <div><span>最大占比</span><strong>${top1 ? formatPct(top1 * 100) : "--"}</strong></div>
         <div><span>前三占比</span><strong>${top3 ? formatPct(top3 * 100) : "--"}</strong></div>
-        <div><span>年化波動</span><strong>${vol ? formatPct(vol * 100) : "--"}</strong></div>
+        <div><span>年化波動</span><strong>${vol !== null && Number.isFinite(vol) ? formatPct(vol * 100) : "資料不足"}</strong></div>
       </div>
       <div class="report-detail-grid">
         <section class="ai-report-section">
@@ -433,10 +433,10 @@ async function analyzePortfolio(){
   if($("riskBadgeMini")) $("riskBadgeMini").textContent = riskLabel;
   if($("kTop1")) $("kTop1").textContent = formatPct(top1 * 100);
   if($("kTop3")) $("kTop3").textContent = formatPct(top3 * 100);
-  if($("kVol")) $("kVol").textContent = riskLabel === "偏高" ? "較高" : "中等";
-  if($("kMdd")) $("kMdd").textContent = riskLabel === "偏高" ? "需留意" : "可控";
-  if($("riskMeterText")) $("riskMeterText").textContent = riskLabel;
-  if($("riskBar")) $("riskBar").style.width = riskScore + "%";
+  if($("kVol")) $("kVol").textContent = "尚未取得行情";
+  if($("kMdd")) $("kMdd").textContent = "尚未取得行情";
+  if($("riskMeterText")) $("riskMeterText").textContent = "僅配置集中度：" + riskLabel;
+  if($("riskBar")) $("riskBar").style.width = "0%";
 
   const assetLines = Object.values(portfolioAssets)
     .map((asset) => `・${asset.symbol}：${formatMoney(asset.amount)}（${formatPct((asset.amount / allocated) * 100)}）`)
@@ -502,13 +502,19 @@ ${report}`;
 
       if($("kTop1")) $("kTop1").textContent = formatPct(Number(rh.top1_weight || top1) * 100);
       if($("kTop3")) $("kTop3").textContent = formatPct(Number(rh.top3_weight || top3) * 100);
-      if($("kVol")) $("kVol").textContent = formatPct(Number(rh.annual_vol || 0) * 100);
-      if($("kMdd")) $("kMdd").textContent = formatPct(Number(rh.max_drawdown || 0) * 100);
+      const hasMarketData = rh.market_data_available !== false && rh.annual_vol != null && rh.max_drawdown != null;
+      if($("kVol")) $("kVol").textContent = hasMarketData ? formatPct(Number(rh.annual_vol) * 100) : "資料不足";
+      if($("kMdd")) $("kMdd").textContent = hasMarketData ? formatPct(Number(rh.max_drawdown) * 100) : "資料不足";
 
       const apiScore = Math.min(95, Math.round((Number(rh.top1_weight || 0) * 55) + (Number(rh.annual_vol || 0) * 55) + (Number(rh.herfindahl || 0) * 45)));
       if($("riskBar")) $("riskBar").style.width = apiScore + "%";
       if($("riskMeterText")) $("riskMeterText").textContent = apiScore >= 70 ? "偏高" : apiScore >= 45 ? "中等" : "分散";
       if($("riskBadgeMini")) $("riskBadgeMini").textContent = apiScore >= 70 ? "偏高" : apiScore >= 45 ? "中等" : "分散";
+      if(!hasMarketData){
+        if($("riskBar")) $("riskBar").style.width = "0%";
+        if($("riskMeterText")) $("riskMeterText").textContent = "行情不足，無法評分";
+        if($("riskBadgeMini")) $("riskBadgeMini").textContent = "資料不足";
+      }
     }
 
     if(aiRes.status === "fulfilled" && aiRes.value.ok){
