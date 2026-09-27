@@ -22,6 +22,7 @@ class SimOrderAmountTests(unittest.TestCase):
         ):
             import app
         cls.module = app
+        cls.actual_price_lookup = staticmethod(app.get_coin_price_usd)
 
     def setUp(self):
         app = self.module
@@ -145,6 +146,43 @@ class SimOrderAmountTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 400)
                 self.assertEqual(self.store, before)
                 self.save.assert_not_called()
+
+    def test_transient_quote_failure_reuses_recent_real_price(self):
+        app = self.module
+        with (
+            patch.dict(app.SIM_PRICE_CACHE, {}, clear=True),
+            patch.object(app.time, "monotonic", side_effect=[1000.0, 1040.0, 1400.0]),
+            patch.object(app.DataManager, "_cg_get", side_effect=[{"bitcoin": {"usd": 84290}}, None, None]),
+        ):
+            self.assertEqual(self.actual_price_lookup("BTC"), 84290)
+            self.assertEqual(self.actual_price_lookup("BTC"), 84290)
+            with self.assertRaisesRegex(ValueError, "行情暫時無法取得"):
+                self.actual_price_lookup("BTC")
+
+    def test_missing_quote_never_uses_a_fixed_price_for_new_order(self):
+        app = self.module
+        before = copy.deepcopy(self.store)
+        with (
+            patch.dict(app.SIM_PRICE_CACHE, {}, clear=True),
+            patch.object(app.DataManager, "_cg_get", return_value=None),
+        ):
+            with self.assertRaisesRegex(ValueError, "行情暫時無法取得"):
+                self.actual_price_lookup("BTC")
+        self.price.side_effect = ValueError("BTC 行情暫時無法取得，請稍後再試。")
+        response = self.order(amount_usd=100)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.store, before)
+        self.save.assert_not_called()
+
+    def test_missing_quote_marks_existing_position_unavailable(self):
+        self.state["portfolio"]["cash_balance"] = 99900
+        self.state["positions"]["BTC"] = {"quantity": 0.001, "avg_price": 100000}
+        self.price.side_effect = ValueError("BTC 行情暫時無法取得，請稍後再試。")
+        response = self.client.get("/api/sim-trade/portfolio", headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        portfolio = response.get_json()["portfolio"]
+        self.assertEqual(portfolio["price_unavailable_symbols"], ["BTC"])
+        self.assertEqual(portfolio["positions"][0]["current_price"], 100000)
 
     def test_remote_rpc_receives_server_calculated_amount(self):
         db = Mock()

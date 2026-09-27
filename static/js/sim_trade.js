@@ -20,16 +20,6 @@
     { symbol: "USDT", name: "Tether" },
     { symbol: "USDC", name: "USD Coin" }
   ];
-  const FALLBACK_PRICES = {
-    BTC: 65000,
-    ETH: 3200,
-    SOL: 150,
-    XRP: 0.55,
-    BNB: 600,
-    DOGE: 0.12,
-    USDT: 1,
-    USDC: 1
-  };
   const DEMO_PORTFOLIO_ORDERS = [
     { symbol: "BTC", amount_usd: 50000 },
     { symbol: "ETH", amount_usd: 15000 },
@@ -209,6 +199,10 @@
 
   async function runStressTest() {
     if (isLocked || !currentPortfolio) return;
+    if (currentPortfolio.price_unavailable_symbols?.length) {
+      setStressStatus("部分持倉行情暫不可用，無法進行情境比較。請稍後重新整理。", "warn");
+      return;
+    }
     const requestVersion = ++stressRequestVersion;
     lastStressResult = null;
     $("stressResults")?.replaceChildren();
@@ -346,7 +340,7 @@
   function updateQuotePanel() {
     const coin = getSelectedCoin();
     const symbol = String(coin.symbol || "BTC").toUpperCase();
-    const price = Number(coin.current_price || FALLBACK_PRICES[symbol] || 0);
+    const price = Number(coin.current_price || 0);
     const marketCap = Number(coin.market_cap || 0);
     const change24h = Number(coin.price_change_percentage_24h || 0);
     const side = $("orderSide")?.value || "buy";
@@ -407,13 +401,14 @@
 
   function updateKpis(snapshot) {
     if (!snapshot) return;
-    $("kpiTotal").textContent = fmtUSD(snapshot.total_value_usd);
+    const valuationUnavailable = Boolean(snapshot.price_unavailable_symbols?.length);
+    $("kpiTotal").textContent = valuationUnavailable ? "--" : fmtUSD(snapshot.total_value_usd);
     $("kpiCash").textContent = fmtUSD(snapshot.cash);
-    $("kpiPnl").textContent = fmtUSD(snapshot.unrealized_pnl);
+    $("kpiPnl").textContent = valuationUnavailable ? "--" : fmtUSD(snapshot.unrealized_pnl);
 
     const pnlPct = Number(snapshot.pnl_pct || 0);
     const pnlPctEl = $("kpiPnlPct");
-    pnlPctEl.textContent = (pnlPct >= 0 ? "+" : "") + pnlPct.toFixed(2) + "%";
+    pnlPctEl.textContent = valuationUnavailable ? "--" : (pnlPct >= 0 ? "+" : "") + pnlPct.toFixed(2) + "%";
     pnlPctEl.className = "sub " + (pnlPct >= 0 ? "ok" : "bad");
   }
 
@@ -429,14 +424,15 @@
 
     body.innerHTML = positions.map((pos) => {
       const pnl = Number(pos.unrealized_pnl || 0);
+      const unavailable = snapshot.price_unavailable_symbols?.includes(pos.symbol);
       return `
         <tr>
           <td>${pos.symbol}</td>
           <td>${fmtQty(pos.quantity)}</td>
           <td>${fmtUSD(pos.avg_price)}</td>
-          <td>${fmtUSD(pos.current_price)}</td>
-          <td>${fmtUSD(pos.market_value)}</td>
-          <td class="${pnl >= 0 ? "ok" : "bad"}">${fmtUSD(pnl)}</td>
+          <td>${unavailable ? "--" : fmtUSD(pos.current_price)}</td>
+          <td>${unavailable ? "--" : fmtUSD(pos.market_value)}</td>
+          <td class="${pnl >= 0 ? "ok" : "bad"}">${unavailable ? "--" : fmtUSD(pnl)}</td>
         </tr>
       `;
     }).join("");
@@ -544,7 +540,10 @@
     stressRequestVersion++;
     lastStressResult = null;
     $("stressResults")?.replaceChildren();
-    setStressStatus("組合已更新，請重新執行情境測試以取得此快照的結果。", "");
+    const unavailable = currentPortfolio?.price_unavailable_symbols || [];
+    setStressStatus(unavailable.length
+      ? `${unavailable.join("、")} 行情暫不可用，總資產與損益暫不顯示；請稍後重新整理。`
+      : "組合已更新，請重新執行情境測試以取得此快照的結果。", unavailable.length ? "warn" : "");
     updateKpis(data.portfolio);
     renderPositions(data.portfolio);
     drawEquity(data.portfolio);

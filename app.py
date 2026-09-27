@@ -241,6 +241,8 @@ AUDIO_DIR.mkdir(parents=True, exist_ok=True)
 SIM_INITIAL_CASH = 100000.0
 SIM_DATA_FILE = DATA_DIR / "sim_trade_local.json"
 SIM_DATA_LOCK = Lock()
+SIM_PRICE_LOCK = Lock()
+SIM_PRICE_CACHE: Dict[str, Tuple[float, float]] = {}
 
 class Config:
     CG_API_KEY: str = os.getenv("CG_API_KEY", "")
@@ -2209,16 +2211,28 @@ def build_agent_allocation(profile: str, budget: Any) -> List[Dict[str, Any]]:
 
 def get_coin_price_usd(symbol: str) -> float:
     symbol = symbol.upper()
+    now = time.monotonic()
+    with SIM_PRICE_LOCK:
+        cached = SIM_PRICE_CACHE.get(symbol)
+    if cached and now - cached[1] < 30:
+        return cached[0]
     coin_id = CG_ID_MAP.get(symbol, symbol.lower())
     data = DataManager._cg_get(
         "/simple/price",
         {"ids": coin_id, "vs_currencies": "usd"},
     ) or {}
     price = data.get(coin_id, {}).get("usd")
-    if price:
-        return float(price)
-    fallback = {"BTC": 65000, "ETH": 3200, "SOL": 150, "USDC": 1, "USDT": 1, "LINK": 15}
-    return float(fallback.get(symbol, 10))
+    try:
+        price = float(price)
+    except (TypeError, ValueError):
+        price = 0.0
+    if math.isfinite(price) and price > 0:
+        with SIM_PRICE_LOCK:
+            SIM_PRICE_CACHE[symbol] = (price, now)
+        return price
+    if cached and now - cached[1] < 300:
+        return cached[0]
+    raise ValueError(f"{symbol} 行情暫時無法取得，請稍後再試。")
 
 
 def require_sim_trade_token() -> Tuple[Optional[str], Optional[Tuple[Any, int]]]:
@@ -2318,14 +2332,20 @@ def sim_snapshot(access_token: str) -> Dict[str, Any]:
     initial_cash = float(portfolio.get("initial_cash") or SIM_INITIAL_CASH)
 
     positions = []
+    price_unavailable_symbols = []
     total_value = cash
     for row in position_rows:
         symbol = str(row.get("symbol", "")).upper()
         qty = float(row.get("quantity", 0))
         if not symbol or qty <= 0:
             continue
-        current_price = get_coin_price_usd(symbol)
-        avg_price = float(row.get("avg_price") or current_price)
+        avg_price = float(row.get("avg_price") or 0)
+        try:
+            current_price = get_coin_price_usd(symbol)
+        except ValueError:
+            current_price = avg_price
+            price_unavailable_symbols.append(symbol)
+        avg_price = avg_price or current_price
         market_value = qty * current_price
         total_value += market_value
         positions.append({
@@ -2373,6 +2393,7 @@ def sim_snapshot(access_token: str) -> Dict[str, Any]:
     return {
         "cash": cash,
         "positions": positions,
+        "price_unavailable_symbols": price_unavailable_symbols,
         "total_value_usd": total_value,
         "unrealized_pnl": unrealized_pnl,
         "pnl_pct": pnl_pct,
