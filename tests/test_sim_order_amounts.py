@@ -151,11 +151,15 @@ class SimOrderAmountTests(unittest.TestCase):
         app = self.module
         with (
             patch.dict(app.SIM_PRICE_CACHE, {}, clear=True),
-            patch.object(app.time, "monotonic", side_effect=[1000.0, 1040.0, 1400.0]),
-            patch.object(app.DataManager, "_cg_get", side_effect=[{"bitcoin": {"usd": 84290}}, None, None]),
+            patch.object(app.time, "monotonic", return_value=1000.0) as clock,
+            patch.object(app.time, "time", return_value=2000.0),
+            patch.object(app, "_fetch_recent_yahoo_price", return_value=(0.0, 0.0)),
+            patch.object(app.DataManager, "_cg_get", side_effect=[{"bitcoin": {"usd": 84290, "last_updated_at": 2000}}, None, None]),
         ):
             self.assertEqual(self.actual_price_lookup("BTC"), 84290)
+            clock.return_value = 1040.0
             self.assertEqual(self.actual_price_lookup("BTC"), 84290)
+            clock.return_value = 1400.0
             with self.assertRaisesRegex(ValueError, "行情暫時無法取得"):
                 self.actual_price_lookup("BTC")
 
@@ -165,6 +169,7 @@ class SimOrderAmountTests(unittest.TestCase):
         with (
             patch.dict(app.SIM_PRICE_CACHE, {}, clear=True),
             patch.object(app.DataManager, "_cg_get", return_value=None),
+            patch.object(app, "_fetch_recent_yahoo_price", return_value=(0.0, 0.0)),
         ):
             with self.assertRaisesRegex(ValueError, "行情暫時無法取得"):
                 self.actual_price_lookup("BTC")

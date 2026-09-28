@@ -242,7 +242,7 @@ SIM_INITIAL_CASH = 100000.0
 SIM_DATA_FILE = DATA_DIR / "sim_trade_local.json"
 SIM_DATA_LOCK = Lock()
 SIM_PRICE_LOCK = Lock()
-SIM_PRICE_CACHE: Dict[str, Tuple[float, float]] = {}
+SIM_PRICE_CACHE: Dict[str, Tuple[float, float, float]] = {}
 
 class Config:
     CG_API_KEY: str = os.getenv("CG_API_KEY", "")
@@ -636,13 +636,13 @@ def ttl_cache(ttl_seconds: int):
 # ==========================================
 class DataManager:
     @staticmethod
-    def _cg_get(path: str, params: dict = None) -> Any:
+    def _cg_get(path: str, params: dict = None, timeout: float = 10) -> Any:
         url = f"https://api.coingecko.com/api/v3{path}"
         headers = {'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json'}
         if Config.CG_API_KEY and Config.CG_API_KEY.startswith("CG-") and Config.CG_API_KEY.isascii():
             headers['x-cg-demo-api-key'] = Config.CG_API_KEY
         try:
-            res = requests.get(url, params=params, headers=headers, timeout=10)
+            res = requests.get(url, params=params, headers=headers, timeout=timeout)
             if res.status_code == 200: return res.json()
         except Exception: pass
         return None
@@ -2209,28 +2209,68 @@ def build_agent_allocation(profile: str, budget: Any) -> List[Dict[str, Any]]:
     ]
 
 
+def _fetch_recent_yahoo_price(symbol: str) -> Tuple[float, float]:
+    """Return a recent intraday quote and its age, never a daily close."""
+    try:
+        history = yf.Ticker(_resolve_yahoo_ticker(symbol)).history(
+            period="1d", interval="1m", auto_adjust=True, timeout=5,
+        )
+        if history is None or history.empty or "Close" not in history:
+            return 0.0, 0.0
+        point = history.iloc[-1]
+        price = float(point["Close"])
+        age = time.time() - pd.Timestamp(history.index[-1]).timestamp()
+        if math.isfinite(price) and price > 0 and 0 <= age < 300:
+            return price, age
+    except Exception:
+        pass
+    return 0.0, 0.0
+
+
+@app.route("/crypto/quote", methods=["GET"])
+def crypto_quote():
+    symbol = request.args.get("ticker", "BTC").strip().upper()
+    if symbol not in CG_ID_MAP:
+        return jsonify({"error": "不支援的幣種。"}), 400
+    try:
+        response = jsonify({"symbol": symbol, "current_price": get_coin_price_usd(symbol)})
+    except ValueError as error:
+        response = jsonify({"symbol": symbol, "current_price": None, "error": str(error)})
+        response.status_code = 503
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 def get_coin_price_usd(symbol: str) -> float:
-    symbol = symbol.upper()
+    symbol = symbol.strip().upper()
     now = time.monotonic()
     with SIM_PRICE_LOCK:
         cached = SIM_PRICE_CACHE.get(symbol)
-    if cached and now - cached[1] < 30:
+    if cached and now - cached[1] < 300 and now - cached[2] < 30:
         return cached[0]
     coin_id = CG_ID_MAP.get(symbol, symbol.lower())
     data = DataManager._cg_get(
         "/simple/price",
-        {"ids": coin_id, "vs_currencies": "usd"},
+        {"ids": coin_id, "vs_currencies": "usd", "include_last_updated_at": "true"},
+        timeout=3,
     ) or {}
-    price = data.get(coin_id, {}).get("usd")
     try:
-        price = float(price)
-    except (TypeError, ValueError):
-        price = 0.0
+        quote = data.get(coin_id, {})
+        price = float(quote.get("usd"))
+        age = time.time() - float(quote.get("last_updated_at"))
+        if not 0 <= age < 300:
+            price = 0.0
+    except (AttributeError, TypeError, ValueError, OverflowError):
+        price, age = 0.0, 0.0
+    if not math.isfinite(price) or price <= 0:
+        price, age = _fetch_recent_yahoo_price(symbol)
     if math.isfinite(price) and price > 0:
+        fetched_at = time.monotonic()
         with SIM_PRICE_LOCK:
-            SIM_PRICE_CACHE[symbol] = (price, now)
+            # Preserve provider age so a fallback never extends an old quote's life.
+            SIM_PRICE_CACHE[symbol] = (price, fetched_at - age, fetched_at)
         return price
-    if cached and now - cached[1] < 300:
+    if cached and time.monotonic() - cached[1] < 300:
         return cached[0]
     raise ValueError(f"{symbol} 行情暫時無法取得，請稍後再試。")
 

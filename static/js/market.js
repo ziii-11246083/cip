@@ -109,6 +109,7 @@ async function loadPopularCoins() {
     coins = await fetchMarketCoinsFallback();
   }
 
+  coins = await withBtcQuote(coins);
   popularCoinsCache = Array.isArray(coins) ? coins.filter(function(coin) {
     return coin.symbol && coinPrice(coin) > 0;
   }) : [];
@@ -120,8 +121,26 @@ async function loadPopularCoins() {
   return popularCoinsCache;
 }
 
+async function withBtcQuote(coins) {
+  const others = coins.filter(coin => coin.symbol !== "BTC");
+  try {
+    const res = await fetchWithTimeout(`/crypto/quote?ticker=BTC&${cacheBust()}`, 12000);
+    if (!res.ok) return others;
+    const quote = await res.json();
+    const price = Number(quote.current_price);
+    if (!Number.isFinite(price) || price <= 0) return others;
+    const previous = coins.find(coin => coin.symbol === "BTC");
+    return [Object.assign({ id: "bitcoin", symbol: "BTC", name: "Bitcoin", price_change_percentage_24h: NaN }, previous, {
+      current_price: price
+    }), ...others];
+  } catch {
+    return others;
+  }
+}
+
 async function loadTopCardsFromSeriesFallback() {
-  const results = await Promise.allSettled(topSymbols.map(function(symbol) {
+  // BTC uses the same current quote as trading; daily chart closes are not spot quotes.
+  const results = await Promise.allSettled(topSymbols.filter(symbol => symbol !== "BTC").map(function(symbol) {
     return fetchSeries(symbol, 1).then(function(series) {
       const prices = Array.isArray(series.prices) ? series.prices : [];
       const first = prices[0] ? Number(prices[0][1]) : NaN;
@@ -136,19 +155,18 @@ async function loadTopCardsFromSeriesFallback() {
     });
   }));
 
-  const fallbackCoins = results
+  let fallbackCoins = results
     .filter(function(result) { return result.status === "fulfilled" && coinPrice(result.value) > 0; })
     .map(function(result) { return result.value; });
+  fallbackCoins = await withBtcQuote(fallbackCoins);
 
-  if (fallbackCoins.length) {
-    const rest = popularCoinsCache.filter(function(coin) {
-      return !topSymbols.includes(coin.symbol);
-    });
-    popularCoinsCache = fallbackCoins.concat(rest);
-    fillSelects();
-    renderPopularCoinCards();
-    setTopCoinCardsFromPopular();
-  }
+  const rest = popularCoinsCache.filter(function(coin) {
+    return !topSymbols.includes(coin.symbol);
+  });
+  popularCoinsCache = fallbackCoins.concat(rest);
+  fillSelects();
+  renderPopularCoinCards();
+  setTopCoinCardsFromPopular();
 
   return fallbackCoins;
 }

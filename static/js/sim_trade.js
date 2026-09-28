@@ -306,6 +306,7 @@
       // Keep default coins when market API is unavailable.
     }
     coinOptions = Array.from(bySymbol.values());
+    await refreshBtcQuote();
 
     const select = $("orderSymbol");
     if (!select) return;
@@ -316,6 +317,21 @@
       select.add(new Option(`${symbol} | ${coin.name || symbol}`, symbol));
     });
     updateQuotePanel();
+  }
+
+  async function refreshBtcQuote() {
+    const coin = coinOptions.find(item => item.symbol === "BTC");
+    if (!coin) return;
+    coin.current_price = null;
+    try {
+      const res = await fetch("/crypto/quote?ticker=BTC", { cache: "no-store" });
+      if (!res.ok) return;
+      const quote = await res.json();
+      const price = Number(quote.current_price);
+      if (Number.isFinite(price) && price > 0) coin.current_price = price;
+    } catch {
+      // Never retain a popular-list price when the executable quote is unavailable.
+    }
   }
 
   function getSelectedCoin() {
@@ -535,6 +551,7 @@
   }
 
   async function refreshPortfolio() {
+    await refreshBtcQuote();
     const data = await request("/api/sim-trade/portfolio");
     currentPortfolio = data.portfolio || null;
     stressRequestVersion++;
