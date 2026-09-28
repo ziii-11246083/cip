@@ -149,7 +149,7 @@ flowchart TB
 ## 7-3 元件圖
 ```mermaid
 flowchart LR
-    component1["交易請求元件\n(Trade Request Component)]
+    component1[交易請求元件\n(Trade Request Component)]
     component2[價格獲取元件\n(Price Fetcher Component)]
     component3[餘額驗證元件\n(Balance Validator Component)]
     component4[資料庫寫入元件\n(DB Access Component)]
