@@ -34,7 +34,7 @@ async function main() {
   let authCallback = null;
   let supabaseSession = null;
   const body = { classList: makeClassList() };
-  const localStorage = makeStorage({ si_demo_member: "1" });
+  const localStorage = makeStorage({ si_demo_member: "1", si_guest_mode: "1" });
   const fakeSupabase = {
     auth: {
       getSession: async () => ({ data: { session: supabaseSession }, error: null }),
@@ -88,16 +88,28 @@ async function main() {
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
   vm.runInContext(moduleSource, sandbox, { filename: sourcePath });
+  assert.strictEqual(localStorage.getItem("si_guest_mode"), null, "舊訪客模式標記應自動清除");
+  assert.strictEqual(sandbox.authManager.continueAsGuest, undefined, "不再需要手動切換訪客模式");
 
   await new Promise((resolve) => setImmediate(resolve));
   assert.strictEqual(typeof authCallback, "function", "Supabase auth listener 未註冊");
   assert.strictEqual(sandbox.authManager.isLoggedIn(), true, "跨頁初始化未恢復 Demo session");
+  assert.strictEqual(sandbox.authManager.getMembershipTier(), "premium", "TEST 帳號屬進階會員");
   assert.strictEqual(body.classList.contains("is-logged-in"), true);
 
   authCallback("INITIAL_SESSION", null);
   assert.strictEqual(sandbox.authManager.isLoggedIn(), true, "Supabase null event 不得覆寫 Demo session");
   assert.strictEqual(body.classList.contains("is-member-locked"), false);
   assert.ok(events.some((event) => event.type === "smartinvest:auth-state" && event.detail.isMember));
+  await sandbox.authManager.updateProfile({ displayName: "測試學員", avatarKey: "focus" });
+  assert.strictEqual(sandbox.authManager.getProfile().displayName, "測試學員");
+  assert.strictEqual(sandbox.authManager.getProfile().avatarKey, "focus");
+  authCallback("INITIAL_SESSION", null);
+  assert.strictEqual(sandbox.authManager.getProfile().displayName, "測試學員", "Demo 個人資料跨登入狀態保留");
+  await assert.rejects(
+    sandbox.authManager.updateProfile({ displayName: " ", avatarKey: "focus" }),
+    /名稱請輸入/
+  );
 
   // Failed attempts must not remove the active Demo identity or its token.
   fakeSupabase.auth.signInWithPassword = async () => ({ error: new Error("wrong password") });
@@ -131,16 +143,24 @@ async function main() {
   assert.strictEqual(events.length, 0, "Demo 讀取 token 不得重發登入事件");
   assert.strictEqual(requests.length, 0, "Demo 讀取 token 不得觸發會員資料刷新");
 
-  const realSession = { access_token: "synthetic-real-token", user: { id: "user-1", email: "member@example.invalid" } };
+  const realSession = { access_token: "synthetic-real-token", user: { id: "user-1", email: "member@example.invalid", created_at: "2026-09-01T00:00:00Z" } };
   supabaseSession = realSession;
   authCallback("SIGNED_IN", realSession);
   assert.strictEqual(sandbox.authManager.isDemoMember(), false, "真實登入應清除 Demo marker");
+  assert.strictEqual(sandbox.authManager.getMembershipTier(), "premium", "原有會員保留進階身分");
   await new Promise((resolve) => setImmediate(resolve));
   assert.strictEqual(events.length, 1, "正式登入只能發送一次狀態事件，不得循環刷新");
   assert.deepStrictEqual(requests.map((request) => request.url).sort(), [
-    "/api/asset-sync/portfolio", "/api/sim-trade/history?limit=50", "/api/sim-trade/portfolio",
+    "/api/sim-trade/history?limit=50", "/api/sim-trade/portfolio",
   ].sort(), "登入後每個會員 API 應只讀取一次");
   assert.ok(requests.every((request) => request.options.headers.Authorization === "Bearer synthetic-real-token"));
+  fakeSupabase.auth.updateUser = async ({ data }) => {
+    supabaseSession = { ...realSession, user: { ...realSession.user, user_metadata: data } };
+    return { data: { user: supabaseSession.user }, error: null };
+  };
+  await sandbox.authManager.updateProfile({ displayName: "正式會員", avatarKey: "calm" });
+  assert.strictEqual(sandbox.authManager.getProfile().displayName, "正式會員");
+  assert.strictEqual(sandbox.authManager.getProfile().avatarKey, "calm");
 
   events.length = 0;
   requests.length = 0;
@@ -152,6 +172,11 @@ async function main() {
 
   // The logout assertion below only needs the auth UI, not a waiting member page.
   listeners.clear();
+  authCallback("SIGNED_IN", {
+    access_token: "new-account-token",
+    user: { id: "user-new", email: "new@example.invalid", created_at: "2026-09-30T00:00:00Z" },
+  });
+  assert.strictEqual(sandbox.authManager.getMembershipTier(), "free", "新註冊帳號屬免費會員");
   supabaseSession = null;
   authCallback("SIGNED_OUT", null);
   assert.strictEqual(sandbox.authManager.isLoggedIn(), false, "真實登出後不應復活舊 Demo session");

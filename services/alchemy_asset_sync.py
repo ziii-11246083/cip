@@ -94,16 +94,20 @@ class ProviderBalanceBatch(list):
 class BetaFeatureFlagEntitlementChecker:
     """Trusted server-side beta entitlement; never reads client plan claims."""
 
-    def __init__(self, enabled: Optional[bool] = None):
+    def __init__(self, enabled: Optional[bool] = None, allowed_user_ids: Optional[set[str]] = None):
         self.enabled = (
             enabled if enabled is not None
             else os.getenv("ASSET_SYNC_ENABLED", "0").strip().lower() in {"1", "true", "yes"}
+        )
+        self.allowed_user_ids = (
+            allowed_user_ids if allowed_user_ids is not None
+            else {value.strip() for value in os.getenv("ASSET_SYNC_ALLOWED_USER_IDS", "").split(",") if value.strip()}
         )
 
     def check(self, *, user_id: str, is_demo: bool = False) -> Tuple[bool, str]:
         if is_demo:
             return False, "asset_sync_demo_denied"
-        if not user_id or not self.enabled:
+        if not user_id or not self.enabled or user_id not in self.allowed_user_ids:
             return False, "asset_sync_disabled"
         return True, "beta_feature_flag"
 

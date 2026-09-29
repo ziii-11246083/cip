@@ -277,7 +277,7 @@ class ServiceTests(unittest.TestCase):
         sleeps = sleeps if sleeps is not None else []
         return AssetSyncService(
             provider=ScriptedProvider(events), store=store or FakeStore(),
-            entitlement=BetaFeatureFlagEntitlementChecker(enabled=enabled),
+            entitlement=BetaFeatureFlagEntitlementChecker(enabled=enabled, allowed_user_ids={"user-a"}),
             policy=SyncPolicy(rate_limit_per_second=20), hmac_secret=SECRET,
             now=lambda: NOW, sleep=sleeps.append,
         )
@@ -291,6 +291,13 @@ class ServiceTests(unittest.TestCase):
             with self.assertRaises(AssetSyncError) as ctx:
                 service.connect(user_id="user-a", public_identifier=ADDRESS, is_demo=demo)
             self.assertEqual(ctx.exception.code, code)
+
+    def test_unlisted_registered_account_is_not_entitled(self):
+        service = self.service([])
+        with self.assertRaises(AssetSyncError) as ctx:
+            service.connect(user_id="new-free-user", public_identifier=ADDRESS)
+        self.assertEqual(ctx.exception.code, "asset_sync_disabled")
+        self.assertEqual(ctx.exception.http_status, 403)
 
     def test_connect_hmacs_address_and_returns_masked_only(self):
         store = FakeStore()
@@ -420,7 +427,8 @@ class SecurityAndWiringTests(unittest.TestCase):
         self.assertIn("真實資產", html)
         self.assertIn("模擬資產完全分開", html)
         self.assertIn("助記詞", html)
-        self.assertIn("不代表已收取訂閱費", html)
+        self.assertIn("目前尚未開放訂閱或扣款", html)
+        self.assertIn("不會查詢真實餘額", html)
 
 
 class EndpointTests(unittest.TestCase):
@@ -436,7 +444,7 @@ class EndpointTests(unittest.TestCase):
 
         real_service = AssetSyncService(
             provider=ScriptedProvider([]), store=FakeStore(),
-            entitlement=BetaFeatureFlagEntitlementChecker(enabled=True),
+            entitlement=BetaFeatureFlagEntitlementChecker(enabled=True, allowed_user_ids={"user-a"}),
             hmac_secret=SECRET,
         )
         with mock.patch.object(self.module, "_asset_sync", real_service):

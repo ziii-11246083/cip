@@ -54,7 +54,7 @@ class MergeRecoveryTests(unittest.TestCase):
             with patch.dict(app.app.config, TESTING=True):
                 client = app.app.test_client()
                 for path in (
-                    "/", "/market", "/ai-coach", "/agent", "/health", "/sim-trade",
+                    "/", "/market", "/ai-coach", "/health", "/sim-trade",
                     "/member", "/podcast", "/register", "/scam-detect",
                     "/social-sentiment", "/narrative-radar",
                 ):
@@ -64,6 +64,10 @@ class MergeRecoveryTests(unittest.TestCase):
                         html = response.get_data(as_text=True)
                         self.assertEqual(html.count('<footer class="footer">'), 1)
                         self.assertIn('class="footer-disclaimer"', html)
+
+                agent_response = client.get("/agent")
+                self.assertEqual(agent_response.status_code, 302)
+                self.assertEqual(agent_response.headers["Location"], "/ai-coach")
 
                 response = client.get("/api/market-scenarios")
                 self.assertEqual(response.status_code, 200)

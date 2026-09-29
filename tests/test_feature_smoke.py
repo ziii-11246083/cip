@@ -2,6 +2,7 @@
 import os
 import socket
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 
@@ -18,11 +19,67 @@ class FeatureSmokeTests(unittest.TestCase):
         self.client = self.module.app.test_client()
 
     def test_all_pages_render(self):
-        for path in ("/", "/ui", "/market", "/analysis/BTC", "/social-sentiment", "/narrative-radar", "/ai-coach", "/agent", "/scam-detect", "/health", "/podcast", "/register", "/sim-trade", "/member"):
+        for path in ("/", "/ui", "/market", "/analysis/BTC", "/social-sentiment", "/narrative-radar", "/ai-coach", "/scam-detect", "/health", "/podcast", "/register", "/membership", "/sim-trade", "/member"):
             with self.subTest(path=path):
                 response = self.client.get(path)
                 self.assertEqual(response.status_code, 200)
                 self.assertIn('class="footer-disclaimer"', response.get_data(as_text=True))
+                self.assertNotIn("訪客使用", response.get_data(as_text=True))
+                self.assertNotIn("continueAsGuest", response.get_data(as_text=True))
+
+    def test_old_agent_url_redirects_to_coach(self):
+        response = self.client.get("/agent")
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["Location"], "/ai-coach")
+
+    def test_upgrade_teaser_links_to_unpaid_plan(self):
+        for path in ("/", "/register", "/member"):
+            with self.subTest(path=path):
+                html = self.client.get(path).get_data(as_text=True)
+                self.assertIn('href="/membership"', html)
+        member_html = self.client.get("/member").get_data(as_text=True)
+        self.assertIn('id="membership-plan"', member_html)
+        self.assertIn("NT$99", member_html)
+        self.assertIn("目前尚未開放訂閱或扣款", member_html)
+        self.assertNotIn("立即付款", member_html)
+        self.assertIn('id="editProfileBtn"', member_html)
+        self.assertIn('id="profileForm"', member_html)
+        self.assertIn('id="subscriptionDialog"', member_html)
+        self.assertGreaterEqual(member_html.count('data-subscribe-open'), 2)
+        self.assertIn("原有會員與 TEST 帳號為進階會員", member_html)
+        self.assertIn("免費會員", member_html)
+        self.assertEqual(member_html.count('<article class="member-plan'), 2)
+        self.assertNotIn("member-plan-test", member_html)
+        self.assertNotIn("TEST 已屬進階會員；作為展示帳號，不連結真實錢包", member_html)
+        self.assertIn("示範連結錢包", member_html)
+        self.assertIn('id="subscriptionContinueFree"', member_html)
+        self.assertIn("查看目前訂閱狀態", member_html)
+        self.assertIn('id="realAssetForm" hidden', member_html)
+
+    def test_podcast_is_public_without_guest_activation(self):
+        html = self.client.get("/podcast").get_data(as_text=True)
+        self.assertIn('id="btnGenPodcast"', html)
+        self.assertNotIn("btnEnablePodcastGuest", html)
+        self.assertNotIn("podcastGuestGate", html)
+        self.assertNotIn("訪客使用", html)
+        source = (Path(__file__).resolve().parents[1] / "static/js/podcast.js").read_text(encoding="utf-8")
+        self.assertNotIn("ensurePodcastAccess", source)
+        with patch.object(self.module, "refresh_openai_client", return_value=None):
+            response = self.client.post("/podcast/generate", json={"market": "BTC"})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("lines", response.get_json())
+
+    def test_membership_entry_and_unpaid_join_flow(self):
+        home = self.client.get("/").get_data(as_text=True)
+        self.assertIn('class="join-member-link" href="/membership"', home)
+        page = self.client.get("/membership").get_data(as_text=True)
+        self.assertIn("免費會員", page)
+        self.assertIn("進階會員", page)
+        self.assertIn("NT$99", page)
+        self.assertIn('id="joinPremiumBtn"', page)
+        self.assertIn('id="membershipDialog"', page)
+        self.assertIn("付款與正式訂閱尚未開放", page)
+        self.assertIn("agent-cat-focus.png", page)
 
     def test_market_and_social_empty_provider_responses(self):
         m = self.module
