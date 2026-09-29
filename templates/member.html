@@ -12,8 +12,8 @@
   <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo.jpg') }}">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/iansui@1.0/dist/iansui.min.css">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=member-overlay-20260604">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/member.css') }}?v=member-center-20260514">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=profile-subscribe-20260929">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/member.css') }}?v=wallet-preview-20260929">
 </head>
 <body>
 {% include "partials/header.html" %}
@@ -25,22 +25,100 @@
         <div>
           <div class="eyebrow"><i class="fas fa-user-shield"></i> Member Center</div>
           <h1>會員中心</h1>
-          <p>記錄資金投放、模擬下單與持倉；可在本頁或模擬交易頁建立交易，再向 AI Agent 諮詢配置思路。</p>
+          <p>記錄資金投放、模擬下單與持倉；可在本頁或模擬交易頁建立交易，再向 AI 教練諮詢配置思路。</p>
         </div>
-        <div class="member-profile-mini">
-          <img src="{{ url_for('static', filename='images/agent-cat-happy.png') }}" alt="" onerror="this.style.display='none';">
-          <div>
-            <span>目前會員</span>
-            <strong id="memberEmail">尚未登入</strong>
+        <div class="member-hero-actions">
+          <button class="member-subscribe-button" type="button" data-subscribe-open>
+            <i class="fas fa-star" aria-hidden="true"></i>
+            <span><strong id="memberSubscribeLabel">訂閱進階會員</strong><small id="memberSubscribeHint">預計 NT$99／月 · 規劃中</small></span>
+            <i class="fas fa-arrow-right" aria-hidden="true"></i>
+          </button>
+          <div class="member-profile-mini">
+            <img id="memberAvatar" src="{{ url_for('static', filename='images/agent-cat-happy.png') }}" alt="會員頭貼">
+            <div>
+              <span id="memberEmail">尚未登入</span>
+              <strong id="memberName">會員</strong>
+            </div>
+            <button class="member-profile-edit-button" id="editProfileBtn" type="button" title="編輯個人資料"><i class="fas fa-pen"></i> 編輯</button>
           </div>
         </div>
       </div>
+
+      <section class="member-profile-editor" id="profileEditor" aria-labelledby="profileEditorTitle" hidden>
+        <div class="member-profile-editor-head">
+          <h2 id="profileEditorTitle">編輯個人資料</h2>
+          <button class="member-profile-close" id="cancelProfileEdit" type="button" aria-label="關閉編輯個人資料"><i class="fas fa-xmark"></i></button>
+        </div>
+        <form id="profileForm">
+          <label for="profileDisplayName">顯示名稱</label>
+          <input id="profileDisplayName" name="displayName" maxlength="40" required autocomplete="nickname" placeholder="你希望顯示的名稱">
+          <fieldset class="member-avatar-picker">
+            <legend>選擇頭貼</legend>
+            <label><input type="radio" name="avatarKey" value="happy" checked><img src="{{ url_for('static', filename='images/agent-cat-happy.png') }}" alt="開心頭貼"><span>開心</span></label>
+            <label><input type="radio" name="avatarKey" value="calm"><img src="{{ url_for('static', filename='images/agent-cat-calm.png') }}" alt="沉穩頭貼"><span>沉穩</span></label>
+            <label><input type="radio" name="avatarKey" value="focus"><img src="{{ url_for('static', filename='images/agent-cat-focus.png') }}" alt="專注頭貼"><span>專注</span></label>
+            <label><input type="radio" name="avatarKey" value="neutral"><img src="{{ url_for('static', filename='images/agent-cat-neutral.png') }}" alt="簡約頭貼"><span>簡約</span></label>
+          </fieldset>
+          <div class="member-profile-form-actions">
+            <button class="member-profile-save" id="saveProfileBtn" type="submit"><i class="fas fa-floppy-disk"></i> 儲存資料</button>
+            <button class="member-profile-cancel" type="button" data-profile-cancel>取消</button>
+          </div>
+          <p class="member-profile-status" id="profileStatus" role="status"></p>
+        </form>
+      </section>
 
       <div class="member-lock-banner">
         <strong><i class="fas fa-lock"></i> 登入後即可使用會員中心</strong>
         <span>請使用測試會員或你的會員帳號登入，登入後會開啟資金與模擬交易紀錄。</span>
         <button type="button" onclick="window.authManager?.openLogin?.()">登入會員</button>
       </div>
+
+      <section class="member-upgrade" id="membership-plan" aria-labelledby="membership-plan-title">
+        <div class="member-plan-head">
+          <div>
+            <span class="member-upgrade-eyebrow"><i class="fas fa-star" aria-hidden="true"></i> 會員方案</span>
+            <h2 id="membership-plan-title">選擇適合你的練習方式</h2>
+            <p>原有會員與 TEST 帳號為進階會員；新註冊帳號為免費會員。正式付款功能尚未上線。</p>
+          </div>
+          <span class="member-current-tier" id="memberCurrentTier">目前方案：訪客</span>
+        </div>
+        <div class="member-plan-grid">
+          <article class="member-plan" id="memberFreePlan">
+            <span class="member-plan-tag" id="memberFreeTag" hidden>目前方案</span>
+            <h3>免費會員</h3>
+            <p class="member-plan-price">NT$0 <span>／月</span></p>
+            <ul>
+              <li><i class="fas fa-check"></i> 市場資訊與防詐提醒</li>
+              <li><i class="fas fa-check"></i> 模擬資金、下單與持倉</li>
+              <li><i class="fas fa-check"></i> 基礎 AI 教練</li>
+              <li><i class="fas fa-minus"></i> 不含真實資產同步</li>
+            </ul>
+            <a class="member-plan-action member-plan-action-secondary" href="/sim-trade">使用免費模擬交易 <i class="fas fa-arrow-right"></i></a>
+          </article>
+          <article class="member-plan member-plan-premium" id="memberPremiumPlan">
+            <span class="member-plan-tag" id="memberPremiumTag">規劃中</span>
+            <h3>進階會員</h3>
+            <p class="member-plan-price">NT$99 <span>／月（預計）</span></p>
+            <ul>
+              <li><i class="fas fa-check"></i> 包含免費會員功能</li>
+              <li><i class="fas fa-check"></i> AI 教練與現有情境分析</li>
+              <li><i class="fas fa-clock"></i> 更多使用額度與唯讀資產同步規劃中</li>
+              <li><i class="fas fa-shield-alt"></i> 同步不會取得交易權限</li>
+            </ul>
+            <button class="member-plan-action" id="memberPremiumAction" type="button" data-subscribe-open>了解訂閱進度 <i class="fas fa-arrow-right"></i></button>
+          </article>
+        </div>
+        <div class="member-plan-next">
+          <h3>訂閱開放後</h3>
+          <ol>
+            <li>登入正式會員帳號，確認方案與價格。</li>
+            <li>完成付款後，系統驗證訂閱狀態並開通權益。</li>
+            <li>在會員中心管理續訂與取消；符合資格時再連結唯讀錢包。</li>
+          </ol>
+          <p>目前尚未開放訂閱或扣款；上述流程與權益仍在規劃，按鈕不會建立訂單。</p>
+          <button class="member-subscription-status-button" type="button" data-subscribe-open><i class="fas fa-id-card"></i> 查看目前訂閱狀態</button>
+        </div>
+      </section>
 
       <section class="member-card real-asset-card" data-member-feature="真實資產唯讀同步">
         <div class="member-card-head">
@@ -52,16 +130,21 @@
           <span class="real-asset-safety"><i class="fas fa-shield-alt"></i> 不會代下單</span>
         </div>
         <div class="real-asset-notice">
-          只需公開錢包地址；我們永遠不會要求助記詞、私鑰或交易所 API Secret。此功能為 Beta feature flag，不代表已收取訂閱費。
+          此區目前是連結流程示範，不會查詢真實餘額或建立正式連結。只輸入公開地址；不要輸入助記詞、私鑰或交易所 API Secret。
         </div>
-        <form class="real-asset-connect" id="realAssetForm">
+        <div class="real-asset-access" id="realAssetAccess">
+          <strong id="realAssetAccessTitle">登入後查看使用資格</strong>
+          <p id="realAssetAccessText">錢包連結流程示範開放給進階會員。</p>
+          <a href="#membership-plan" id="realAssetPlanLink">查看方案比較 <i class="fas fa-arrow-right"></i></a>
+        </div>
+        <form class="real-asset-connect" id="realAssetForm" hidden>
           <label for="realAssetAddress">Ethereum 公開地址</label>
           <div>
-            <input id="realAssetAddress" autocomplete="off" spellcheck="false" maxlength="42" placeholder="0x…（40 個十六進位字元）">
-            <button type="submit"><i class="fas fa-link"></i> 連結唯讀錢包</button>
+            <input id="realAssetAddress" autocomplete="off" spellcheck="false" maxlength="42" placeholder="0x…（40 個十六進位字元）" aria-describedby="realAssetStatus">
+            <button type="submit"><i class="fas fa-link"></i> 示範連結錢包</button>
           </div>
         </form>
-        <div class="real-asset-status" id="realAssetStatus" role="status" aria-live="polite">登入後可查看是否已開放 Beta。</div>
+        <div class="real-asset-status" id="realAssetStatus" role="status" aria-live="polite">登入後可查看連結流程示範。</div>
         <div class="real-asset-accounts" id="realAssetAccounts"></div>
       </section>
 
@@ -105,9 +188,9 @@
           <div class="member-card-head">
             <div>
               <h2>模擬下單</h2>
-              <p>下單後會更新模擬帳本，也可在 AI Agent 側欄查看資產摘要。</p>
+              <p>下單後會更新模擬帳本，也可在 AI 教練查看資產摘要。</p>
             </div>
-            <a href="/agent">去 AI Agent <i class="fas fa-arrow-right"></i></a>
+            <a href="/ai-coach">前往 AI 教練 <i class="fas fa-arrow-right"></i></a>
           </div>
           <form class="member-form order-form" id="orderForm">
             <label for="orderSide">方向</label>
@@ -148,6 +231,18 @@
   </section>
 </main>
 
+<dialog class="member-subscribe-dialog" id="subscriptionDialog" aria-labelledby="subscriptionDialogTitle">
+  <button class="member-profile-close" id="subscriptionClose" type="button" aria-label="關閉訂閱方案視窗"><i class="fas fa-xmark"></i></button>
+  <div class="member-subscribe-dialog-icon"><i class="fas fa-star"></i></div>
+  <h2 id="subscriptionDialogTitle">進階會員 · 預計 NT$99／月</h2>
+  <p class="member-subscription-account-status" id="subscriptionAccountStatus">目前狀態：尚未登入</p>
+  <p>原有會員與 TEST 帳號屬進階會員，可操作錢包連結畫面示範；目前不會讀取真實資產。新註冊帳號為免費會員。訂閱與付款尚未開放，點擊不會建立訂單或收費。</p>
+  <div class="member-subscribe-dialog-actions">
+    <a href="#membership-plan" id="subscriptionViewPlan">查看方案比較 <i class="fas fa-arrow-right"></i></a>
+    <button type="button" id="subscriptionContinueFree">關閉</button>
+  </div>
+</dialog>
+
 <div class="float-actions">
   <a href="/" class="float-btn" title="回首頁"><i class="fas fa-house"></i></a>
   <button class="float-btn" id="backToTopBtn" type="button" title="回到頂部"><i class="fas fa-arrow-up"></i></button>
@@ -162,8 +257,8 @@
     anonKey: '{{ supabase_anon_key | default("dummy") }}'
   };
 </script>
-<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=auth-state-20260830"></script>
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=wallet-preview-20260929"></script>
 <script src="{{ url_for('static', filename='js/common.js') }}?v=member-nav-lock-20260604"></script>
-<script src="{{ url_for('static', filename='js/member.js') }}?v=member-center-20260514"></script>
+<script src="{{ url_for('static', filename='js/member.js') }}?v=wallet-preview-20260929"></script>
 </body>
 </html>

@@ -42,8 +42,7 @@
         <button class="auth-btn" id="loginToggle" type="button">
           <i class="fas fa-user"></i> 登入
         </button>
-
-        <button class="guest-btn" type="button" onclick="if(window.authManager) window.authManager.continueAsGuest()">訪客使用</button>
+        <a class="join-member-link" href="/membership"><i class="fas fa-star" aria-hidden="true"></i> 加入會員</a>
 
         <div class="account-popup" id="accountPopup">
           <button class="popup-close" id="popupClose" type="button" aria-label="關閉登入視窗">×</button>
@@ -82,21 +81,26 @@
             <div class="register-hint">
               還沒有帳號？ <a href="/register">建立會員</a>
             </div>
+            <div class="login-plan-teaser">
+              <span><i class="fas fa-star" aria-hidden="true"></i> 進階會員預計 NT$99／月 <small>規劃中</small></span>
+              <a href="/membership">查看方案 <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+            </div>
           </div>
         </div>
 
         <details class="user-menu" id="user-section">
           <summary class="user-avatar-toggle" aria-label="開啟會員選單">
-            <span class="user-avatar"><i class="fas fa-user"></i></span>
+            <span class="user-avatar"><img data-user-avatar hidden alt=""><i class="fas fa-user" data-user-avatar-icon></i></span>
           </summary>
           <div class="user-menu-panel">
             <div class="user-menu-profile">
-              <span class="user-avatar large"><i class="fas fa-user"></i></span>
+              <span class="user-avatar large"><img data-user-avatar hidden alt=""><i class="fas fa-user" data-user-avatar-icon></i></span>
               <div>
                 <strong id="user-name">會員</strong>
                 <span id="user-email"></span>
               </div>
             </div>
+            <a class="user-menu-profile-link" href="/member#profileEditor"><i class="fas fa-user-pen"></i> 編輯個人資料</a>
             <button class="user-menu-logout" type="button" onclick="if(window.authManager) window.authManager.logoutUser()">登出</button>
           </div>
         </details>

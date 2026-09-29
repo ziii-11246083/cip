@@ -37,3 +37,12 @@
     grid-template-columns:1fr;
   }
 }
+
+.register-plan-link{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  margin-top:18px;
+  color:#146b65;
+  font-weight:900;
+}

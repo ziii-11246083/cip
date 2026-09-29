@@ -93,7 +93,7 @@ button,input,select,textarea{font-family:inherit}
 .nav a.primary-nav:hover{background:var(--brand);color:#fff}
 
 .auth-area{position:relative;display:flex;align-items:center;gap:8px;flex-shrink:0;min-width:max-content;z-index:1203}
-.auth-btn,.guest-btn{
+.auth-btn{
   height:40px;
   border-radius:13px;
   padding:0 16px;
@@ -109,8 +109,6 @@ button,input,select,textarea{font-family:inherit}
 }
 .auth-btn{border:1px solid var(--line);background:#fff;color:var(--dark)}
 .auth-btn:hover{transform:translateY(-2px);border-color:var(--brand-2);box-shadow:0 12px 24px rgba(154,91,37,.10)}
-.guest-btn{border:none;background:var(--brand);color:#fff}
-.guest-btn:hover{transform:translateY(-2px);background:var(--dark)}
 
 .account-popup{
   position:absolute;
@@ -162,10 +160,6 @@ button,input,select,textarea{font-family:inherit}
 .forgot-btn{display:block;width:100%;margin-top:14px;border:none;background:transparent;color:var(--brand);font-weight:900;cursor:pointer}
 .register-hint{margin-top:14px;padding-top:14px;border-top:1px solid var(--line);text-align:center;color:var(--muted);font-size:13px;font-weight:800}
 .register-hint a{color:var(--brand);font-weight:900}
-.is-guest-mode .guest-btn{
-  background:var(--dark);
-  box-shadow:0 12px 24px rgba(67,20,7,.12);
-}
 
 .hero{position:relative;padding:68px 0 34px;overflow:hidden;isolation:isolate}
 .hero:before{
@@ -375,7 +369,6 @@ body{
 
 .button,
 .auth-btn,
-.guest-btn,
 .login-submit,
 .google-login{
   min-height:46px;
@@ -1734,8 +1727,7 @@ body.is-logged-in .nav a.primary-nav.active {
   flex-shrink: 0;
 }
 
-.auth-btn,
-.guest-btn {
+.auth-btn {
   border: 0;
   cursor: pointer;
   border-radius: 999px;
@@ -1756,15 +1748,27 @@ body.is-logged-in .nav a.primary-nav.active {
   box-shadow: 0 14px 28px rgba(255, 122, 26, 0.32);
 }
 
-.guest-btn {
-  background: #fff7ef;
-  color: #c65a12;
-  border: 1px solid rgba(255, 138, 42, 0.22);
+.join-member-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 9px 14px;
+  border: 1px solid #146b65;
+  border-radius: 6px;
+  background: #146b65;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 850;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
-.guest-btn:hover {
-  background: #fff0df;
-  transform: translateY(-1px);
+.join-member-link:hover,
+.join-member-link:focus-visible {
+  background: #0f5752;
+  color: #fff;
 }
 
 /* 登入彈窗 */
@@ -1940,6 +1944,34 @@ body.is-logged-in .nav a.primary-nav.active {
 .register-hint a {
   color: #e96513;
   font-weight: 900;
+}
+
+.account-popup{
+  max-height:calc(100dvh - 110px);
+  overflow-y:auto;
+}
+.login-plan-teaser{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:6px 10px;
+  margin-top:10px;
+  padding-top:12px;
+  border-top:1px solid var(--line);
+  color:#146b65;
+  font-size:12px;
+  font-weight:850;
+}
+.login-plan-teaser small{
+  margin-left:4px;
+  color:var(--muted);
+  font-size:11px;
+}
+.login-plan-teaser a{
+  color:#146b65;
+  font-weight:900;
+  white-space:nowrap;
 }
 
 /* 未登入點會員功能時的提示 */
@@ -2154,6 +2186,13 @@ body{
   flex:0 0 auto;
   font-size:20px;
 }
+.user-avatar img{
+  width:100%;
+  height:100%;
+  border-radius:50%;
+  object-fit:cover;
+}
+.user-avatar [hidden]{display:none!important}
 
 .user-menu-panel{
   position:absolute;
@@ -2217,6 +2256,19 @@ body{
 .user-menu-logout:hover{
   background:#fff0df;
 }
+.user-menu-profile-link{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-height:38px;
+  margin-top:12px;
+  padding:0 10px;
+  border-radius:8px;
+  color:#146b65;
+  font-size:13px;
+  font-weight:850;
+}
+.user-menu-profile-link:hover{background:#eef8f5}
 
 @media (max-width: 1180px){
   .container,

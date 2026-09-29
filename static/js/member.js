@@ -2,6 +2,8 @@
   const USD_TO_TWD = 32;
   const $ = (id) => document.getElementById(id);
   let depositPending = false;
+  let authRevision = 0;
+  let previewWallet = null;
 
   function fmtTwdFromUsd(valueUsd) {
     const value = Number(valueUsd || 0) * USD_TO_TWD;
@@ -28,6 +30,10 @@
 
   function isMember() {
     return Boolean(window.authManager?.isLoggedIn?.() || window.smartInvestMembership?.isMember);
+  }
+
+  function isPremiumMember() {
+    return window.authManager?.getMembershipTier?.() === "premium";
   }
 
   async function getAuthToken() {
@@ -88,7 +94,7 @@
   }
 
   function renderPortfolio(portfolio) {
-    if ($("memberEmail")) $("memberEmail").textContent = window.smartInvestMembership?.email || "測試會員";
+    renderMemberProfile();
     if (!portfolio) return;
     const isDemo = Boolean(window.authManager?.isDemoMember?.());
 
@@ -149,6 +155,107 @@
     }
   }
 
+  function renderMemberProfile() {
+    const profile = window.authManager?.getProfile?.();
+    if ($("memberEmail")) $("memberEmail").textContent = profile?.email || "尚未登入";
+    if ($("memberName")) $("memberName").textContent = profile?.displayName || "會員";
+    if ($("memberAvatar")) {
+      $("memberAvatar").src = `/static/images/agent-cat-${profile?.avatarKey || "happy"}.png`;
+    }
+    const isTestPremium = Boolean(window.authManager?.isDemoMember?.());
+    const premium = isPremiumMember();
+    const tier = !isMember() ? "訪客" : isTestPremium ? "進階會員（TEST）" : premium ? "進階會員" : "免費會員";
+    if ($("memberCurrentTier")) $("memberCurrentTier").textContent = `目前方案：${tier}`;
+    if ($("memberFreeTag")) $("memberFreeTag").hidden = !isMember() || premium;
+    if ($("memberPremiumTag")) $("memberPremiumTag").textContent = premium ? "目前方案" : "規劃中";
+    $("memberFreePlan")?.classList.toggle("is-current", isMember() && !premium);
+    $("memberPremiumPlan")?.classList.toggle("is-current", premium);
+    if ($("memberPremiumAction")) {
+      $("memberPremiumAction").innerHTML = premium
+        ? '查看會員狀態 <i class="fas fa-arrow-right"></i>'
+        : '了解訂閱進度 <i class="fas fa-arrow-right"></i>';
+    }
+    if ($("memberSubscribeLabel")) {
+      $("memberSubscribeLabel").textContent = premium ? "查看進階會員權益" : "訂閱進階會員";
+    }
+    if ($("memberSubscribeHint")) {
+      $("memberSubscribeHint").textContent = premium
+        ? `${isTestPremium ? "TEST 帳號" : "原有會員"} · 目前方案`
+        : "預計 NT$99／月 · 規劃中";
+    }
+  }
+
+  function openProfileEditor() {
+    if (!requireMember()) return;
+    const editor = $("profileEditor");
+    const profile = window.authManager?.getProfile?.();
+    if (!editor || !profile) return;
+    if ($("profileDisplayName")) $("profileDisplayName").value = profile.displayName;
+    const choice = editor.querySelector(`input[name="avatarKey"][value="${profile.avatarKey}"]`);
+    if (choice) choice.checked = true;
+    if ($("profileStatus")) $("profileStatus").textContent = "";
+    editor.hidden = false;
+    $("profileDisplayName")?.focus();
+  }
+
+  function closeProfileEditor() {
+    if ($("profileEditor")) $("profileEditor").hidden = true;
+  }
+
+  function setProfileStatus(message, isError = false) {
+    const status = $("profileStatus");
+    if (!status) return;
+    status.textContent = message;
+    status.classList.toggle("is-error", isError);
+  }
+
+  async function saveProfile(event) {
+    event.preventDefault();
+    if (!requireMember()) return;
+    const form = $("profileForm");
+    const button = $("saveProfileBtn");
+    if (!form || button?.disabled) return;
+    const avatarKey = form.querySelector('input[name="avatarKey"]:checked')?.value || "happy";
+    if (button) button.disabled = true;
+    setProfileStatus("儲存中...");
+    try {
+      await window.authManager.updateProfile({
+        displayName: $("profileDisplayName")?.value || "",
+        avatarKey,
+      });
+      renderMemberProfile();
+      closeProfileEditor();
+      window.toast?.("個人資料", "名稱與頭貼已更新。");
+    } catch (error) {
+      setProfileStatus(error.message || "儲存失敗，請稍後重試。", true);
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  function openSubscriptionDialog() {
+    const dialog = $("subscriptionDialog");
+    if (!dialog) return;
+    const tier = !isMember() ? "尚未登入" : window.authManager?.isDemoMember?.() ? "進階會員（TEST，無扣款）" : isPremiumMember() ? "進階會員（原有會員）" : "免費會員（尚無付費訂閱）";
+    if ($("subscriptionAccountStatus")) $("subscriptionAccountStatus").textContent = `目前狀態：${tier}`;
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else dialog.setAttribute("open", "");
+  }
+
+  function closeSubscriptionDialog() {
+    const dialog = $("subscriptionDialog");
+    if (!dialog) return;
+    if (typeof dialog.close === "function") dialog.close();
+    else dialog.removeAttribute("open");
+  }
+
+  function setRealAssetAccess(allowed, title, description) {
+    if ($("realAssetForm")) $("realAssetForm").hidden = !allowed;
+    if ($("realAssetAccess")) $("realAssetAccess").hidden = allowed;
+    if ($("realAssetAccessTitle")) $("realAssetAccessTitle").textContent = title;
+    if ($("realAssetAccessText")) $("realAssetAccessText").textContent = description;
+  }
+
   function renderTrades(trades) {
     const orderList = $("orderList");
     if (!orderList) return;
@@ -195,10 +302,10 @@
     root.replaceChildren();
     const accounts = Array.isArray(portfolio?.accounts) ? portfolio.accounts : [];
     if (!accounts.length) {
-      renderRealAssetMessage("尚未連結錢包。只輸入公開地址即可，不要輸入任何密鑰。", "info");
+      renderRealAssetMessage("可輸入 Ethereum 公開地址體驗連結流程；目前不讀取真實資產。", "info");
       return;
     }
-    renderRealAssetMessage(`已連結 ${accounts.length} 個唯讀錢包。`, "success");
+    renderRealAssetMessage(accounts[0]?.account?.preview ? "已建立錢包連結畫面示範；尚未連接真實服務。" : `已連結 ${accounts.length} 個唯讀錢包。`, "success");
     accounts.forEach((group) => {
       const account = group?.account || {};
       const snapshot = group?.snapshot || null;
@@ -209,16 +316,16 @@
       head.className = "real-account-head";
       const identity = document.createElement("div");
       appendText(identity, "strong", account.address_masked || "Ethereum 錢包");
-      appendText(identity, "span", "Ethereum Mainnet · Alchemy 唯讀", "real-account-meta");
+      appendText(identity, "span", account.preview ? "連結畫面示範 · 未讀取資產" : "Ethereum Mainnet · Alchemy 唯讀", "real-account-meta");
       head.appendChild(identity);
       const actions = document.createElement("div");
       actions.className = "real-account-actions";
       if (account.status === "active") {
-        const sync = appendText(actions, "button", "立即同步");
+        const sync = appendText(actions, "button", account.preview ? "示範同步" : "立即同步");
         sync.type = "button";
         sync.dataset.assetAction = "sync";
         sync.dataset.accountId = account.id || "";
-        const disconnect = appendText(actions, "button", "停止連結", "secondary");
+        const disconnect = appendText(actions, "button", account.preview ? "解除示範連結" : "停止連結", "secondary");
         disconnect.type = "button";
         disconnect.dataset.assetAction = "disconnect";
         disconnect.dataset.accountId = account.id || "";
@@ -230,15 +337,15 @@
 
       const summary = document.createElement("div");
       summary.className = "real-account-summary";
-      appendText(summary, "span", snapshot ? `狀態：${snapshot.status}` : "尚無快照");
-      appendText(summary, "strong", snapshot ? fmtUsd(snapshot.total_value_usd) : "尚未同步");
-      appendText(summary, "small", snapshot?.captured_at ? `資料時間：${dateText(snapshot.captured_at)}` : "同步後會顯示 as-of 時間");
+      appendText(summary, "span", account.preview ? "展示模式" : snapshot ? `狀態：${snapshot.status}` : "尚無快照");
+      appendText(summary, "strong", account.preview ? "未讀取真實資產" : snapshot ? fmtUsd(snapshot.total_value_usd) : "尚未同步");
+      appendText(summary, "small", account.preview ? "正式串接前不顯示餘額" : snapshot?.captured_at ? `資料時間：${dateText(snapshot.captured_at)}` : "同步後會顯示 as-of 時間");
       card.appendChild(summary);
 
       const list = document.createElement("div");
       list.className = "real-balance-list";
       if (!balances.length) {
-        appendText(list, "p", "沒有可顯示的錢包餘額。");
+        appendText(list, "p", account.preview ? "這裡會顯示同步後的資產明細。" : "沒有可顯示的錢包餘額。");
       } else {
         balances.forEach((item) => {
           const row = document.createElement("div");
@@ -256,31 +363,58 @@
     });
   }
 
-  async function refreshRealAssets(headers) {
-    try {
-      const data = await request("/api/asset-sync/portfolio", { headers });
-      renderRealAssets(data.portfolio);
-    } catch (error) {
-      const root = $("realAssetAccounts");
-      if (root) root.replaceChildren();
-      renderRealAssetMessage(error.message || "真實資產暫時無法讀取。", "warning");
+  async function refreshRealAssets(headers, revision = authRevision) {
+    if (revision !== authRevision) return;
+    if (isPremiumMember()) {
+      setRealAssetAccess(true, "", "");
+      renderRealAssets({ accounts: previewWallet ? [{
+        account: { id: "preview", status: "active", preview: true, address_masked: `${previewWallet.slice(0, 6)}…${previewWallet.slice(-4)}` },
+        snapshot: null,
+        balances: []
+      }] : [] });
+      return;
     }
+    $("realAssetAccounts")?.replaceChildren();
+    setRealAssetAccess(false, isMember() ? "目前為免費會員" : "登入後查看使用資格",
+      isMember() ? "錢包連結流程示範屬進階會員；你仍可使用模擬交易與基礎 AI 教練。" : "錢包連結流程示範開放給進階會員。");
+    renderRealAssetMessage(isMember() ? "免費會員目前沒有錢包連結權限。" : "登入後可查看連結流程示範。", "info");
   }
 
   async function refreshData() {
+    const revision = authRevision;
     const token = await waitForAuthToken();
-    if (!token) return;
+    if (!token || revision !== authRevision) return;
     const headers = { Authorization: `Bearer ${token}` };
     const [portfolioData, tradeData] = await Promise.all([
       request("/api/sim-trade/portfolio", { headers }),
       request("/api/sim-trade/history?limit=50", { headers })
     ]);
+    if (revision !== authRevision) return;
     renderPortfolio(portfolioData.portfolio);
     renderTrades(tradeData.trades || []);
-    await refreshRealAssets(headers);
+    await refreshRealAssets(headers, revision);
   }
 
   document.addEventListener("DOMContentLoaded", () => {
+    renderMemberProfile();
+    $("editProfileBtn")?.addEventListener("click", openProfileEditor);
+    document.querySelector(".user-menu-profile-link")?.addEventListener("click", openProfileEditor);
+    $("cancelProfileEdit")?.addEventListener("click", closeProfileEditor);
+    document.querySelectorAll("[data-profile-cancel]").forEach((button) => {
+      button.addEventListener("click", closeProfileEditor);
+    });
+    $("profileForm")?.addEventListener("submit", saveProfile);
+    document.querySelectorAll("[data-subscribe-open]").forEach((button) => {
+      button.addEventListener("click", openSubscriptionDialog);
+    });
+    $("subscriptionClose")?.addEventListener("click", closeSubscriptionDialog);
+    $("subscriptionContinueFree")?.addEventListener("click", closeSubscriptionDialog);
+    $("subscriptionViewPlan")?.addEventListener("click", closeSubscriptionDialog);
+    window.authManager?.whenReady?.().then(() => {
+      renderMemberProfile();
+      refreshRealAssets();
+      if (window.location.hash === "#profileEditor") openProfileEditor();
+    });
     refreshData().catch(() => {});
 
     $("capitalForm")?.addEventListener("submit", (event) => {
@@ -363,44 +497,31 @@
       }
     });
 
-    $("realAssetForm")?.addEventListener("submit", async (event) => {
+    $("realAssetForm")?.addEventListener("submit", (event) => {
       event.preventDefault();
       if (!requireMember()) return;
+      if (!isPremiumMember()) return;
       const input = $("realAssetAddress");
       const address = input?.value?.trim() || "";
-      renderRealAssetMessage("正在建立唯讀連結…", "info");
-      try {
-        await request("/api/asset-sync/accounts", {
-          method: "POST",
-          body: JSON.stringify({ public_address: address })
-        });
-        if (input) input.value = "";
-        const token = await getAuthToken();
-        await refreshRealAssets({ Authorization: `Bearer ${token}` });
-      } catch (error) {
-        renderRealAssetMessage(error.message || "錢包連結失敗。", "warning");
+      if (!/^0x[0-9a-fA-F]{40}$/.test(address)) {
+        renderRealAssetMessage("請輸入 0x 開頭、共 42 字元的 Ethereum 公開地址。", "warning");
+        return;
       }
+      previewWallet = address;
+      if (input) input.value = "";
+      refreshRealAssets();
     });
 
-    $("realAssetAccounts")?.addEventListener("click", async (event) => {
+    $("realAssetAccounts")?.addEventListener("click", (event) => {
       const button = event.target.closest("button[data-asset-action]");
       if (!button || button.disabled) return;
-      const accountId = button.dataset.accountId || "";
+      if (!isPremiumMember() || !previewWallet) return;
       const action = button.dataset.assetAction;
-      if (!accountId) return;
-      if (action === "disconnect" && !confirm("停止後將不再同步，已有快照會保留並顯示時間。確定繼續？")) return;
-      button.disabled = true;
-      renderRealAssetMessage(action === "sync" ? "正在唯讀同步…" : "正在停止連結…", "info");
-      try {
-        await request(`/api/asset-sync/accounts/${encodeURIComponent(accountId)}${action === "sync" ? "/sync" : ""}`, {
-          method: action === "sync" ? "POST" : "DELETE",
-          body: action === "sync" ? "{}" : undefined
-        });
-        const token = await getAuthToken();
-        await refreshRealAssets({ Authorization: `Bearer ${token}` });
-      } catch (error) {
-        renderRealAssetMessage(error.message || "操作失敗。", "warning");
-        button.disabled = false;
+      if (action === "sync") {
+        renderRealAssetMessage("已點擊示範同步；目前不會讀取或顯示真實資產。", "info");
+      } else if (action === "disconnect") {
+        previewWallet = null;
+        refreshRealAssets();
       }
     });
   });
@@ -410,6 +531,17 @@
   });
 
   window.addEventListener("smartinvest:auth-state", () => {
+    authRevision += 1;
+    previewWallet = null;
+    renderMemberProfile();
+    refreshRealAssets();
+    if (!isMember()) {
+      return;
+    }
     refreshData().catch(() => {});
+  });
+  window.addEventListener("smartinvest:profile-updated", renderMemberProfile);
+  window.addEventListener("hashchange", () => {
+    if (window.location.hash === "#profileEditor") openProfileEditor();
   });
 })();

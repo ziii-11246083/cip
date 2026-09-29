@@ -70,31 +70,6 @@ let browserVoiceActive = false;
 
 const player = $("player");
 
-async function hasMemberSession() {
-    try {
-        const token = await window.authManager?.getToken?.();
-        return Boolean(token);
-    } catch (_) {
-        return false;
-    }
-}
-
-async function ensurePodcastAccess() {
-    const isGuest = Boolean(window.authManager?.isGuestMode?.());
-    const isMember = await hasMemberSession();
-    if (isGuest || isMember) return true;
-
-    if (window.authManager?.continueAsGuest) {
-        await window.authManager.continueAsGuest();
-        updatePodcastAccessState();
-        showPodcastToast("已切換訪客模式", "Podcast 已開放使用，現在開始生成內容。");
-        return true;
-    }
-
-    showPodcastToast("請先啟用訪客模式", "按下「訪客使用」後即可生成 Podcast。");
-    return false;
-}
-
 async function fetchPersonalPortfolioSummary() {
     const token = await window.authManager?.getToken?.().catch(() => null);
     if (!token) return null;
@@ -118,18 +93,6 @@ async function fetchPersonalPortfolioSummary() {
     } catch (error) {
         console.warn("portfolio summary unavailable", error);
         return null;
-    }
-}
-
-function updatePodcastAccessState() {
-    const gate = $("podcastGuestGate");
-    const btn = $("btnEnablePodcastGuest");
-    const isGuest = Boolean(window.authManager?.isGuestMode?.());
-    if (gate) gate.classList.toggle("is-active", isGuest);
-    if (btn) {
-        btn.innerHTML = isGuest
-            ? '<i class="fas fa-circle-check"></i> 已啟用訪客模式'
-            : '<i class="fas fa-user-check"></i> 啟用訪客模式';
     }
 }
 
@@ -588,9 +551,6 @@ async function generatePodcast(btn) {
     const stream = $("chatStream");
 
     try {
-        const canUse = await ensurePodcastAccess();
-        if (!canUse) return;
-
         setButtonLoading(btn, '<i class="fas fa-wand-magic-sparkles fa-spin"></i> 生成中...');
         setStudioGenerating(true);
         clearInterval(bubbleTimer);
@@ -812,16 +772,6 @@ function initPlayerButtons() {
 
 function initPodcastPage() {
     syncWatchlistFromTopic();
-    updatePodcastAccessState();
-
-    bindClick("btnEnablePodcastGuest", async function() {
-        if (window.authManager?.continueAsGuest) {
-            setButtonLoading(this, '<i class="fas fa-spinner fa-spin"></i> 啟用中...');
-            await window.authManager.continueAsGuest();
-            updatePodcastAccessState();
-            resetButtonLoading(this);
-        }
-    });
 
     bindClick("btnGenPodcast", function() {
         generatePodcast(this);
@@ -837,8 +787,6 @@ function initPodcastPage() {
     initSpeedControl();
     initPlayerButtons();
     updateSpeakingState("主持人");
-    window.addEventListener("smartinvest:guest-mode", updatePodcastAccessState);
-    window.addEventListener("smartinvest:auth-state", updatePodcastAccessState);
 }
 
 document.addEventListener("DOMContentLoaded", initPodcastPage);

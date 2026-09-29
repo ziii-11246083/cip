@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>會員方案 | Smart Invest</title>
+  <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo.jpg') }}">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=membership-entry-20260929">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/membership.css') }}?v=membership-entry-20260929">
+</head>
+<body>
+{% include "partials/header.html" %}
+<main class="membership-page">
+  <section class="membership-overview">
+    <div class="container wide-container">
+      <p class="membership-eyebrow"><i class="fas fa-star" aria-hidden="true"></i> SMART INVEST MEMBERSHIP</p>
+      <h1>Smart Invest 會員方案</h1>
+      <p>從免費練習開始；需要更深入的工具時，再考慮進階會員。</p>
+      <p class="membership-account-status" id="membershipAccountStatus" role="status">正在確認會員狀態…</p>
+    </div>
+  </section>
+
+  <section class="membership-comparison" aria-label="會員方案比較">
+    <div class="container wide-container membership-plan-grid">
+      <article class="membership-plan" id="membershipFreePlan">
+        <div class="membership-plan-head">
+          <div>
+            <span class="membership-plan-label">基本方案</span>
+            <h2>免費會員</h2>
+          </div>
+          <img src="{{ url_for('static', filename='images/agent-cat-happy.png') }}" alt="" width="76" height="76">
+        </div>
+        <p class="membership-price">NT$0 <span>／月</span></p>
+        <p class="membership-plan-summary">適合先認識市場、練習建立交易紀律的新手。</p>
+        <ul>
+          <li><i class="fas fa-check" aria-hidden="true"></i> 公開市場資訊、Podcast 與防詐提醒</li>
+          <li><i class="fas fa-check" aria-hidden="true"></i> 會員模擬交易與持倉紀錄</li>
+          <li><i class="fas fa-check" aria-hidden="true"></i> 基礎 AI 教練</li>
+          <li><i class="fas fa-minus" aria-hidden="true"></i> 不含錢包連結流程</li>
+        </ul>
+        <a class="membership-plan-button membership-plan-button-secondary" id="membershipFreeAction" href="/register">建立免費帳號 <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+      </article>
+
+      <article class="membership-plan membership-plan-premium" id="membershipPremiumPlan">
+        <div class="membership-plan-head">
+          <div>
+            <span class="membership-plan-label">進階方案</span>
+            <h2>進階會員</h2>
+          </div>
+          <img src="{{ url_for('static', filename='images/agent-cat-focus.png') }}" alt="" width="76" height="76">
+        </div>
+        <p class="membership-price">NT$99 <span>／月（預計）</span></p>
+        <p class="membership-plan-summary">原有會員與 TEST 帳號目前已享有進階會員身分。</p>
+        <ul>
+          <li><i class="fas fa-check" aria-hidden="true"></i> 包含免費會員功能</li>
+          <li><i class="fas fa-check" aria-hidden="true"></i> 錢包連結與資產同步流程展示</li>
+          <li><i class="fas fa-clock" aria-hidden="true"></i> 更多 AI 額度與正式唯讀同步規劃中</li>
+          <li><i class="fas fa-shield-alt" aria-hidden="true"></i> 不要求私鑰或助記詞</li>
+        </ul>
+        <button class="membership-plan-button" id="joinPremiumBtn" type="button">登入後加入進階會員 <i class="fas fa-arrow-right" aria-hidden="true"></i></button>
+      </article>
+    </div>
+  </section>
+
+  <section class="membership-next">
+    <div class="container wide-container">
+      <h2>加入流程</h2>
+      <div class="membership-steps">
+        <div><span>1</span><strong>登入或建立帳號</strong><p>先有帳號，才能確認你的會員身分。</p></div>
+        <div><span>2</span><strong>確認進階方案</strong><p>查看功能與預計價格，再決定是否加入。</p></div>
+        <div><span>3</span><strong>訂閱開放後啟用</strong><p>付款與續訂管理尚未上線，目前不會扣款。</p></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<dialog class="membership-dialog" id="membershipDialog" aria-labelledby="membershipDialogTitle">
+  <button class="membership-dialog-close" id="membershipDialogClose" type="button" aria-label="關閉"><i class="fas fa-xmark"></i></button>
+  <h2 id="membershipDialogTitle">進階會員訂閱準備中</h2>
+  <p>你已登入，現在可以查看進階方案。付款與正式訂閱尚未開放；按下加入不會建立訂單、扣款或變更會員等級。</p>
+  <a href="/member#membership-plan">查看會員中心方案 <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+</dialog>
+
+{% include "partials/footer.html" %}
+<div class="toast" id="toast"><div class="t" id="toastT">提示</div><div class="m" id="toastM">--</div></div>
+<script>
+  window.__SUPABASE_CONFIG__ = {
+    url: '{{ supabase_url | default("https://dummy.supabase.co") }}',
+    anonKey: '{{ supabase_anon_key | default("dummy") }}'
+  };
+</script>
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=membership-entry-20260929"></script>
+<script src="{{ url_for('static', filename='js/common.js') }}?v=member-nav-lock-20260604"></script>
+<script src="{{ url_for('static', filename='js/membership.js') }}?v=membership-entry-20260929"></script>
+</body>
+</html>

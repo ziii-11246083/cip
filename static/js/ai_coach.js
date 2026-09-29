@@ -1,12 +1,23 @@
 (function () {
   const $ = (id) => document.getElementById(id);
   const CONVERSATION_KEY = "smartinvest_ai_coach_conversation_id";
+  const LEGACY_AGENT_KEY = "smartinvest_ai_agent_conversation_id";
   const messageHistory = [];
   const newChatBtn = $("aiCoachNewChatBtn");
   let conversationCache = [];
   let isLocked = false;
   let pageInitialized = false;
   let memberDataLoaded = false;
+  let planAllocation = [];
+  let orderPending = false;
+
+  function migrateAgentConversation() {
+    if (!localStorage.getItem(CONVERSATION_KEY)) {
+      const legacyId = localStorage.getItem(LEGACY_AGENT_KEY);
+      if (legacyId) localStorage.setItem(CONVERSATION_KEY, legacyId);
+    }
+    localStorage.removeItem(LEGACY_AGENT_KEY);
+  }
 
   function setLockedState(locked) {
     isLocked = locked;
@@ -25,6 +36,7 @@
     }
     if (!pageInitialized || memberDataLoaded) return;
     memberDataLoaded = true;
+    migrateAgentConversation();
     loadConversations();
     loadHistory();
   }
@@ -300,7 +312,7 @@
     const stream = $("chatStream");
     if (!stream) return;
     stream.innerHTML = `
-      <div class="chat-row ai"><div class="avatar">AI</div><div class="bubble"><b>AI 投資教練</b><p>你好，請問你現在最想解決的投資問題是什麼？</p></div></div>
+      <div class="chat-row ai"><div class="avatar">AI</div><div class="bubble"><b>AI 投資教練</b><p>你好，請問你現在最想解決的投資問題是什麼？例如「BTC 目前占比太高怎麼辦？」或「買入前該檢查哪些風險？」</p></div></div>
     `;
   }
 
@@ -615,6 +627,251 @@
     });
   }
 
+  function makeElement(tag, text, className) {
+    const el = document.createElement(tag);
+    if (text !== undefined) el.textContent = String(text);
+    if (className) el.className = className;
+    return el;
+  }
+
+  function formatUsd(value) {
+    return new Intl.NumberFormat("zh-TW", {
+      style: "currency", currency: "USD", maximumFractionDigits: 2,
+    }).format(Number(value) || 0);
+  }
+
+  function setToolStatus(id, message, isError = false) {
+    const el = $(id);
+    if (!el) return;
+    el.textContent = message;
+    el.classList.toggle("is-error", isError);
+  }
+
+  async function memberRequest(url, options = {}) {
+    const token = await getAuthToken();
+    if (!token) throw new Error("請先登入會員。");
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        ...(options.headers || {}),
+      },
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || data.detail || "請求失敗，請稍後再試。");
+    return data;
+  }
+
+  function activateView(view) {
+    for (const name of ["chat", "plan", "portfolio"]) {
+      const selected = name === view;
+      const tab = $({ chat: "coachTabChat", plan: "coachTabPlan", portfolio: "coachTabPortfolio" }[name]);
+      const panel = $({ chat: "coachChatView", plan: "coachPlanView", portfolio: "coachPortfolioView" }[name]);
+      tab?.classList.toggle("active", selected);
+      tab?.setAttribute("aria-selected", String(selected));
+      if (panel) panel.hidden = !selected;
+    }
+    if (view === "portfolio") refreshPortfolio();
+  }
+
+  function addTextList(parent, title, items, tag) {
+    if (!Array.isArray(items) || !items.length) return;
+    parent.appendChild(makeElement("h3", title));
+    const list = document.createElement(tag);
+    items.forEach((item) => {
+      if (typeof item === "string" && item.trim()) list.appendChild(makeElement("li", item));
+    });
+    parent.appendChild(list);
+  }
+
+  function addTable(parent, className, headers, rows) {
+    const table = makeElement("table", undefined, className);
+    const head = document.createElement("thead");
+    const headRow = document.createElement("tr");
+    headers.forEach((label) => headRow.appendChild(makeElement("th", label)));
+    head.appendChild(headRow);
+    table.appendChild(head);
+    const body = document.createElement("tbody");
+    rows.forEach((values) => {
+      const row = document.createElement("tr");
+      values.forEach((value) => row.appendChild(makeElement("td", value)));
+      body.appendChild(row);
+    });
+    table.appendChild(body);
+    parent.appendChild(table);
+  }
+
+  function renderPlan(data, budget) {
+    const container = $("coachPlanResult");
+    if (!container) return;
+    container.innerHTML = "";
+    container.hidden = false;
+    container.className = "coach-plan-result";
+    container.appendChild(makeElement("h2", data.summary || "投資任務計畫"));
+    addTextList(container, "執行步驟", data.steps, "ol");
+    addTextList(container, "需要留意的風險", data.risks, "ul");
+    if (data.next_action) {
+      container.appendChild(makeElement("h3", "建議下一步"));
+      container.appendChild(makeElement("p", data.next_action));
+    }
+
+    const raw = Array.isArray(data.allocation) ? data.allocation : [];
+    planAllocation = raw.map((item) => ({
+      symbol: String(item?.symbol || "").toUpperCase().trim(),
+      amount_usd: Number(item?.amount_usd),
+    })).filter((item) => /^[A-Z0-9]{2,12}$/.test(item.symbol)
+      && Number.isFinite(item.amount_usd) && item.amount_usd > 0);
+    const total = planAllocation.reduce((sum, item) => sum + item.amount_usd, 0);
+    if (total > budget) {
+      const scale = budget / total;
+      planAllocation = planAllocation.map((item) => ({
+        ...item, amount_usd: Math.floor(item.amount_usd * scale * 100) / 100,
+      })).filter((item) => item.amount_usd > 0);
+    }
+    if (!planAllocation.length) return;
+
+    container.appendChild(makeElement("h3", "模擬配置預覽"));
+    addTable(container, "coach-allocation-table", ["幣種", "預計金額"], planAllocation.map((item) => [
+      item.symbol, formatUsd(item.amount_usd),
+    ]));
+    const confirmArea = makeElement("div", undefined, "coach-confirm-area");
+    confirmArea.appendChild(makeElement("p", "教練不會在你確認前下單。確認後會批次建立模擬買單；若帳戶現金不足，系統會按比例縮小金額。"));
+    const label = makeElement("label", undefined, "coach-confirm-check");
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    label.appendChild(checkbox);
+    label.appendChild(makeElement("span", "我已核對幣種與金額"));
+    confirmArea.appendChild(label);
+    const button = makeElement("button", "確認建立模擬單", "button primary");
+    button.type = "button";
+    button.disabled = true;
+    checkbox.addEventListener("change", () => { button.disabled = !checkbox.checked || orderPending; });
+    button.addEventListener("click", async () => {
+      if (!checkbox.checked || orderPending) return;
+      orderPending = true;
+      button.disabled = true;
+      setToolStatus("coachPlanStatus", "模擬單送出中...");
+      try {
+        const result = await memberRequest("/api/agent-auto-order", {
+          method: "POST", body: JSON.stringify({ allocation: planAllocation }),
+        });
+        checkbox.checked = false;
+        button.disabled = true;
+        const count = Array.isArray(result.trades) ? result.trades.length : 0;
+        setToolStatus("coachPlanStatus", `已建立 ${count} 筆模擬單${result.scaled ? "，金額已依可用現金按比例調整" : ""}。請至模擬資產確認結果。`);
+        window.dispatchEvent?.(new Event("smartinvest:sim-trade-updated"));
+      } catch (error) {
+        setToolStatus("coachPlanStatus", `${error.message || "模擬下單狀態不明。"} 請至模擬資產確認紀錄後再重試。`, true);
+        checkbox.checked = false;
+      } finally {
+        orderPending = false;
+      }
+    });
+    confirmArea.appendChild(button);
+    container.appendChild(confirmArea);
+  }
+
+  async function submitPlan(event) {
+    event.preventDefault();
+    const goal = $("coachGoal")?.value.trim() || "";
+    const budget = Number($("coachBudget")?.value);
+    if (!goal || !Number.isFinite(budget) || budget <= 0) {
+      setToolStatus("coachPlanStatus", "請輸入投資任務與大於 0 的 USD 預算。", true);
+      return;
+    }
+    const button = $("coachPlanSubmit");
+    if (button?.disabled) return;
+    button.disabled = true;
+    planAllocation = [];
+    const resultEl = $("coachPlanResult");
+    if (resultEl) { resultEl.hidden = true; resultEl.innerHTML = ""; }
+    setToolStatus("coachPlanStatus", "正在整理計畫...");
+    try {
+      const data = await memberRequest("/api/agent-plan", {
+        method: "POST",
+        body: JSON.stringify({ goal, profile: $("riskProfile")?.value || "穩健型", budget: String(budget) }),
+      });
+      renderPlan(data, budget);
+      setToolStatus("coachPlanStatus", "請檢查計畫與金額；建議僅供參考。");
+    } catch (error) {
+      setToolStatus("coachPlanStatus", error.message || "產生計畫失敗。", true);
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  async function refreshPortfolio() {
+    const container = $("coachPortfolioContent");
+    if (!container) return;
+    setToolStatus("coachPortfolioStatus", "正在讀取模擬帳本...");
+    try {
+      const [portfolioData, tradeData] = await Promise.all([
+        memberRequest("/api/sim-trade/portfolio"),
+        memberRequest("/api/sim-trade/history?limit=20"),
+      ]);
+      const portfolio = portfolioData.portfolio || {};
+      const positions = Array.isArray(portfolio.positions) ? portfolio.positions : [];
+      const trades = Array.isArray(tradeData.trades) ? tradeData.trades : [];
+      container.innerHTML = "";
+      const metrics = makeElement("div", undefined, "coach-portfolio-metrics");
+      [
+        ["總資產", formatUsd(portfolio.total_value_usd)],
+        ["可用現金", formatUsd(portfolio.cash)],
+        ["模擬損益", formatUsd(portfolio.unrealized_pnl)],
+      ].forEach(([label, value]) => {
+        const item = document.createElement("div");
+        item.appendChild(makeElement("span", label));
+        item.appendChild(makeElement("strong", value));
+        metrics.appendChild(item);
+      });
+      container.appendChild(metrics);
+      container.appendChild(makeElement("h3", "目前持倉"));
+      if (positions.length) {
+        addTable(container, "coach-allocation-table", ["幣種", "數量", "市值"], positions.map((item) => [
+          item.symbol || "", Number(item.quantity || 0).toLocaleString("zh-TW", { maximumFractionDigits: 8 }), formatUsd(item.market_value),
+        ]));
+      } else {
+        container.appendChild(makeElement("p", "尚無模擬持倉。"));
+      }
+      container.appendChild(makeElement("h3", "最近模擬交易"));
+      if (trades.length) {
+        addTable(container, "coach-recent-table", ["方向", "幣種", "金額"], trades.slice(0, 5).map((item) => [
+          item.side === "sell" ? "賣出" : "買入", item.symbol || "", formatUsd(item.amount_usd),
+        ]));
+      } else {
+        container.appendChild(makeElement("p", "尚無模擬交易紀錄。"));
+      }
+      setToolStatus("coachPortfolioStatus", "");
+    } catch (error) {
+      setToolStatus("coachPortfolioStatus", error.message || "無法讀取模擬帳本。", true);
+    }
+  }
+
+  function initAgentTools() {
+    document.querySelectorAll("[data-coach-view]").forEach((tab) => {
+      tab.addEventListener("click", () => activateView(tab.dataset.coachView));
+    });
+    document.querySelectorAll("[data-plan-example]").forEach((button) => {
+      button.addEventListener("click", () => selectPlanExample(button.dataset));
+    });
+    $("coachPlanForm")?.addEventListener("submit", submitPlan);
+    $("coachPortfolioRefresh")?.addEventListener("click", refreshPortfolio);
+    window.addEventListener("smartinvest:sim-trade-updated", () => {
+      if ($("coachPortfolioView") && !$("coachPortfolioView").hidden) refreshPortfolio();
+    });
+  }
+
+  function selectPlanExample(example) {
+    const goal = $("coachGoal");
+    const budget = $("coachBudget");
+    if (!goal || !budget) return;
+    goal.value = example.planExample || "";
+    budget.value = example.planBudget || budget.value;
+    activateView("plan");
+    goal.focus();
+  }
+
   // ── TASK 04：純函式／渲染測試 hooks ─────────────────────────────────
   if (typeof window !== "undefined") {
     window.aiCoachTestHooks = {
@@ -625,6 +882,10 @@
       displayableCitationCount,
       appendChatBubble,
       syncMemberState,
+      migrateAgentConversation,
+      renderPlan,
+      refreshPortfolio,
+      selectPlanExample,
     };
     window.addEventListener("smartinvest:auth-state", (event) => {
       syncMemberState(Boolean(event?.detail?.isMember));
@@ -643,6 +904,7 @@
     initRiskCards();
     initQuickAsk();
     initChatEvents();
+    initAgentTools();
     pageInitialized = true;
     syncMemberState(loggedIn);
   });

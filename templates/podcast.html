@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/iansui@1.0/dist/iansui.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=utf8fix">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/podcast.css') }}?v=shared-site-podcast">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/podcast.css') }}?v=public-podcast-20260929">
 </head>
 <body class="podcast-page">
   
@@ -51,12 +51,6 @@
 
   <section class="section podcast-workspace-section">
     <div class="container wide-container">
-      <div class="podcast-access-strip" id="podcastGuestGate">
-        <div class="podcast-access-icon"><i class="fas fa-user-check"></i></div>
-        <div><strong>Podcast 開放訪客模式使用</strong><p>按下按鈕即可啟用訪客模式；會員登入也可以直接使用。</p></div>
-        <button class="button primary" id="btnEnablePodcastGuest" type="button"><i class="fas fa-user-check"></i> 啟用訪客模式</button>
-      </div>
-
       <div class="podcast-console">
         <section class="podcast-studio-card" id="podcastStudioCard">
           <div class="podcast-top-grid">
@@ -125,6 +119,6 @@
 <script>window.__SUPABASE_CONFIG__ = { url: '{{ supabase_url | default("https://dummy.supabase.co") }}', anonKey: '{{ supabase_anon_key | default("dummy") }}' };</script>
 <script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=auth-state-20260830"></script>
 <script src="{{ url_for('static', filename='js/common.js') }}?v=member-nav-lock-20260604"></script>
-<script src="{{ url_for('static', filename='js/podcast.js') }}?v=personal-podcast-2"></script>
+<script src="{{ url_for('static', filename='js/podcast.js') }}?v=public-podcast-20260929"></script>
 </body>
 </html>

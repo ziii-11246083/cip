@@ -37,7 +37,7 @@ try:
 except Exception:
     WordCloud = None
 from bs4 import BeautifulSoup
-from flask import Flask, request, jsonify, send_file, abort, render_template, has_request_context
+from flask import Flask, request, jsonify, send_file, abort, render_template, has_request_context, redirect
 from flask_cors import CORS
 from pydantic import BaseModel, Field, ValidationError
 from openai import OpenAI
@@ -1486,7 +1486,7 @@ def ai_coach_page():
 
 @app.route('/agent')
 def ai_agent_page():
-    return render_template('agent.html')
+    return redirect('/ai-coach')
 
 @app.route('/scam-detect')
 def scam_detect_page():
@@ -1503,6 +1503,10 @@ def podcast_page():
 @app.route('/register')
 def register_page():
     return render_template('register.html')
+
+@app.route('/membership')
+def membership_page():
+    return render_template('membership.html')
 
 @app.route('/sim-trade')
 def sim_trade_page():

@@ -671,7 +671,7 @@
     initialAuthState = Boolean(token);
     if (!token) {
       setLockedState(true);
-      setStatus("目前是訪客模式，請先登入會員。", "bad");
+      setStatus("目前尚未登入，請先登入會員。", "bad");
       return;
     }
 
