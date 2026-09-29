@@ -44,6 +44,21 @@
   padding:0;
   overflow:hidden;
   border-radius:28px;
+  height:750px;
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+}
+
+.coach-chat .chat-stream{
+  flex:1;
+  min-height:0;
+  max-height:none;
+}
+
+.coach-chat > .chat-head,
+.coach-chat > .chat-input-row{
+  flex-shrink:0;
 }
 
 .chat-input-row{
@@ -130,17 +145,21 @@
 }
 
 .coach-layout{
+  display:block;
+}
+
+/* The sidebar and chat are siblings inside the app, not coach-layout. */
+.ai-coach-app{
   display:grid;
   grid-template-columns:360px minmax(0,1fr);
   gap:28px;
   align-items:start;
 }
 
-/* 未登入時只有會員提示卡可見，讓它跨越雙欄並置中，避免右側留下空欄。 */
+/* 未登入時讓會員提示卡置中，不受應用程式的雙欄限制。 */
 .coach-layout > .member-gate.show{
-  grid-column:1 / -1;
   width:min(100%,760px);
-  justify-self:center;
+  margin:0 auto;
 }
 
 .coach-side-stack{
@@ -588,7 +607,7 @@
 }
 
 @media(max-width:1120px){
-  .coach-layout{
+  .ai-coach-app{
     grid-template-columns:1fr;
   }
 }
