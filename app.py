@@ -13,7 +13,7 @@ import json
 import uuid
 import wave
 import hashlib
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Tuple
 from functools import wraps
@@ -59,6 +59,8 @@ except Exception as _rag_exc:
 # （須在 RAG trace singleton 建立之前，否則 .env 中的 HMAC secret 與
 #   service-role credential 不會被 trace service 看到，會誤判 missing）
 load_dotenv()
+_PROJECT_DOTENV_PATH = Path(__file__).with_name(".env")
+load_dotenv(dotenv_path=_PROJECT_DOTENV_PATH, override=True)
 
 # ── RAG Trace (TASK 02 / TASK 03) ───────────────────────────
 try:
@@ -329,7 +331,7 @@ client: Optional[OpenAI] = OpenAI(api_key=Config.OPENAI_API_KEY) if Config.OPENA
 
 def refresh_openai_client() -> Optional[OpenAI]:
     global client
-    load_dotenv(override=True)
+    load_dotenv(dotenv_path=_PROJECT_DOTENV_PATH, override=True)
     latest_key = os.getenv("OPENAI_API_KEY", "").strip().strip('"').strip("'")
     if latest_key == Config.OPENAI_API_KEY:
         return client
@@ -644,7 +646,11 @@ class DataManager:
         try:
             res = requests.get(url, params=params, headers=headers, timeout=timeout)
             if res.status_code == 200: return res.json()
-        except Exception: pass
+            app.logger.warning("CoinGecko request failed path=%s status=%s", path, res.status_code)
+        except requests.RequestException as exc:
+            app.logger.warning("CoinGecko request failed path=%s error=%s", path, type(exc).__name__)
+        except ValueError:
+            app.logger.warning("CoinGecko returned invalid JSON path=%s", path)
         return None
 
     @staticmethod
@@ -672,13 +678,13 @@ class DataManager:
         price_usd = coin.get('price_usd', 0.0)
 
         if symbol == 'BTC':
-            coin['risk'] = {"level": "base", "msg": "市場基準", "corr": 1.0, "score": 0, "lambda": 0, "beta": 1}
+            coin['risk'] = {"level": "base", "msg": "市場基準", "corr": None, "score": None, "lambda": None, "beta": None}
         elif len(btc_prices) > 10 and len(history_prices) > 10:
             min_len = min(len(btc_prices), len(history_prices))
             df = pd.DataFrame({'BTC': btc_prices[-min_len:], symbol: history_prices[-min_len:]})
             coin['risk'] = RiskModel.calculate_copula_risk(symbol, df, coin.get('is_stable', False), price_usd)
         else:
-            coin['risk'] = {"level": "base", "msg": "資料不足", "score": 0}
+            coin['risk'] = {"level": "base", "msg": "資料不足", "score": None}
 
         if 'history_prices' in coin: del coin['history_prices']
         return coin
@@ -886,25 +892,35 @@ class RiskModel:
     @staticmethod
     def calculate_copula_risk(symbol: str, df: pd.DataFrame, is_stable: bool, current_price: float) -> Dict:
         try:
+            if str(symbol).upper() == 'BTC':
+                return {"level": "base", "msg": "市場基準", "corr": None, "score": None, "lambda": None, "beta": None}
             if is_stable: return {"level": "safe", "msg": "穩定資產", "corr": 0.01, "score": 1, "lambda": 0, "beta": 0}
-            if symbol not in df.columns or 'BTC' not in df.columns: return {"level": "base", "msg": "資料不足", "score": 0}
+            if symbol not in df.columns or 'BTC' not in df.columns: return {"level": "base", "msg": "資料不足", "score": None}
             target_df = df[['BTC', symbol]].dropna()
             returns = target_df.pct_change().dropna()
-            if len(target_df) < 10: return {"level": "base", "msg": "資料不足", "score": 0}
+            if len(target_df) < 10: return {"level": "base", "msg": "資料不足", "score": None}
 
             corr = returns['BTC'].corr(returns[symbol])
             if np.isnan(corr): corr = 0.0
             u, v = returns['BTC'].rank(pct=True), returns[symbol].rank(pct=True)
             lambda_lower = np.sum((u <= 0.2) & (v <= 0.2)) / max(1, np.sum(u <= 0.2))
-            tail_beta = returns[symbol][returns['BTC'] <= returns['BTC'].quantile(0.1)].mean() / max(0.0001, returns['BTC'][returns['BTC'] <= returns['BTC'].quantile(0.1)].mean())
-            if np.isnan(tail_beta): tail_beta = 1.0
+            downside = returns['BTC'] <= returns['BTC'].quantile(0.1)
+            btc_downside_mean = returns.loc[downside, 'BTC'].mean()
+            coin_downside_mean = returns.loc[downside, symbol].mean()
+            # Keep the sign of BTC losses: replacing a negative denominator with
+            # +0.0001 would turn a coin's amplified losses into a negative beta.
+            if not np.isfinite(btc_downside_mean) or abs(btc_downside_mean) < 0.0001:
+                tail_beta = 1.0
+            else:
+                tail_beta = coin_downside_mean / btc_downside_mean
+                if not np.isfinite(tail_beta): tail_beta = 1.0
             
             raw_score = (lambda_lower * 0.5 + (corr if corr>0 else 0)*0.2 + ((min(2.0, max(0.5, float(np.clip(tail_beta, -2.0, 5.0)))) - 0.5) / 1.5) * 0.3) * 100
             sfi_score = int(np.clip(0 if np.isnan(raw_score) else raw_score, 0, 100))
             level, msg = ("danger", "極度脆弱") if sfi_score >= 65 else ("warning", "中度連動") if sfi_score >= 40 else ("safe", "走勢獨立")
             
             return {"level": level, "msg": msg, "corr": round(corr, 2), "score": sfi_score, "beta": round(tail_beta, 2), "lambda": round(lambda_lower, 2)}
-        except: return {"level": "base", "msg": "運算錯誤", "score": 0}
+        except: return {"level": "base", "msg": "運算錯誤", "score": None}
 
 class SocialMediaEngine:
     SIGNAL_KEYWORDS = ["ETF", "升息", "降息", "通膨", "監管", "支撐", "壓力", "均線", "鯨魚", "鏈上", "TVL", "質押", "空投", "白皮書", "核准", "通過", "上市", "減半", "現貨", "合約", "回購", "增持", "銷毀", "新高", "大漲", "突破", "趨勢", "佈局", "創新", "整合"]
@@ -1212,7 +1228,18 @@ class ScamScanResult(BaseModel):
     risk_level: Literal["high", "medium", "low"]
     report: str = Field(..., min_length=1)
 
-def build_fallback_podcast(req: PodcastGenerateRequest) -> Dict[str, Any]:
+def taipei_now() -> datetime:
+    return datetime.now(timezone(timedelta(hours=8)))
+
+
+def podcast_broadcast_intro(moment: datetime, topic: str) -> str:
+    return (
+        f"本集播報基準時間為台灣時間 {moment.year} 年 {moment.month} 月 {moment.day} 日 "
+        f"{moment.hour:02d}:{moment.minute:02d}。歡迎收聽 Smart Invest {topic}。"
+    )
+
+
+def build_fallback_podcast(req: PodcastGenerateRequest, moment: Optional[datetime] = None) -> Dict[str, Any]:
     topic_map = {
         "CRYPTO": "整體市場快報",
         "ALT": "新興幣市場快報",
@@ -1226,7 +1253,7 @@ def build_fallback_podcast(req: PodcastGenerateRequest) -> Dict[str, Any]:
     watchlist = [str(s).upper() for s in (req.watchlist or ["BTC", "ETH", "SOL"])][:4]
     focus = "、".join(watchlist)
     lines = [
-        {"speaker": "主持人", "text": f"歡迎收聽 Smart Invest，今天這集是{topic}。"},
+        {"speaker": "主持人", "text": podcast_broadcast_intro(moment or taipei_now(), topic)},
         {"speaker": "分析師", "text": f"這集會先用比較白話的方式看 {focus}，重點放在趨勢、風險和下一步。"},
         {"speaker": "主持人", "text": "如果市場短線波動很大，第一件事不是追價，而是先確認自己的配置比例。"},
         {"speaker": "分析師", "text": "對，新手最常見的風險是單一幣種太集中，或是在上漲後一次投入太多。"},
@@ -1337,6 +1364,77 @@ def _normalize_price_series(points: Any) -> List[List[float]]:
         deduped.append([timestamp, price])
 
     return deduped
+
+
+def _ohlc_candle(timestamp_seconds: Any, open_price: Any, high_price: Any,
+                 low_price: Any, close_price: Any) -> Optional[Dict[str, Any]]:
+    try:
+        values = [float(timestamp_seconds), float(open_price), float(high_price),
+                  float(low_price), float(close_price)]
+    except (TypeError, ValueError):
+        return None
+
+    timestamp, opening, high, low, close = values
+    if not all(math.isfinite(value) for value in values):
+        return None
+    if timestamp <= 0 or min(opening, high, low, close) <= 0:
+        return None
+    if low > min(opening, close) or high < max(opening, close):
+        return None
+
+    return {"time": int(timestamp), "open": opening, "high": high,
+            "low": low, "close": close}
+
+
+def _normalize_ohlc_candles(rows: Any) -> List[Dict[str, Any]]:
+    """Convert CoinGecko [close_time_ms, open, high, low, close] rows to candles."""
+    if not isinstance(rows, (list, tuple)):
+        return []
+
+    by_time: Dict[int, Dict[str, Any]] = {}
+    for row in rows:
+        if not isinstance(row, (list, tuple)) or len(row) < 5:
+            continue
+        try:
+            timestamp_ms = float(row[0])
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(timestamp_ms):
+            continue
+        candle = _ohlc_candle(timestamp_ms / 1000, *row[1:5])
+        if candle:
+            by_time[candle["time"]] = candle
+    return [by_time[timestamp] for timestamp in sorted(by_time)]
+
+
+def _fetch_yfinance_ohlc(symbol: str, days: int) -> List[Dict[str, Any]]:
+    yahoo_symbol = _resolve_yahoo_ticker(symbol)
+    if not yahoo_symbol:
+        return []
+
+    period = {7: "7d", 30: "1mo", 90: "3mo"}.get(days, "1mo")
+    try:
+        history = yf.Ticker(yahoo_symbol).history(period=period, interval="1d", auto_adjust=True)
+    except Exception:
+        return []
+    if history is None or history.empty or not {"Open", "High", "Low", "Close"}.issubset(history.columns):
+        return []
+
+    by_time: Dict[int, Dict[str, Any]] = {}
+    for timestamp, row in history.iterrows():
+        try:
+            date_time = pd.Timestamp(timestamp)
+            if pd.isna(date_time):
+                continue
+            if date_time.tzinfo is None:
+                date_time = date_time.tz_localize("UTC")
+            candle = _ohlc_candle(date_time.timestamp(), row["Open"], row["High"],
+                                  row["Low"], row["Close"])
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if candle:
+            by_time[candle["time"]] = candle
+    return [by_time[timestamp] for timestamp in sorted(by_time)]
 
 
 def _fetch_yfinance_series(symbol: str, days: int) -> List[List[float]]:
@@ -1455,6 +1553,42 @@ def calculate_portfolio_risk_health(req: RiskHealthRequest) -> Dict[str, Any]:
         "market_data_available": market_data_available,
         "herfindahl": round(herfindahl, 6),
     }
+
+
+def build_portfolio_rule_report(req: RiskHealthRequest, metrics: Dict[str, Any]) -> Dict[str, Any]:
+    """Explain measured portfolio risk when AI generation cannot be used."""
+    symbols = sorted({str(item.ticker).strip().upper() for item in req.holdings if str(item.ticker).strip()})
+    top1 = float(metrics.get("top1_weight") or 0)
+    requested_weights = sorted((float(item.weight) for item in req.holdings), reverse=True)
+    requested_total = sum(requested_weights)
+    top3 = float(metrics["top3_weight"]) if metrics.get("top3_weight") is not None else (
+        sum(requested_weights[:3]) / requested_total if requested_total > 0 else 0.0
+    )
+    concentration = "前三大持幣集中度偏高" if top3 >= 0.7 else "前三大持幣集中度仍需觀察" if top3 >= 0.55 else "配置沒有明顯集中於前三大持幣"
+    narrative = (
+        f"目前配置 {len(symbols)} 種幣別（{', '.join(symbols)}）。最大單一幣種占 {top1:.1%}，"
+        f"前三大幣種合計 {top3:.1%}；{concentration}。"
+        "持有多種加密資產仍可能同時受到市場波動影響，請依自己的資金用途與風險承受度判讀。"
+    )
+    highlights = [
+        f"最大單一幣種占比 {top1:.1%}；可先核對是否超過你預先設定的單幣上限。",
+        f"前三大幣種合計 {top3:.1%}；如高於原定配置，檢查是否需要再平衡。",
+    ]
+    if metrics.get("market_data_available") and metrics.get("annual_vol") is not None and metrics.get("max_drawdown") is not None:
+        vol = float(metrics["annual_vol"])
+        drawdown = float(metrics["max_drawdown"])
+        narrative += (
+            f"依近 {max(30, int(req.days or 90))} 天可取得的每日價格估計，"
+            f"組合年化波動約 {vol:.1%}，樣本內最大回撤約 {drawdown:.1%}。"
+            "這是歷史區間的風險觀察，不是未來虧損上限或報酬預測。"
+        )
+        highlights.append(f"年化波動 {vol:.1%}：數值越高，歷史價格起伏越大；請與可承受的波動範圍比較。")
+        highlights.append(f"最大回撤 {drawdown:.1%}：代表所選區間內從前高到後續低點的最大跌幅。")
+    else:
+        narrative += "行情資料不足，無法計算完整組合的年化波動與最大回撤；缺少數值不代表零風險。"
+        highlights.append("至少一項持幣缺少可對齊的歷史價格，請稍後重試或檢查幣種代碼。")
+    highlights.append("設定檢查頻率與再平衡條件；市場大幅變動後重新檢查實際比例。")
+    return {"risk_health": metrics, "narrative": narrative, "highlights": highlights}
 
 # ==========================================
 # 🚦 4. Flask Routes & APIs
@@ -1646,20 +1780,18 @@ def market_scenarios():
     })
 
 @app.route('/api/coingecko')
-@ttl_cache(ttl_seconds=Config.CACHE_TTL)
 def live_data():
     crypto_list = DataManager.get_all_tickers()
     if not crypto_list: return jsonify({"timestamp": "", "data": []})
     history_df = DataManager.build_historical_df(crypto_list)
     for coin in crypto_list:
         symbol, price_usd = coin['symbol'], coin['price_usd']
-        if symbol == 'BTC': coin['risk'] = {"level": "base", "msg": "市場基準", "corr": 1.0, "score": 0, "lambda": 0, "beta": 1}
+        if symbol == 'BTC': coin['risk'] = {"level": "base", "msg": "市場基準", "corr": None, "score": None, "lambda": None, "beta": None}
         else: coin['risk'] = RiskModel.calculate_copula_risk(symbol, history_df, coin.get('is_stable', False), price_usd)
         if 'history_prices' in coin: del coin['history_prices']
     return jsonify({"timestamp": "", "data": crypto_list})
 
 @app.route('/api/market', methods=['GET'])
-@ttl_cache(ttl_seconds=Config.CACHE_TTL)
 def api_market():
     crypto_list = DataManager.get_market_tickers()
     if not crypto_list:
@@ -1703,6 +1835,7 @@ def get_social_data():
 @app.route('/api/details/<symbol>')
 def get_coin_details(symbol):
     try:
+        symbol = symbol.strip().upper()
         crypto_list = DataManager.get_all_tickers()
         target_coin = next((c for c in crypto_list if c['symbol'] == symbol), None)
         btc_coin = next((c for c in crypto_list if c['symbol'] == 'BTC'), None)
@@ -1711,22 +1844,76 @@ def get_coin_details(symbol):
         prices = target_coin.get('history_prices', [])
         btc_prices = btc_coin.get('history_prices', [])
         min_len = min(len(prices), len(btc_prices))
-        df = pd.DataFrame({'BTC': btc_prices[-min_len:], symbol: prices[-min_len:]})
-        returns = df.pct_change().dropna()
+        if min_len < 2:
+            return jsonify({"error": "歷史價格資料不足"}), 503
+        df = pd.DataFrame({'BTC': btc_prices[-min_len:]}) if symbol == 'BTC' else pd.DataFrame({'BTC': btc_prices[-min_len:], symbol: prices[-min_len:]})
+        returns = df.pct_change().dropna() if symbol != 'BTC' else pd.DataFrame()
+        benchmark_sfi = []
+        comparison_symbol = symbol
+        comparison_corr = None
+        if symbol == 'BTC':
+            by_symbol = {coin.get('symbol'): coin for coin in crypto_list}
+            preferred = ['ETH', 'SOL', 'BNB', 'XRP', 'DOGE', 'AVAX']
+            candidates = [by_symbol[s] for s in preferred if s in by_symbol]
+            candidates += [coin for coin in crypto_list if coin.get('symbol') not in preferred
+                           and coin.get('symbol') != 'BTC' and not coin.get('is_stable')]
+            comparison_returns = None
+            for coin in candidates:
+                peer_symbol = coin.get('symbol')
+                peer_prices = coin.get('history_prices', [])
+                if peer_symbol in Config.STABLE_COINS or min(len(btc_prices), len(peer_prices)) < 10:
+                    continue
+                peer_length = min(len(btc_prices), len(peer_prices))
+                peer_df = pd.DataFrame({'BTC': btc_prices[-peer_length:], peer_symbol: peer_prices[-peer_length:]})
+                peer_risk = RiskModel.calculate_copula_risk(peer_symbol, peer_df, False, peer_prices[-1])
+                if peer_risk.get('score') is None:
+                    continue
+                benchmark_sfi.append({
+                    'symbol': peer_symbol,
+                    'score': peer_risk['score'],
+                    'corr': peer_risk.get('corr'),
+                    'beta': peer_risk.get('beta'),
+                    'lambda': peer_risk.get('lambda'),
+                })
+                if comparison_returns is None:
+                    candidate_returns = peer_df.pct_change().dropna()
+                    if len(candidate_returns) >= 3:
+                        comparison_symbol = peer_symbol
+                        comparison_returns = candidate_returns
+                        measured_corr = candidate_returns['BTC'].corr(candidate_returns[peer_symbol])
+                        comparison_corr = round(float(measured_corr), 2) if np.isfinite(measured_corr) else None
+                if len(benchmark_sfi) >= 6:
+                    break
+            if comparison_returns is not None:
+                returns = comparison_returns
         
         is_stable = symbol in Config.STABLE_COINS
-        risk_data = RiskModel.calculate_copula_risk(symbol, df, is_stable, prices[-1]) if len(prices) > 0 else {}
+        risk_data = RiskModel.calculate_copula_risk(symbol, df, is_stable, prices[-1])
         sim_data = MonteCarloEngine.simulate_price_paths(prices[-30:]) if len(prices) > 30 else {}
+        if symbol == 'BTC':
+            sfi_insight = (f"BTC 是全站 SFI 的比較基準；圖表以 {comparison_symbol} 為例，顯示其他幣種相對 BTC 的分數、相關性、Beta 與尾端連動。BTC 本身沒有自我比較分數。"
+                           if benchmark_sfi else "BTC 是全站 SFI 的比較基準；目前沒有足夠的其他幣種資料可計算相對指標。")
+            correlation_insight = (f"散點圖比較 {comparison_symbol} 與 BTC 的近期價格報酬，相關係數約 {comparison_corr:.2f}；"
+                                   "正相關不代表兩者漲跌幅相同。") if comparison_corr is not None else "目前沒有足夠的其他幣種報酬可與 BTC 比較。"
+        elif risk_data.get('score') is None:
+            sfi_insight = "歷史資料不足，尚不能計算 SFI 分數；請勿把缺資料解讀為零風險。"
+            correlation_insight = "歷史資料不足，尚不能判斷此幣與 BTC 的報酬連動。"
+        else:
+            sfi_insight = AIAssistant.generate_sfi_insight(risk_data['score'])
+            correlation_insight = AIAssistant.generate_copula_insight(risk_data.get('corr') or 0, risk_data.get('lambda') or 0)
         
         return jsonify({
-            "btc_returns": [0 if np.isnan(x) else x for x in returns['BTC'].tolist()],
-            "coin_returns": [0 if np.isnan(x) else x for x in returns[symbol].tolist()],
+            "btc_returns": returns['BTC'].tolist() if not returns.empty else [],
+            "coin_returns": returns[comparison_symbol].tolist() if not returns.empty else [],
             "dates": list(range(len(returns))),
+            "benchmark_sfi": benchmark_sfi,
+            "comparison_symbol": comparison_symbol,
+            "comparison_corr": comparison_corr,
             "simulation": sim_data,
             "risk_data": risk_data, 
             "ai_insights": {
-                "sfi": AIAssistant.generate_sfi_insight(risk_data.get('score', 0)),
-                "copula": AIAssistant.generate_copula_insight(risk_data.get('corr', 0), risk_data.get('lambda', 0)),
+                "sfi": sfi_insight,
+                "copula": correlation_insight,
                 "mc": AIAssistant.generate_mc_insight(prices[-1], sim_data.get('mean_path', [0])[-1] if sim_data else prices[-1], sim_data.get('volatility', 0) if sim_data else 0)
             }
         })
@@ -1750,6 +1937,58 @@ def search_sfi_assets():
     query = request.args.get("q", "").strip()
     if not query: return jsonify({"data": []})
     return jsonify({"data": DataManager.search_sfi_assets(query)})
+
+_OHLC_CACHE: Dict[Tuple[str, int], Tuple[float, Dict[str, Any]]] = {}
+_OHLC_CACHE_LOCK = Lock()
+
+
+@app.route("/crypto/ohlc", methods=["GET"])
+def crypto_ohlc():
+    ticker = request.args.get("ticker", "BTC").strip().upper()
+    vs_currency = request.args.get("vs_currency", "usd").strip().lower()
+    days_param = request.args.get("days", "30")
+    if ticker not in CG_ID_MAP:
+        return jsonify({"error": "不支援的幣種。"}), 400
+    if vs_currency != "usd":
+        return jsonify({"error": "K 線圖目前僅支援 USD。"}), 400
+    if days_param not in {"7", "30", "90"}:
+        return jsonify({"error": "days 必須是 7、30 或 90。"}), 400
+
+    days = int(days_param)
+    coin_id = CG_ID_MAP[ticker]
+    cache_key = (ticker, days)
+    now = time.monotonic()
+    with _OHLC_CACHE_LOCK:
+        cached = _OHLC_CACHE.get(cache_key)
+        if cached and now - cached[0] < 300:
+            return jsonify(copy.deepcopy(cached[1]))
+        if cached:
+            del _OHLC_CACHE[cache_key]
+
+    candles: List[Dict[str, Any]] = []
+    try:
+        raw_candles = DataManager._cg_get(
+            f"/coins/{coin_id}/ohlc",
+            {"vs_currency": "usd", "days": days, "precision": "full"},
+        )
+        candles = _normalize_ohlc_candles(raw_candles)
+    except Exception:
+        app.logger.exception("CoinGecko OHLC request failed for %s", ticker)
+
+    source = "coingecko"
+    interval = "4d" if days == 90 else "4h"
+    if len(candles) < 2:
+        candles = _fetch_yfinance_ohlc(ticker, days)
+        source = "yfinance" if len(candles) >= 2 else "unavailable"
+        interval = "1d" if source == "yfinance" else None
+    payload = {"ticker": ticker, "coin_id": coin_id, "vs": "usd", "days": days,
+               "source": source, "interval": interval, "candles": candles}
+
+    if len(candles) >= 2:
+        with _OHLC_CACHE_LOCK:
+            _OHLC_CACHE[cache_key] = (time.monotonic(), copy.deepcopy(payload))
+    return jsonify(payload)
+
 
 @app.route("/crypto/series", methods=["GET"])
 def crypto_price_series():
@@ -1833,7 +2072,7 @@ def api_ai_chat():
     if not user_msg:
         return jsonify({"reply": "請先輸入訊息內容。"}), 400
     if not client:
-        return jsonify({"reply": "API Key 未設定，無法連線 AI。"})
+        return jsonify({"reply": "AI 服務尚未設定，請聯絡管理者。", "error_code": "ai_not_configured"}), 503
 
     # ── RAG trace (TASK 02)：demo 使用者不寫 user_id（非 UUID，且避免污染正式使用者資料）
     trace_run = None
@@ -2069,10 +2308,17 @@ def api_ai_chat():
             payload["citations"] = trace_run.citations
             payload["confidence"] = trace_run.confidence
         return jsonify(payload)
-    except Exception:
+    except Exception as error:
         # 錯誤訊息固定化：不回傳、不保存 provider exception text（可能含 token）
+        app.logger.warning("ai_chat provider failed: %s", type(error).__name__)
         if trace_run:
             trace_run.finish(answer="", error="ai_chat_error")
+        if is_openai_auth_error(error):
+            payload = {"reply": "AI 服務目前無法使用，請聯絡管理者檢查連線設定。", "error_code": "invalid_api_key"}
+            if trace_run:
+                payload.update({"trace_id": trace_run.trace_id, "citations": [], "confidence": None})
+            return jsonify(payload), 503
+        if trace_run:
             return jsonify({
                 "reply": "系統錯誤，請稍後再試。",
                 "trace_id": trace_run.trace_id,
@@ -3074,6 +3320,7 @@ def api_scam_scan():
 def generate_podcast():
     try: req = PodcastGenerateRequest(**(request.get_json(silent=True) or {}))
     except ValidationError as e: return jsonify({"detail": str(e)}), 422
+    broadcast_at = taipei_now()
 
     personal_summary = ""
     if req.market == "PERSONAL" and req.portfolio_summary:
@@ -3109,13 +3356,18 @@ def generate_podcast():
         if trace_run:
             trace_run.note_rag_error()
     _record_rag_for_trace(trace_run, rag_result)
-    system_msg = "你是加密貨幣晨報 Podcast 主持人與分析師。請遵循 Podcast 風格指南，開場含日期與市場概覽，結尾含投資提醒。輸出 JSON。" + rag_context
+    system_msg = (
+        "你是加密貨幣 Podcast 主持人與分析師。請遵循 Podcast 風格指南，結尾含投資提醒。"
+        f"本集播報基準時間是台灣時間 {broadcast_at.strftime('%Y-%m-%d %H:%M')} (UTC+08:00)。"
+        "不要自行推測其他『今天』的日期、現在時刻、即時行情或尚未提供的新聞。"
+        "開場日期與時間由系統補上，你的對話內不必重複日期。輸出 JSON。"
+    ) + rag_context
     try:
         podcast_client = refresh_openai_client()
         if not podcast_client:
             if trace_run:
                 trace_run.note_llm_unavailable()
-            business = build_fallback_podcast(req)
+            business = build_fallback_podcast(req, broadcast_at)
             _finish_trace(trace_run, answer=_trace_snapshot(business, max_len=8000))
             return jsonify({**business, **_trace_meta(trace_run)})
         completion = podcast_client.beta.chat.completions.parse(
@@ -3125,6 +3377,11 @@ def generate_podcast():
         )
         out = completion.choices[0].message.parsed
         lines = out.lines
+        topic_label = {"CRYPTO": "整體市場快報", "ALT": "新興幣市場快報",
+                       "BTC": "BTC 盤勢晨報", "RISK": "風險提醒特輯",
+                       "PERSONAL": "專屬資產 Podcast", "US": "美股市場快報",
+                       "JP": "日股市場快報"}.get(req.market, "市場快報")
+        lines[0] = Line(speaker="主持人", text=podcast_broadcast_intro(broadcast_at, topic_label))
         estimated_seconds = max(35, int(sum(len(l.text) for l in lines) / 3.0))
         script_text = "\n".join([f"{l.speaker}：{l.text}" for l in lines])
         business = {
@@ -3136,7 +3393,7 @@ def generate_podcast():
     except Exception:
         # 不回傳 provider exception 資訊（安全修正）；trace 記固定代碼；
         # 使用者實際收到 fallback podcast → 以同一份內容做 answer snapshot
-        business = build_fallback_podcast(req)
+        business = build_fallback_podcast(req, broadcast_at)
         _finish_trace(trace_run, answer=_trace_snapshot(business, max_len=8000), error="llm_error")
         return jsonify({**business, **_trace_meta(trace_run)})
 
@@ -3145,19 +3402,16 @@ def api_generate_podcast_alias():
     return generate_podcast()
 
 def create_dialogue_wav(podcast_client: OpenAI, req: TTSRequest, model: str, out_path: Path) -> None:
-    segment_paths: List[Path] = []
-    output_params: Optional[Tuple[int, int, int, str, str]] = None
-    output_frames: List[bytes] = []
     voices = {"主持人": "nova", "分析師": "onyx"}
+    segments = [(index, line) for index, line in enumerate(req.lines[:28]) if line.text.strip()]
+    if not segments:
+        raise ValueError("Podcast dialogue is empty")
 
-    try:
-        for index, line in enumerate(req.lines[:28]):
-            segment_text = re.sub(r"\s+", " ", line.text).strip()
-            if not segment_text:
-                continue
-
-            segment_path = AUDIO_DIR / f"{out_path.stem}_{index}.wav"
-            segment_paths.append(segment_path)
+    def synthesize_segment(item: Tuple[int, Line]) -> Tuple[Tuple[int, int, int, str, str], bytes]:
+        index, line = item
+        segment_text = re.sub(r"\s+", " ", line.text).strip()
+        segment_path = AUDIO_DIR / f"{out_path.stem}_{index}.wav"
+        try:
             with podcast_client.audio.speech.with_streaming_response.create(
                 model=model,
                 voice=voices.get(line.speaker, "nova"),
@@ -3175,29 +3429,33 @@ def create_dialogue_wav(podcast_client: OpenAI, req: TTSRequest, model: str, out
                     source.getcomptype(),
                     source.getcompname(),
                 )
-                if output_params and params != output_params:
-                    raise RuntimeError("TTS WAV format mismatch")
-                output_params = params
-                output_frames.append(source.readframes(source.getnframes()))
+                return params, source.readframes(source.getnframes())
+        finally:
+            segment_path.unlink(missing_ok=True)
 
-        if not output_params or not output_frames:
-            raise ValueError("Podcast dialogue is empty")
+    # Each speech request is independent. map() returns segments in script order.
+    with ThreadPoolExecutor(max_workers=min(3, len(segments))) as executor:
+        completed = list(executor.map(synthesize_segment, segments))
 
-        channels, sample_width, frame_rate, comp_type, comp_name = output_params
-        pause_frames = max(1, int(frame_rate * 0.16))
-        pause = b"\x00" * pause_frames * channels * sample_width
+    output_params = completed[0][0]
+    if any(params != output_params for params, _ in completed):
+        raise RuntimeError("TTS WAV format mismatch")
+    channels, sample_width, frame_rate, comp_type, comp_name = output_params
+    pause_frames = max(1, int(frame_rate * 0.16))
+    pause = b"\x00" * pause_frames * channels * sample_width
+    try:
         with wave.open(str(out_path), "wb") as target:
             target.setnchannels(channels)
             target.setsampwidth(sample_width)
             target.setframerate(frame_rate)
             target.setcomptype(comp_type, comp_name)
-            for index, frames in enumerate(output_frames):
+            for index, (_, frames) in enumerate(completed):
                 target.writeframes(frames)
-                if index < len(output_frames) - 1:
+                if index < len(completed) - 1:
                     target.writeframes(pause)
-    finally:
-        for segment_path in segment_paths:
-            segment_path.unlink(missing_ok=True)
+    except Exception:
+        out_path.unlink(missing_ok=True)
+        raise
 
 @app.route("/podcast/tts", methods=["POST"])
 def podcast_tts():
@@ -3210,7 +3468,7 @@ def podcast_tts():
         return jsonify({"detail": "Podcast dialogue is empty"}), 422
     clean = re.sub(r"^(主持人|分析師)：", "", req.text, flags=re.MULTILINE).strip()[:3800]
     audio_id = uuid.uuid4().hex[:10]
-    filename = f"podcast_{date.today().isoformat()}_{audio_id}.{'wav' if req.lines else 'mp3'}"
+    filename = f"podcast_{taipei_now().date().isoformat()}_{audio_id}.{'wav' if req.lines else 'mp3'}"
     out_path = AUDIO_DIR / filename
     preferred_model = os.getenv("OPENAI_TTS_MODEL", req.model or "gpt-4o-mini-tts")
     tts_models = []
@@ -3257,7 +3515,7 @@ def analyze_portfolio_llm():
     except ValidationError as e: return jsonify({"detail": str(e)}), 422
     rh_dict = calculate_portfolio_risk_health(req)
     if rh_dict.get("market_data_available") is False:
-        return jsonify({"risk_health": rh_dict, "narrative": "行情資料不足，無法計算完整組合的波動與回撤；目前僅能檢查配置集中度。", "highlights": ["請稍後重試，缺少行情不代表零風險。"]})
+        return jsonify({**build_portfolio_rule_report(req, rh_dict), "analysis_mode": "rules", "ai_status": "market_data_unavailable"})
     holdings_text = ", ".join([f"{h.ticker}({h.weight:.2f})" for h in req.holdings])
 
     # ── RAG trace (TASK 03)：驗證已通過 → 建立 trace；demo 使用者 user_id=NULL；
@@ -3280,13 +3538,9 @@ def analyze_portfolio_llm():
     if client is None:
         if trace_run:
             trace_run.note_llm_unavailable()
-        business = {
-            "risk_health": rh_dict,
-            "narrative": "未設定金鑰，改用規則摘要。請注意波動風險。",
-            "highlights": ["提醒：無 AI 金鑰"],
-        }
+        business = build_portfolio_rule_report(req, rh_dict)
         _finish_trace(trace_run, answer=_trace_snapshot(business, max_len=8000))
-        return jsonify({**business, **_trace_meta(trace_run)})
+        return jsonify({**business, **_trace_meta(trace_run), "analysis_mode": "rules", "ai_status": "key_not_configured"})
     # ── RAG: health education supplement ──
     rag_context = ""
     rag_result = None
@@ -3314,14 +3568,13 @@ def analyze_portfolio_llm():
             "highlights": out.highlights or [],
         }
         _finish_trace(trace_run, answer=_trace_snapshot(business, max_len=8000))
-        return jsonify({**business, **_trace_meta(trace_run)})
-    except Exception:
-        business = {
-            "risk_health": rh_dict, "narrative": "LLM 分析連線失敗，請檢查金鑰。",
-            "highlights": ["連線異常"],
-        }
+        return jsonify({**business, **_trace_meta(trace_run), "analysis_mode": "ai"})
+    except Exception as error:
+        app.logger.warning("portfolio AI generation failed: %s", type(error).__name__)
+        business = build_portfolio_rule_report(req, rh_dict)
         _finish_trace(trace_run, answer=_trace_snapshot(business, max_len=8000), error="llm_error")
-        return jsonify({**business, **_trace_meta(trace_run)})
+        return jsonify({**business, **_trace_meta(trace_run), "analysis_mode": "rules",
+                        "ai_status": "invalid_api_key" if is_openai_auth_error(error) else "service_unavailable"})
 
 @app.route("/api/portfolio/analyze", methods=["POST"])
 @token_required

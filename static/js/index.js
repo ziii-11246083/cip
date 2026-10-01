@@ -20,7 +20,8 @@ async function loadHomeSfiPreview(){
 
     tbody.innerHTML = rows.map(function(coin){
       const risk = coin.risk || {};
-      const score = Number(risk.score || 0);
+      const hasScore = risk.level !== "base" && risk.score != null && Number.isFinite(Number(risk.score));
+      const score = hasScore ? Number(risk.score) : 0;
       const change = Number(coin.change || 0);
       const price = Number(coin.price_usd || 0);
       return `
@@ -38,12 +39,12 @@ async function loadHomeSfiPreview(){
             <div class="sfi-score">
               <div class="sfi-score-head">
                 <span style="color:${scoreTone(score)};">${risk.msg || "風險觀察中"}</span>
-                <b>${score}/100</b>
+                <b>${hasScore ? `${score}/100` : risk.msg === "市場基準" ? "基準" : "--"}</b>
               </div>
-              <div class="sfi-bar">
+              ${hasScore ? `<div class="sfi-bar">
                 <div class="sfi-bar-fill"></div>
                 <div class="sfi-bar-pointer" style="left:${Math.max(0, Math.min(100, score))}%"></div>
-              </div>
+              </div>` : ""}
             </div>
           </td>
         </tr>

@@ -11,7 +11,7 @@
   <title>會員中心 | Smart Invest Crypto</title>
   <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo.jpg') }}">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/iansui@1.0/dist/iansui.min.css">
+  
   <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=profile-subscribe-20260929">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/member.css') }}?v=wallet-preview-20260929">
 </head>
@@ -30,7 +30,7 @@
         <div class="member-hero-actions">
           <button class="member-subscribe-button" type="button" data-subscribe-open>
             <i class="fas fa-star" aria-hidden="true"></i>
-            <span><strong id="memberSubscribeLabel">訂閱進階會員</strong><small id="memberSubscribeHint">預計 NT$99／月 · 規劃中</small></span>
+            <span><strong id="memberSubscribeLabel">訂閱進階會員</strong><small id="memberSubscribeHint">NT$399／月 · 規劃中</small></span>
             <i class="fas fa-arrow-right" aria-hidden="true"></i>
           </button>
           <div class="member-profile-mini">
@@ -98,7 +98,7 @@
           <article class="member-plan member-plan-premium" id="memberPremiumPlan">
             <span class="member-plan-tag" id="memberPremiumTag">規劃中</span>
             <h3>進階會員</h3>
-            <p class="member-plan-price">NT$99 <span>／月（預計）</span></p>
+            <p class="member-plan-price">NT$399 <span>／月</span></p>
             <ul>
               <li><i class="fas fa-check"></i> 包含免費會員功能</li>
               <li><i class="fas fa-check"></i> AI 教練與現有情境分析</li>
@@ -234,7 +234,7 @@
 <dialog class="member-subscribe-dialog" id="subscriptionDialog" aria-labelledby="subscriptionDialogTitle">
   <button class="member-profile-close" id="subscriptionClose" type="button" aria-label="關閉訂閱方案視窗"><i class="fas fa-xmark"></i></button>
   <div class="member-subscribe-dialog-icon"><i class="fas fa-star"></i></div>
-  <h2 id="subscriptionDialogTitle">進階會員 · 預計 NT$99／月</h2>
+  <h2 id="subscriptionDialogTitle">進階會員 · NT$399／月</h2>
   <p class="member-subscription-account-status" id="subscriptionAccountStatus">目前狀態：尚未登入</p>
   <p>原有會員與 TEST 帳號屬進階會員，可操作錢包連結畫面示範；目前不會讀取真實資產。新註冊帳號為免費會員。訂閱與付款尚未開放，點擊不會建立訂單或收費。</p>
   <div class="member-subscribe-dialog-actions">
@@ -259,6 +259,6 @@
 </script>
 <script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=wallet-preview-20260929"></script>
 <script src="{{ url_for('static', filename='js/common.js') }}?v=member-nav-lock-20260604"></script>
-<script src="{{ url_for('static', filename='js/member.js') }}?v=wallet-preview-20260929"></script>
+<script src="{{ url_for('static', filename='js/member.js') }}?v=20261001-price-label"></script>
 </body>
 </html>

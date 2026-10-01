@@ -50,22 +50,45 @@ function chartUnavailable() {
   return typeof Chart === "undefined";
 }
 
-function drawSfiChart(riskData) {
+function drawSfiChart(riskData, payload = {}) {
   const canvas = $("sfiRiskChart");
   if (!canvas) return;
 
-  const score = finiteNumber(riskData.score);
-  const beta = finiteNumber(riskData.beta);
-  const lambda = finiteNumber(riskData.lambda);
-  const corr = finiteNumber(riskData.corr);
+  destroyChart(sfiChart);
+  sfiChart = null;
+  const isBenchmark = riskData.msg === "市場基準";
+  const peers = Array.isArray(payload.benchmark_sfi) ? payload.benchmark_sfi : [];
+  const validPeer = (item) => item && item.symbol && ["score", "corr", "beta", "lambda"]
+    .every((key) => item[key] != null && Number.isFinite(Number(item[key])));
+  const peer = isBenchmark
+    ? (peers.find((item) => item.symbol === payload.comparison_symbol && validPeer(item))
+      || peers.find(validPeer))
+    : null;
+  const displayRisk = isBenchmark ? peer : riskData;
+  if (isBenchmark) {
+    setText("sfiDescription", peer
+      ? `${peer.symbol} 相對 BTC 的分數、相關性、Beta 與尾端連動` 
+      : "以 BTC 為基準比較其他幣種的分數、相關性、Beta 與尾端連動");
+  }
+  if (!displayRisk || displayRisk.level === "base" || displayRisk.score == null) {
+    setText("sfiScoreLabel", "資料不足");
+    setEmpty("sfiChartEmpty", isBenchmark
+      ? "目前沒有足夠的其他幣種資料可顯示相對 BTC 的 SFI 指標。"
+      : "歷史資料不足，尚不能計算 SFI 分數。", true);
+    return;
+  }
 
-  setText("sfiScoreLabel", `${Math.round(score)}/100`);
+  const score = finiteNumber(displayRisk.score);
+  const beta = finiteNumber(displayRisk.beta);
+  const lambda = finiteNumber(displayRisk.lambda);
+  const corr = finiteNumber(displayRisk.corr);
+
+  setText("sfiScoreLabel", `${isBenchmark ? `${peer.symbol} ` : ""}${Math.round(score)}/100`);
   if (chartUnavailable()) {
     setEmpty("sfiChartEmpty", "Chart.js 尚未載入，請重新整理頁面。", true);
     return;
   }
 
-  destroyChart(sfiChart);
   setEmpty("sfiChartEmpty", "", false);
   sfiChart = new Chart(canvas, {
     type: "bar",
@@ -73,7 +96,8 @@ function drawSfiChart(riskData) {
       labels: ["SFI 分數", "BTC 相關性", "Beta", "尾端連動"],
       datasets: [{
         label: "風險指標",
-        data: [score, corr * 100, beta * 50, lambda * 100],
+        data: [score, corr * 100, beta * 50, lambda * 100]
+          .map((value) => Math.max(0, Math.min(100, value))),
         backgroundColor: ["#E76F51", "#2A9D8F", "#457B9D", "#F4A261"],
         borderRadius: 8,
         maxBarThickness: 32
@@ -109,14 +133,24 @@ function drawCopulaChart(payload, symbol) {
   const canvas = $("copulaChart");
   if (!canvas) return;
 
+  destroyChart(copulaChart);
+  copulaChart = null;
+  const comparisonSymbol = symbol === "BTC" ? payload.comparison_symbol : symbol;
+  if (symbol === "BTC") {
+    setText("corrDescription", comparisonSymbol && comparisonSymbol !== "BTC"
+      ? `${comparisonSymbol} 與 BTC 的近期價格報酬散點`
+      : "其他幣種與 BTC 的近期價格報酬散點");
+  }
+
   const btcReturns = Array.isArray(payload.btc_returns) ? payload.btc_returns : [];
   const coinReturns = Array.isArray(payload.coin_returns) ? payload.coin_returns : [];
   const points = btcReturns
-    .map((btc, index) => ({ x: finiteNumber(btc), y: finiteNumber(coinReturns[index]) }))
+    .map((btc, index) => ({ x: btc == null ? NaN : Number(btc), y: coinReturns[index] == null ? NaN : Number(coinReturns[index]) }))
     .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
 
-  const corr = finiteNumber(payload.risk_data && payload.risk_data.corr);
-  setText("corrLabel", `corr ${corr.toFixed(2)}`);
+  const measuredCorr = symbol === "BTC" ? payload.comparison_corr : payload.risk_data?.corr;
+  const corr = measuredCorr == null ? null : Number(measuredCorr);
+  setText("corrLabel", Number.isFinite(corr) ? `corr ${corr.toFixed(2)}` : "資料不足");
 
   if (points.length < 3) {
     setEmpty("copulaChartEmpty", "目前沒有足夠報酬資料可畫相關性散點。", true);
@@ -128,13 +162,12 @@ function drawCopulaChart(payload, symbol) {
     return;
   }
 
-  destroyChart(copulaChart);
   setEmpty("copulaChartEmpty", "", false);
   copulaChart = new Chart(canvas, {
     type: "scatter",
     data: {
       datasets: [{
-        label: `${symbol} vs BTC`,
+        label: `${comparisonSymbol} vs BTC`,
         data: points,
         pointRadius: 3,
         pointHoverRadius: 5,
@@ -150,19 +183,19 @@ function drawCopulaChart(payload, symbol) {
         tooltip: {
           callbacks: {
             label(context) {
-              return `BTC ${percentLabel(context.parsed.x)}, ${symbol} ${percentLabel(context.parsed.y)}`;
+              return `BTC ${percentLabel(context.parsed.x)}, ${comparisonSymbol} ${percentLabel(context.parsed.y)}`;
             }
           }
         }
       },
       scales: {
         x: {
-          title: { display: true, text: "BTC 日報酬" },
+          title: { display: true, text: "BTC 區間報酬" },
           ticks: { callback: (value) => `${(value * 100).toFixed(1)}%` },
           grid: { color: "rgba(80,64,44,.12)" }
         },
         y: {
-          title: { display: true, text: `${symbol} 日報酬` },
+          title: { display: true, text: `${comparisonSymbol} 區間報酬` },
           ticks: { callback: (value) => `${(value * 100).toFixed(1)}%` },
           grid: { color: "rgba(80,64,44,.12)" }
         }
@@ -289,7 +322,7 @@ async function loadAnalysis() {
 
     const riskData = payload.risk_data || {};
     setInsights(payload.ai_insights || {});
-    drawSfiChart(riskData);
+    drawSfiChart(riskData, payload);
     drawCopulaChart(payload, symbol);
     drawMcChart(payload);
     setStatus("已載入");

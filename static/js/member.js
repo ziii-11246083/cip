@@ -181,7 +181,7 @@
     if ($("memberSubscribeHint")) {
       $("memberSubscribeHint").textContent = premium
         ? `${isTestPremium ? "TEST 帳號" : "原有會員"} · 目前方案`
-        : "預計 NT$99／月 · 規劃中";
+        : "NT$399／月 · 規劃中";
     }
   }
 

@@ -41,6 +41,9 @@ let topSymbols = ["BTC", "ETH", "SOL", "XRP"];
 let overlaySymbols = [];
 let marketChart = null;
 let marketSfiCache = [];
+let professionalChart = null;
+let professionalChartRequest = 0;
+let professionalFallbackCandles = null;
 
 function cacheBust() {
   return `_=${Date.now()}`;
@@ -94,6 +97,12 @@ async function fetchMarketCoinsFallback() {
 
 async function fetchSeries(ticker, days) {
   const res = await fetchWithTimeout(`/crypto/series?ticker=${encodeURIComponent(ticker)}&vs_currency=usd&days=${encodeURIComponent(days)}&${cacheBust()}`, 12000);
+  if (!res.ok) throw new Error(await res.text());
+  return await res.json();
+}
+
+async function fetchCandles(ticker, days) {
+  const res = await fetchWithTimeout(`/crypto/ohlc?ticker=${encodeURIComponent(ticker)}&vs_currency=usd&days=${encodeURIComponent(days)}&${cacheBust()}`, 30000);
   if (!res.ok) throw new Error(await res.text());
   return await res.json();
 }
@@ -380,12 +389,17 @@ function setTopCoinCardsFromPopular() {
 
   const snapTime = document.getElementById("snapTime");
   if (snapTime) {
-    snapTime.innerHTML = `<i class="fas fa-clock"></i> 資料時間：${new Date().toLocaleString("zh-TW", {
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit"
-    })}`;
+    const hasTopPrice = topSymbols.some(function(symbol) {
+      return coinPrice(getCoinBySymbol(symbol)) > 0;
+    });
+    snapTime.innerHTML = hasTopPrice
+      ? `<i class="fas fa-clock"></i> 資料時間：${new Date().toLocaleString("zh-TW", {
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit"
+      })}`
+      : '<i class="fas fa-circle-exclamation"></i> 即時價格暫時無法取得';
   }
 }
 
@@ -451,20 +465,21 @@ function renderMarketSfiTable() {
 
   const rows = marketSfiCache.slice(0, 8);
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="sfi-market-loading">目前沒有可顯示的風險資料。</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="sfi-market-loading">市場資料來源暫時無法取得，SFI 風險排名尚未更新，請稍後再試。</td></tr>';
     return;
   }
 
   tbody.innerHTML = rows.map(function(coin) {
     const risk = coin.risk || {};
-    const score = Number(risk.score || 0);
+    const hasScore = risk.level !== "base" && risk.score != null && Number.isFinite(Number(risk.score));
+    const score = hasScore ? Number(risk.score) : 0;
     const price = Number(coin.price_usd || coin.current_price || 0);
     const change = Number(coin.change ?? coin.price_change_percentage_24h ?? 0);
     const params = new URLSearchParams({
       name: coin.cn_name || coin.name || coin.symbol || "",
       corr: risk.corr || 0,
       score: score,
-      beta: risk.beta || 1,
+      beta: risk.beta ?? 1,
       lambda: risk.lambda || 0,
       level: risk.level || "base"
     }).toString();
@@ -484,12 +499,12 @@ function renderMarketSfiTable() {
           <div class="sfi-market-score">
             <div class="sfi-market-score-head">
               <span style="color:${riskTone(score)};">${risk.msg || "風險觀察中"}</span>
-              <b>${score}/100</b>
+              <b>${hasScore ? `${score}/100` : risk.msg === "市場基準" ? "基準" : "--"}</b>
             </div>
-            <div class="sfi-market-bar">
+            ${hasScore ? `<div class="sfi-market-bar">
               <div class="sfi-market-bar-fill"></div>
               <div class="sfi-market-bar-pointer" style="left:${Math.max(0, Math.min(100, score))}%"></div>
-            </div>
+            </div>` : ""}
             ${coin.symbol !== "BTC" ? `<a class="tool-badge" href="/analysis/${coin.symbol}?${params}"><i class="fas fa-arrow-right"></i> 深度分析</a>` : ""}
           </div>
         </td>
@@ -759,30 +774,199 @@ function calculateRSI(values, period) {
   return 100 - (100 / (1 + (avgGain / avgLoss)));
 }
 
-function initTradingView() {
-  const holder = document.getElementById("tv_chart_container");
-  if (!holder || !window.TradingView) return;
+function showProfessionalChartMessage(message, visible) {
+  const empty = document.getElementById("tvChartEmpty");
+  if (!empty) return;
+  empty.textContent = message;
+  empty.classList.toggle("is-hidden", !visible);
+}
 
-  holder.innerHTML = "";
-
-  new TradingView.widget({
-    autosize: false,
-    width: holder.clientWidth || "100%",
-    height: holder.clientHeight || 520,
-    symbol: "BINANCE:BTCUSDT",
-    interval: "60",
-    timezone: "Asia/Taipei",
-    theme: "light",
-    style: "1",
-    locale: "zh_TW",
-    enable_publishing: false,
-    backgroundColor: "rgba(255,255,255,1)",
-    hide_top_toolbar: false,
-    save_image: false,
-    container_id: "tv_chart_container",
-    allow_symbol_change: true,
-    studies: ["RSI@tv-basicstudies"]
+function normalizeCandles(rows) {
+  if (!Array.isArray(rows)) return [];
+  const byTime = new Map();
+  rows.forEach(function(row) {
+    const time = Number(row?.time);
+    const open = Number(row?.open);
+    const high = Number(row?.high);
+    const low = Number(row?.low);
+    const close = Number(row?.close);
+    if (!Number.isSafeInteger(time) || time <= 0 ||
+        ![open, high, low, close].every(function(value) { return Number.isFinite(value) && value > 0; }) ||
+        high < Math.max(open, close) || low > Math.min(open, close) || high < low) return;
+    byTime.set(time, { time, open, high, low, close });
   });
+  return Array.from(byTime.values()).sort(function(a, b) { return a.time - b.time; });
+}
+
+function disposeProfessionalChart() {
+  if (!professionalChart) return;
+  professionalChart.remove();
+  professionalChart = null;
+}
+
+function drawNativeCandlestickChart(canvas, candles) {
+  const context = canvas.getContext && canvas.getContext("2d");
+  if (!context) throw new Error("Canvas unavailable");
+  const rect = canvas.getBoundingClientRect();
+  const width = Math.max(320, Math.floor(rect.width || canvas.parentElement?.clientWidth || 760));
+  const height = Math.max(240, Math.floor(rect.height || canvas.parentElement?.clientHeight || 480));
+  const ratio = Math.max(1, window.devicePixelRatio || 1);
+  canvas.width = Math.round(width * ratio);
+  canvas.height = Math.round(height * ratio);
+  context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  context.clearRect(0, 0, width, height);
+
+  const left = 16;
+  const right = width - 86;
+  const top = 24;
+  const bottom = height - 34;
+  const minPrice = Math.min.apply(null, candles.map(function(candle) { return candle.low; }));
+  const maxPrice = Math.max.apply(null, candles.map(function(candle) { return candle.high; }));
+  const margin = Math.max((maxPrice - minPrice) * .07, maxPrice * .002);
+  const lower = minPrice - margin;
+  const upper = maxPrice + margin;
+  const y = function(price) { return bottom - (price - lower) / (upper - lower) * (bottom - top); };
+
+  context.font = "12px system-ui, sans-serif";
+  context.textAlign = "left";
+  context.strokeStyle = "#e2e8f0";
+  context.fillStyle = "#64748b";
+  context.lineWidth = 1;
+  for (let i = 0; i <= 4; i += 1) {
+    const price = lower + (upper - lower) * i / 4;
+    const lineY = y(price);
+    context.beginPath();
+    context.moveTo(left, lineY);
+    context.lineTo(right, lineY);
+    context.stroke();
+    context.fillText(fmtUSD(price), right + 8, lineY + 4);
+  }
+
+  const step = (right - left) / candles.length;
+  const bodyWidth = Math.max(2, Math.min(16, step * .65));
+  candles.forEach(function(candle, index) {
+    const x = left + step * (index + .5);
+    const color = candle.close >= candle.open ? "#16a34a" : "#ef4444";
+    context.strokeStyle = color;
+    context.fillStyle = color;
+    context.beginPath();
+    context.moveTo(x, y(candle.high));
+    context.lineTo(x, y(candle.low));
+    context.stroke();
+    const bodyTop = Math.min(y(candle.open), y(candle.close));
+    const bodyHeight = Math.max(1, Math.abs(y(candle.open) - y(candle.close)));
+    context.fillRect(x - bodyWidth / 2, bodyTop, bodyWidth, bodyHeight);
+  });
+
+  context.fillStyle = "#64748b";
+  const labelCount = Math.min(5, candles.length);
+  for (let i = 0; i < labelCount; i += 1) {
+    const index = Math.round((candles.length - 1) * i / Math.max(1, labelCount - 1));
+    const date = new Date(candles[index].time * 1000);
+    context.fillText(`${date.getMonth() + 1}/${date.getDate()}`, left + step * (index + .5) - 12, height - 10);
+  }
+}
+
+function renderProfessionalCandles(host, canvas, candles) {
+  disposeProfessionalChart();
+  const library = window.LightweightCharts;
+  if (library && typeof library.createChart === "function" && library.CandlestickSeries) {
+    try {
+      host.hidden = false;
+      canvas.hidden = true;
+      const chart = library.createChart(host, {
+        autoSize: true,
+        width: host.clientWidth || 760,
+        height: host.clientHeight || 480,
+        layout: {
+          background: { type: "solid", color: "#ffffff" },
+          textColor: "#64748b",
+          attributionLogo: true
+        },
+        grid: {
+          vertLines: { color: "#f1f5f9" },
+          horzLines: { color: "#e2e8f0" }
+        },
+        rightPriceScale: { borderColor: "#e2e8f0" },
+        timeScale: { borderColor: "#e2e8f0", timeVisible: true, secondsVisible: false }
+      });
+      professionalChart = chart;
+      const series = chart.addSeries(library.CandlestickSeries, {
+        upColor: "#16a34a",
+        downColor: "#ef4444",
+        wickUpColor: "#16a34a",
+        wickDownColor: "#ef4444",
+        borderVisible: false,
+        priceFormat: { type: "price", precision: 2, minMove: .01 }
+      });
+      series.setData(candles);
+      chart.timeScale().fitContent();
+      professionalFallbackCandles = null;
+      return;
+    } catch (error) {
+      console.error("TradingView K 線繪製失敗，改用站內蠟燭圖", error);
+      disposeProfessionalChart();
+      host.replaceChildren();
+    }
+  }
+  host.hidden = true;
+  canvas.hidden = false;
+  drawNativeCandlestickChart(canvas, candles);
+  professionalFallbackCandles = candles;
+}
+
+async function drawProfessionalChart(days) {
+  const host = document.getElementById("tvCandlesChart");
+  const canvas = document.getElementById("tvFallbackChart");
+  if (!host || !canvas) return;
+  const requestId = ++professionalChartRequest;
+  setText("tvChartStatus", `正在載入 BTC 近 ${days} 天 K 線…`);
+  showProfessionalChartMessage("正在載入 K 線資料…", true);
+
+  try {
+    const result = await fetchCandles("BTC", days);
+    if (requestId !== professionalChartRequest) return;
+    const candles = normalizeCandles(result.candles);
+    if (candles.length < 2) throw new Error("BTC OHLC unavailable");
+    renderProfessionalCandles(host, canvas, candles);
+
+    const source = result.source === "yfinance" ? "Yahoo Finance" : result.source === "coingecko" ? "CoinGecko" : "市場資料";
+    const interval = result.interval === "4h" ? "4 小時 K" : result.interval === "4d" ? "4 日 K" : "日 K";
+    const latest = candles[candles.length - 1];
+    setText("tvChartStatus", `BTC / USD · 近 ${days} 天 · ${interval}`);
+    setText("tvSourceNote", `K 線資料來源：${source}。本站為 BTC/USD；外連 TradingView 為 BTC/USDT，兩者報價可能不同。`);
+    setText("tvOhlcValue", `最新 K 線：開盤 ${fmtUSD(latest.open)}　最高 ${fmtUSD(latest.high)}　最低 ${fmtUSD(latest.low)}　收盤 ${fmtUSD(latest.close)}`);
+    host.setAttribute("aria-label", `BTC 近 ${days} 天 ${interval} 圖`);
+    canvas.setAttribute("aria-label", `BTC 近 ${days} 天 ${interval} 圖`);
+    showProfessionalChartMessage("", false);
+  } catch (error) {
+    if (requestId !== professionalChartRequest) return;
+    if (error.message !== "BTC OHLC unavailable") console.error(error);
+    disposeProfessionalChart();
+    professionalFallbackCandles = null;
+    host.hidden = true;
+    canvas.hidden = true;
+    setText("tvChartStatus", "BTC K 線暫時無法取得");
+    setText("tvSourceNote", "K 線資料暫時無法取得；仍可在 TradingView 開啟完整圖表。");
+    setText("tvOhlcValue", "開盤 --　最高 --　最低 --　收盤 --");
+    showProfessionalChartMessage("K 線資料暫時無法取得，請稍後重試。", true);
+  }
+}
+
+function initProfessionalChart() {
+  const buttons = document.querySelectorAll("[data-tv-days]");
+  buttons.forEach(function(button) {
+    button.addEventListener("click", function() {
+      buttons.forEach(function(item) { item.setAttribute("aria-pressed", String(item === button)); });
+      drawProfessionalChart(Number(button.dataset.tvDays));
+    });
+  });
+  window.addEventListener("resize", function() {
+    if (!professionalFallbackCandles) return;
+    const canvas = document.getElementById("tvFallbackChart");
+    if (canvas && !canvas.hidden) drawNativeCandlestickChart(canvas, professionalFallbackCandles);
+  });
+  drawProfessionalChart(30);
 }
 
 async function refreshAll() {
@@ -791,17 +975,19 @@ async function refreshAll() {
   setButtonLoading(btn, `<i class="fas fa-spinner fa-spin"></i> 載入中...`);
 
   try {
-    const marketResult = await Promise.race([
+    let fallbackAttempted = false;
+    await Promise.race([
       loadPopularCoins(),
       new Promise(function(_, reject) {
         setTimeout(function() { reject(new Error("market timeout")); }, 10000);
       })
     ]).catch(async function(err) {
       console.error(err);
+      fallbackAttempted = true;
       return await loadTopCardsFromSeriesFallback();
     });
 
-    if (!marketResult || !marketResult.length) {
+    if (!fallbackAttempted && !topSymbols.some(function(symbol) { return coinPrice(getCoinBySymbol(symbol)) > 0; })) {
       await loadTopCardsFromSeriesFallback();
     }
 
@@ -811,7 +997,12 @@ async function refreshAll() {
       loadMarketSfiPreview()
     ]);
 
-    toast("資料已更新", "市場總覽已重新整理完成。");
+    if (topSymbols.some(function(symbol) { return coinPrice(getCoinBySymbol(symbol)) > 0; })) {
+      toast("資料已更新", "市場總覽已重新整理完成。");
+    } else {
+      setStatus("snapTime", '<i class="fas fa-circle-exclamation"></i> 即時價格暫時無法取得');
+      toast("即時市場資料無法取得", "價格來源暫時無回應，請稍後再試。");
+    }
   } catch (err) {
     console.error(err);
     toast("資料載入失敗", "請確認後端 API 是否正常啟動，或 CoinGecko 是否暫時無回應。");
@@ -882,6 +1073,6 @@ function initReveal() {
 window.addEventListener("DOMContentLoaded", async function() {
   initControls();
   initReveal();
-  initTradingView();
+  initProfessionalChart();
   await refreshAll();
 });

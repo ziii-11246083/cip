@@ -12,7 +12,7 @@
   <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo.jpg') }}">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/iansui@1.0/dist/iansui.min.css">
+  
   <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
 </head>
@@ -49,7 +49,7 @@
         <div class="process-card reveal">
           <div class="process-num">01</div>
           <h3>先看市場狀態</h3>
-          <p>從主流幣價格、熱門幣種、價格走勢比較與 TradingView 圖表開始，先掌握整體市場方向與波動感受。</p>
+          <p>從主流幣價格、熱門幣種、價格走勢比較與 TradingView 圖表入口開始，先掌握整體市場方向與波動感受。</p>
         </div>
 
         <div class="process-card reveal delay-1">
@@ -164,7 +164,7 @@
         <a class="feature-card reveal" href="/market">
           <span><i class="fas fa-chart-line"></i></span>
           <h3>市場總覽</h3>
-          <p>查看主流幣漲跌、人氣快選、互動式走勢比較與 TradingView 專業圖表。</p>
+          <p>查看主流幣漲跌、人氣快選、互動式走勢比較，並開啟 TradingView 專業圖表。</p>
         </a>
 
         <a class="feature-card reveal delay-1" href="/health">
@@ -327,6 +327,6 @@
 </script>
 <script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=auth-state-20260830"></script>
 <script src="{{ url_for('static', filename='js/common.js') }}?v=member-nav-lock-20260604"></script>
-<script src="{{ url_for('static', filename='js/index.js') }}"></script>
+<script src="{{ url_for('static', filename='js/index.js') }}?v=20261001-sfi-baseline"></script>
 </body>
 </html>

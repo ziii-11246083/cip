@@ -168,10 +168,12 @@ async function loadPopularCoins(){
       const data = await res.json();
 
       if(Array.isArray(data) && data.length){
-        popularCoinsCache = data.map((coin) => ({
+        const liveCoins = data.map((coin) => ({
           symbol: String(coin.symbol || "").toUpperCase(),
           name: coin.name || String(coin.symbol || "").toUpperCase()
         })).filter((coin) => coin.symbol);
+        const seen = new Set(liveCoins.map((coin) => coin.symbol));
+        popularCoinsCache = liveCoins.concat(DEFAULT_COINS.filter((coin) => !seen.has(coin.symbol)));
       }
     }
   }catch(error){
@@ -339,7 +341,7 @@ function buildHoldingsPayload(){
   }));
 }
 
-function renderAiReport(narrative, highlights, metrics){
+function renderAiReport(narrative, highlights, metrics, analysisMode = "rules", aiStatus = ""){
   const safeNarrative = String(narrative || "目前無法取得 AI 報告，請稍後再試。");
   const list = Array.isArray(highlights) && highlights.length ? highlights : [
     "檢查最大單一資產是否過度集中。",
@@ -349,7 +351,21 @@ function renderAiReport(narrative, highlights, metrics){
   const top1 = Number(metrics?.top1_weight || 0);
   const top3 = Number(metrics?.top3_weight || 0);
   const vol = metrics?.annual_vol == null ? null : Number(metrics.annual_vol);
-  const riskTone = top3 >= 0.8 || top1 >= 0.5 ? "集中偏高" : top3 >= 0.65 ? "中等集中" : "相對分散";
+  const mdd = metrics?.max_drawdown == null ? null : Number(metrics.max_drawdown);
+  const riskTone = top3 >= 0.7 || top1 >= 0.5 ? "集中偏高" : top3 >= 0.55 ? "中等集中" : "相對分散";
+  const allocated = getAllocatedAmount();
+  const currency = $("capitalCcy")?.value || "TWD";
+  const assets = Object.values(portfolioAssets).sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0));
+  const statusNote = analysisMode === "ai" ? "AI 已結合配置與風險指標產生解說。"
+    : aiStatus === "market_data_unavailable" ? "部分行情不足；目前先呈現可計算的配置集中度。"
+    : "AI 服務目前不可用；以下為依配置與歷史行情產生的規則分析。";
+  const nextSteps = [
+    top3 >= .7 ? `前三大幣種占 ${formatPct(top3 * 100)}，核對是否超過你原先設定的上限。` : "定期核對前三大幣種比例是否偏離原先配置。",
+    vol !== null && Number.isFinite(vol) && mdd !== null && Number.isFinite(mdd)
+      ? `將年化波動 ${formatPct(vol * 100)} 與最大回撤 ${formatPct(mdd * 100)} 和你可承受的範圍比較；兩者都不是未來損失預測。`
+      : "待歷史行情恢復後重新計算年化波動與最大回撤，不能把缺資料視為低風險。",
+    "市場價格大幅變動後，重新檢查各幣種實際占比與再平衡條件。"
+  ];
 
   if(!$("aiReport")) return;
 
@@ -357,9 +373,10 @@ function renderAiReport(narrative, highlights, metrics){
     <div class="ai-report-grid">
       <div class="ai-summary-panel">
         <div>
-          <span class="report-kicker">AI Portfolio Brief</span>
+          <span class="report-kicker">${analysisMode === "ai" ? "AI Portfolio Brief" : "依資料產生的規則分析"}</span>
           <h3>配置健康摘要</h3>
           <p>${escapeHTML(safeNarrative).replace(/\n/g, "<br>")}</p>
+          <p class="report-data-note">${escapeHTML(statusNote)}</p>
         </div>
         <div class="report-status">
           <small>目前狀態</small>
@@ -370,7 +387,12 @@ function renderAiReport(narrative, highlights, metrics){
         <div><span>最大占比</span><strong>${top1 ? formatPct(top1 * 100) : "--"}</strong></div>
         <div><span>前三占比</span><strong>${top3 ? formatPct(top3 * 100) : "--"}</strong></div>
         <div><span>年化波動</span><strong>${vol !== null && Number.isFinite(vol) ? formatPct(vol * 100) : "資料不足"}</strong></div>
+        <div><span>最大回撤</span><strong>${mdd !== null && Number.isFinite(mdd) ? formatPct(mdd * 100) : "資料不足"}</strong></div>
       </div>
+      <section class="ai-report-section portfolio-breakdown">
+        <strong><i class="fas fa-chart-pie"></i> 配置明細 · ${escapeHTML(currency)} ${formatMoney(allocated)}</strong>
+        <div class="portfolio-breakdown-list">${assets.map((asset) => `<div><span>${escapeHTML(asset.symbol)}</span><strong>${formatMoney(asset.amount)}</strong><span>${allocated > 0 ? formatPct(Number(asset.amount || 0) / allocated * 100) : "--"}</span></div>`).join("")}</div>
+      </section>
       <div class="report-detail-grid">
         <section class="ai-report-section">
           <strong><i class="fas fa-circle-exclamation"></i> 重點提醒</strong>
@@ -379,9 +401,7 @@ function renderAiReport(narrative, highlights, metrics){
         <section class="ai-report-section">
           <strong><i class="fas fa-list-check"></i> 下一步建議</strong>
           <ul>
-            <li>先確認最大持倉是否超過你能承受的波動範圍。</li>
-            <li>若前三大資產過度集中，補足不同類型資產或保留現金部位。</li>
-            <li>大漲大跌後重新檢查一次，避免配置偏離原本風險屬性。</li>
+            ${nextSteps.map((item) => `<li>${escapeHTML(item)}</li>`).join("")}
           </ul>
         </section>
       </div>
@@ -416,19 +436,7 @@ async function analyzePortfolio(){
   const top1 = ratios[0] || 0;
   const top3 = ratios.slice(0, 3).reduce((sum, value) => sum + value, 0);
 
-  let riskLabel = "分散";
-  let riskScore = 35;
-  let report = "目前配置相對分散，仍建議定期檢查市場波動與再平衡。";
-
-  if(top1 >= 0.65){
-    riskLabel = "偏高";
-    riskScore = 78;
-    report = "目前單一幣種占比偏高，配置容易受到單一資產波動影響。建議降低最大持倉比例，或分散至其他主流資產。";
-  }else if(top1 >= 0.45){
-    riskLabel = "中等";
-    riskScore = 58;
-    report = "目前配置有一定集中度，但仍在可觀察範圍。建議留意最大持倉幣種的波動與消息風險。";
-  }
+  const riskLabel = top1 >= .65 || top3 >= .85 ? "偏高" : top1 >= .45 || top3 >= .7 ? "中等" : "分散";
 
   if($("riskBadgeMini")) $("riskBadgeMini").textContent = riskLabel;
   if($("kTop1")) $("kTop1").textContent = formatPct(top1 * 100);
@@ -438,23 +446,7 @@ async function analyzePortfolio(){
   if($("riskMeterText")) $("riskMeterText").textContent = "僅配置集中度：" + riskLabel;
   if($("riskBar")) $("riskBar").style.width = "0%";
 
-  const assetLines = Object.values(portfolioAssets)
-    .map((asset) => `・${asset.symbol}：${formatMoney(asset.amount)}（${formatPct((asset.amount / allocated) * 100)}）`)
-    .join("\n");
-
-  if($("aiReport")){
-    $("aiReport").textContent =
-`配置摘要
-目前已配置：${formatMoney(allocated)}
-最大單一幣種占比：${formatPct(top1 * 100)}
-前三大幣種占比：${formatPct(top3 * 100)}
-
-目前配置：
-${assetLines}
-
-分析建議：
-${report}`;
-  }
+  if($("aiReport")) $("aiReport").textContent = "正在讀取歷史行情並建立配置報告…";
 
   saveHealthRecord({
     createdAt: new Date().toISOString(),
@@ -482,23 +474,28 @@ ${report}`;
       holdings: buildHoldingsPayload()
     };
 
-    const [riskRes, aiRes] = await Promise.allSettled([
-      fetch("/portfolio/risk-health", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(payload)
-      }),
-      fetch("/portfolio/analyze-llm", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(payload)
-      })
-    ]);
-
+    const token = await window.authManager?.getToken?.();
+    const headers = {"Content-Type": "application/json"};
+    if(token) headers.Authorization = `Bearer ${token}`;
+    let aiPayload = null;
     let riskPayload = null;
-    if(riskRes.status === "fulfilled" && riskRes.value.ok){
-      riskPayload = await riskRes.value.json();
-      const rh = riskPayload.risk_health || {};
+    const aiRes = await fetch("/portfolio/analyze-llm", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload)
+      });
+    if(aiRes.ok) aiPayload = await aiRes.json();
+    if(!aiPayload?.risk_health){
+      const riskRes = await fetch("/portfolio/risk-health", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload)
+      });
+      if(riskRes.ok) riskPayload = await riskRes.json();
+    }
+
+    const rh = aiPayload?.risk_health || riskPayload?.risk_health;
+    if(rh){
 
       if($("kTop1")) $("kTop1").textContent = formatPct(Number(rh.top1_weight || top1) * 100);
       if($("kTop3")) $("kTop3").textContent = formatPct(Number(rh.top3_weight || top3) * 100);
@@ -506,7 +503,7 @@ ${report}`;
       if($("kVol")) $("kVol").textContent = hasMarketData ? formatPct(Number(rh.annual_vol) * 100) : "資料不足";
       if($("kMdd")) $("kMdd").textContent = hasMarketData ? formatPct(Number(rh.max_drawdown) * 100) : "資料不足";
 
-      const apiScore = Math.min(95, Math.round((Number(rh.top1_weight || 0) * 55) + (Number(rh.annual_vol || 0) * 55) + (Number(rh.herfindahl || 0) * 45)));
+      const apiScore = Math.min(95, Math.round((Number(rh.top1_weight || 0) * 55) + (Number(rh.top3_weight || 0) * 20) + (Number(rh.annual_vol || 0) * 55) + (Number(rh.herfindahl || 0) * 45)));
       if($("riskBar")) $("riskBar").style.width = apiScore + "%";
       if($("riskMeterText")) $("riskMeterText").textContent = apiScore >= 70 ? "偏高" : apiScore >= 45 ? "中等" : "分散";
       if($("riskBadgeMini")) $("riskBadgeMini").textContent = apiScore >= 70 ? "偏高" : apiScore >= 45 ? "中等" : "分散";
@@ -517,12 +514,15 @@ ${report}`;
       }
     }
 
-    if(aiRes.status === "fulfilled" && aiRes.value.ok){
-      const aiPayload = await aiRes.value.json();
-      renderAiReport(aiPayload.narrative, aiPayload.highlights, riskPayload?.risk_health);
-    }
+    const fallbackNarrative = `目前配置 ${Object.keys(portfolioAssets).length} 種幣別，最大單一幣種占 ${formatPct(top1 * 100)}，前三大合計 ${formatPct(top3 * 100)}。請核對這兩項集中度是否符合原先設定；即使分成多種幣別，仍應留意整體加密市場波動。`;
+    renderAiReport(aiPayload?.narrative || fallbackNarrative, aiPayload?.highlights || [
+      `最大持幣占 ${formatPct(top1 * 100)}，請核對單幣上限。`,
+      `前三大持幣合計 ${formatPct(top3 * 100)}，請檢查是否需要再平衡。`,
+      rh?.market_data_available ? "參考歷史波動與回撤，確認是否符合個人承受範圍。" : "行情不足，暫時無法估算歷史波動與回撤。"
+    ], rh || {top1_weight: top1, top3_weight: top3}, aiPayload?.analysis_mode || "rules", aiPayload?.ai_status || (aiRes.ok ? "" : "service_unavailable"));
   }catch(error){
     console.warn("AI health report fallback:", error);
+    renderAiReport(`目前配置 ${Object.keys(portfolioAssets).length} 種幣別，最大單一幣種占 ${formatPct(top1 * 100)}，前三大合計 ${formatPct(top3 * 100)}。完整波動與回撤資料暫時無法取得，請稍後重試。`, ["目前僅能核對配置集中度；缺少行情不代表零風險。"], {top1_weight: top1, top3_weight: top3}, "rules", "service_unavailable");
   }finally{
     setAnalyzeLoading(false);
   }

@@ -13,9 +13,9 @@
   <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo.jpg') }}">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/iansui@1.0/dist/iansui.min.css">
+  
   <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=shared-site-density">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/market.css') }}?v=shared-market-bg">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/market.css') }}?v=20261001-kline">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
@@ -29,7 +29,7 @@
       <div class="reveal is-visible">
         <div class="eyebrow"><i class="fas fa-chart-line"></i> Market Overview</div>
         <h1 class="hero-title">市場總覽</h1>
-        <p class="hero-lead">整理主流加密貨幣價格、熱門幣種、價格走勢比較、技術指標與 TradingView 圖表，方便快速掌握市場目前的節奏與風險感受。</p>
+        <p class="hero-lead">整理主流加密貨幣價格、熱門幣種、價格走勢比較、技術指標與 BTC K 線圖，方便快速掌握市場目前的節奏與風險感受。</p>
       </div>
 
       <div class="hero-card reveal is-visible">
@@ -52,7 +52,7 @@
           </div>
           <div class="hero-mini">
             <span>技術圖</span>
-            <strong>TradingView</strong>
+            <strong>BTC K 線</strong>
           </div>
         </div>
 
@@ -295,16 +295,27 @@
       <div class="card reveal">
         <div class="section-head">
           <div>
-            <h2 class="section-title">TradingView 圖表</h2>
-            <p class="section-copy">可切換週期並查看即時 K 線，也能直接透過圖表工具加入其他技術指標。</p>
+            <h2 class="section-title">BTC K 線圖</h2>
+            <p class="section-copy">以實際開盤、最高、最低與收盤價繪製蠟燭圖，切換區間觀察漲跌；更多畫線工具與技術指標可在 TradingView 開啟。</p>
           </div>
+          <a class="tv-open-link" href="https://www.tradingview.com/chart/?symbol=BINANCE%3ABTCUSDT" target="_blank" rel="noopener noreferrer"><i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i> 開啟 TradingView 完整圖表</a>
         </div>
         <div class="divider"></div>
-        <div class="tv-box">
-          <div class="tradingview-widget-container">
-            <div id="tv_chart_container"></div>
+        <div class="tv-chart-toolbar">
+          <span id="tvChartStatus" role="status">正在載入 BTC K 線…</span>
+          <div class="tv-range" role="group" aria-label="BTC 圖表區間">
+            <button type="button" data-tv-days="7">近 7 天</button>
+            <button type="button" data-tv-days="30" aria-pressed="true">近 30 天</button>
+            <button type="button" data-tv-days="90">近 90 天</button>
           </div>
         </div>
+        <div class="tv-box chart-box">
+          <div id="tvCandlesChart" role="img" aria-label="BTC 近 30 天 K 線圖"></div>
+          <canvas id="tvFallbackChart" role="img" aria-label="BTC 近 30 天 K 線圖" hidden></canvas>
+          <div id="tvChartEmpty" class="chart-empty">正在載入 K 線資料…</div>
+        </div>
+        <p class="tv-ohlc-value" id="tvOhlcValue" aria-live="polite">開盤 --　最高 --　最低 --　收盤 --</p>
+        <p class="tv-source-note"><span id="tvSourceNote">K 線資料載入中。</span> 圖表函式庫由 <a href="https://www.tradingview.com/" target="_blank" rel="noopener noreferrer">TradingView Lightweight Charts™</a> 提供。</p>
       </div>
     </div>
   </section>
@@ -331,7 +342,7 @@
 
 <script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=auth-state-20260830"></script>
 <script src="{{ url_for('static', filename='js/common.js') }}?v=member-nav-lock-20260604"></script>
-<script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-<script src="{{ url_for('static', filename='js/market.js') }}?v=20260508-market-textfix"></script>
+<script src="{{ url_for('static', filename='vendor/lightweight-charts/lightweight-charts.standalone.production.js') }}?v=5.2.1"></script>
+<script src="{{ url_for('static', filename='js/market.js') }}?v=20261001-sfi-baseline"></script>
 </body>
 </html>

@@ -590,7 +590,7 @@ body.market-page .hero:after{
   padding:12px;
 }
 
-.chart-box canvas{
+.chart-box > canvas{
   width:100%!important;
   height:100%!important;
 }
@@ -667,26 +667,88 @@ body.market-page .hero:after{
   position:relative;
 }
 
-#tv_chart_container,
-.tradingview-widget-container{
-  position:absolute;
-  inset:0;
+.tv-box #tvCandlesChart,
+.tv-box #tvFallbackChart{
   width:100%;
   height:100%;
-  min-width:100%;
-  min-height:100%;
 }
 
-#tv_chart_container iframe,
-.tradingview-widget-container iframe{
-  position:absolute!important;
-  inset:0!important;
-  width:100%!important;
-  height:100%!important;
-  min-width:100%!important;
-  min-height:100%!important;
-  display:block!important;
-  border:0!important;
+.tv-box [hidden]{
+  display:none!important;
+}
+
+.tv-open-link{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  min-height:42px;
+  padding:10px 16px;
+  border:1px solid var(--brand);
+  border-radius:999px;
+  color:var(--brand);
+  font-weight:800;
+  text-decoration:none;
+  white-space:nowrap;
+}
+
+.tv-open-link:hover{
+  background:rgba(249,115,22,.08);
+}
+
+.tv-chart-toolbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:12px;
+  margin-bottom:14px;
+  color:var(--muted);
+  font-weight:750;
+}
+
+.tv-range{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:8px;
+}
+
+.tv-range button{
+  border:1px solid var(--line);
+  border-radius:999px;
+  background:#fff;
+  color:var(--muted);
+  padding:8px 14px;
+  font:inherit;
+  font-weight:800;
+  cursor:pointer;
+}
+
+.tv-range button[aria-pressed="true"]{
+  border-color:var(--brand);
+  background:var(--brand);
+  color:#fff;
+}
+
+.tv-source-note{
+  margin:12px 0 0;
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.55;
+}
+
+.tv-source-note a{
+  color:var(--brand);
+  font-weight:800;
+}
+
+.tv-ohlc-value{
+  margin:12px 0 0;
+  color:var(--dark);
+  font-size:13px;
+  font-weight:800;
+  font-variant-numeric:tabular-nums;
 }
 
 .toast{
@@ -774,6 +836,11 @@ body.market-page .hero:after{
   .tv-box{
     height:360px;
     min-height:360px;
+  }
+
+  .tv-open-link{
+    width:100%;
+    white-space:normal;
   }
 }
 

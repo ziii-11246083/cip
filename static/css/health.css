@@ -469,8 +469,34 @@
 
 .report-stat-strip{
   display:grid;
-  grid-template-columns:repeat(3,1fr);
+  grid-template-columns:repeat(4,1fr);
   gap:12px;
+}
+
+.report-data-note{
+  margin-top:12px;
+  color:var(--muted);
+  font-size:13px;
+}
+
+.portfolio-breakdown-list{
+  display:grid;
+  gap:8px;
+  margin-top:14px;
+}
+
+.portfolio-breakdown-list div{
+  display:grid;
+  grid-template-columns:minmax(75px,1fr) minmax(90px,1fr) 80px;
+  gap:12px;
+  align-items:center;
+  padding:9px 12px;
+  border-radius:10px;
+  background:#fff8f0;
+}
+
+.portfolio-breakdown-list div span:last-child{
+  text-align:right;
 }
 
 .report-stat-strip div,
