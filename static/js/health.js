@@ -572,6 +572,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 /* restored FOMO + AI one-click allocation */
+/* restored FOMO + AI one-click allocation */
 function syncFomoSymbolOptions(){
   const select = $("fomoSymbol");
   if(!select) return;
@@ -581,9 +582,16 @@ function syncFomoSymbolOptions(){
 
   const coins = popularCoinsCache.length ? popularCoinsCache : DEFAULT_COINS;
 
+  // ▼▼▼ 專題展示專用：強制在下拉選單最上方加入 TEST 幣 ▼▼▼
+  const testOption = document.createElement("option");
+  testOption.value = "TEST";
+  testOption.textContent = "TEST｜專題展示幣 (+18.5%)";
+  select.appendChild(testOption);
+  // ▲▲▲ 專題展示專用結束 ▲▲▲
+
   coins.slice(0, 24).forEach((coin) => {
     const symbol = String(coin.symbol || "").toUpperCase();
-    if(!symbol) return;
+    if(!symbol || symbol === "TEST") return; // 避免重複
 
     const option = document.createElement("option");
     option.value = symbol;
@@ -603,6 +611,14 @@ async function updateFomoChange(){
   const input = $("fomoChange");
 
   if(!input) return;
+
+  // ▼▼▼ 專題展示專用：當選取 TEST 時，直接鎖定 18.5% 暴漲幅度以觸發 FOMO 紅燈 ▼▼▼
+  if(symbol === "TEST") {
+    input.value = "18.5%";
+    input.dataset.change = "18.5";
+    return;
+  }
+  // ▲▲▲ 專題展示專用結束 ▲▲▲
 
   input.value = "讀取中...";
 
