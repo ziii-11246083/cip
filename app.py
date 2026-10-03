@@ -9,7 +9,7 @@ import time
 import copy
 import io
 import base64
-import json 
+import json
 import uuid
 import wave
 import hashlib
@@ -692,8 +692,51 @@ class DataManager:
     @staticmethod
     @ttl_cache(ttl_seconds=Config.CACHE_TTL)
     def get_all_tickers() -> List[Dict]:
-        tickers = DataManager._cg_get("/coins/markets", {"vs_currency": "usd", "order": "market_cap_desc", "per_page": Config.SFI_COIN_LIMIT, "page": 1, "sparkline": "true"})
-        if not tickers: return []
+        tickers = DataManager._cg_get("/coins/markets", {
+            "vs_currency": "usd", 
+            "order": "market_cap_desc", 
+            "per_page": Config.SFI_COIN_LIMIT, 
+            "page": 1, 
+            "sparkline": "true"
+        })
+        
+        # 動態真實備援機制：當 CoinGecko 限流時，改從 Yahoo Finance 抓取真實行情
+        if not tickers:
+            fallback_symbols = ['BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'DOGE', 'ADA', 'AVAX']
+            fallback_list = []
+            rank = 1
+            for sym in fallback_symbols:
+                try:
+                    # 即時抓取過去 7 天「每小時」K 線 (約 168 筆)，滿足 SFI 運算門檻
+                    hist = yf.Ticker(f"{sym}-USD").history(period="7d", interval="1h", auto_adjust=True)
+                    if hist is None or hist.empty or len(hist) < 15:
+                        continue
+                        
+                    close_prices = hist['Close'].tolist()
+                    cur_price = close_prices[-1]
+                    prev_price = close_prices[-24] if len(close_prices) >= 24 else close_prices[0]
+                    change_pct = ((cur_price - prev_price) / prev_price) * 100
+                    
+                    meta = Config.COIN_META.get(sym, {})
+                    fallback_list.append({
+                        "id": CG_ID_MAP.get(sym, sym.lower()),
+                        "symbol": sym,
+                        "price_usd": float(cur_price),
+                        "change": float(change_pct),
+                        "rank": rank,
+                        "name": meta.get('name') or sym,
+                        "cn_name": meta.get('cn_name', sym),
+                        "is_stable": sym in Config.STABLE_COINS,
+                        "history_prices": close_prices,
+                        "risk": {}
+                    })
+                    rank += 1
+                except Exception:
+                    continue
+                    
+            if fallback_list:
+                return fallback_list
+
         final_list = []
         if db:
             crypto_rows, price_rows = [], []
@@ -702,25 +745,21 @@ class DataManager:
                 final_list.append(entry)
                 crypto_rows.append({"symbol": entry["symbol"], "name": entry["name"], "chinese_name": entry.get("cn_name"), "coingecko_id": entry.get("id")})
                 price_rows.append({"symbol": entry["symbol"], "price": entry["price_usd"], "market_cap": float(t.get("market_cap", 0) or 0), "volume_24h": float(t.get("total_volume", 0) or 0), "price_change_24h": float(t.get("price_change_percentage_24h", 0) or 0), "timestamp": datetime.utcnow().isoformat()})
-            symbol_to_id = db.upsert_cryptocurrencies(crypto_rows)
-            insert_data = []
-            for price_row in price_rows:
-                crypto_id = symbol_to_id.get(price_row["symbol"])
-                if crypto_id:
-                    price_row["crypto_id"] = crypto_id
-                    insert_data.append(price_row)
-            if insert_data: db.bulk_insert_price_data(insert_data)
+            try:
+                symbol_to_id = db.upsert_cryptocurrencies(crypto_rows)
+                insert_data = []
+                for price_row in price_rows:
+                    crypto_id = symbol_to_id.get(price_row["symbol"])
+                    if crypto_id:
+                        price_row["crypto_id"] = crypto_id
+                        insert_data.append(price_row)
+                if insert_data: db.bulk_insert_price_data(insert_data)
+            except Exception:
+                pass
         else:
             for idx, t in enumerate(tickers):
                 final_list.append(DataManager._market_coin_to_entry(t, rank=idx + 1))
         return final_list
-
-    @staticmethod
-    @ttl_cache(ttl_seconds=Config.CACHE_TTL)
-    def get_market_tickers() -> List[Dict]:
-        tickers = DataManager._cg_get("/coins/markets", {"vs_currency": "usd", "order": "market_cap_desc", "per_page": Config.MARKET_COIN_LIMIT, "page": 1, "sparkline": "false"})
-        if not tickers: return []
-        return [DataManager._market_coin_to_entry(t, rank=idx + 1) for idx, t in enumerate(tickers)]
 
     @staticmethod
     def build_historical_df(crypto_list: List[Dict]) -> pd.DataFrame:
