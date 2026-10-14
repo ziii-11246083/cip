@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-Hant">
 <head>
   <style>
@@ -8,31 +8,26 @@
   <script>document.documentElement.classList.add('js-enabled');</script>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AI 投資教練 | Smart Invest Crypto</title>
+  <title>AI 投資教練 | Smart Invest Crypto｜智慧虛擬貨幣平台</title>
   <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo.jpg') }}">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=member-overlay-20260604">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/ai_coach.css') }}?v=confirm-check-20260929">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=brand-width-20261013">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ai_coach.css') }}?v=orange-white-20261013">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/visual-refresh-1012.css') }}?v=orange-white-20261013">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/site-theme.css') }}?v=money-type-20261013">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/coach-refinement.css') }}?v=coach-reply-colors-20261014">
 </head>
-<body>
+<body class="coach-page refresh-1012">
   
 {% include "partials/header.html" %}
 
-<main>
-  <section class="hero coach-hero">
-    <div class="container hero-grid">
-      <div>
-        <div class="eyebrow"><i class="fas fa-robot"></i> AI Coach</div>
-        <h1 class="hero-title">專屬 AI 投資教練</h1>
-        <p class="hero-lead">向 AI 教練提問，或請教練幫你規劃配置與模擬交易。每筆模擬單都會先顯示內容，經你確認後才建立。</p>
-      </div>
-    </div>
-  </section>
+<main aria-label="AI 投資教練">
+  
 
-  <section class="section">
+  <section class="section coach-section">
     <div class="container wide-container coach-layout">
 
       <div class="member-gate" id="memberGate">
@@ -42,7 +37,7 @@
           <a class="button primary" href="/register">註冊 / 登入會員</a>
           <a class="button" href="/market">查看市場總覽</a>
         </div>
-        <div class="member-helper">登入後可建立對話紀錄、查詢歷史配置建議。</div>
+        <div class="member-helper">進階會員可建立對話紀錄、查詢歷史配置建議。</div>
       </div>
 
       <div id="aiCoachApp" class="ai-coach-app">
@@ -50,15 +45,15 @@
         <section class="card coach-panel" data-member-feature="AI 投資教練">
           <h2 class="section-title small-title">選擇你的風險偏好</h2>
           <input type="hidden" id="riskProfile" value="穩健型">
-          <div class="risk-card-grid">
-            <button class="risk-card" data-risk="保守型" type="button"><strong>保守型</strong></button>
-            <button class="risk-card active" data-risk="穩健型" type="button"><strong>穩健型</strong></button>
-            <button class="risk-card" data-risk="積極型" type="button"><strong>積極型</strong></button>
+          <div class="risk-card-grid" role="radiogroup" aria-label="選擇風險偏好">
+            <button class="risk-card" data-risk="保守型" type="button" role="radio" aria-checked="false" tabindex="-1"><strong>保守型</strong></button>
+            <button class="risk-card active" data-risk="穩健型" type="button" role="radio" aria-checked="true" tabindex="0"><strong>穩健型</strong></button>
+            <button class="risk-card" data-risk="積極型" type="button" role="radio" aria-checked="false" tabindex="-1"><strong>積極型</strong></button>
           </div>
           <div class="quick-prompts">
             <strong>快速提問</strong>
             <button type="button" data-question="BTC 和 ETH 的配置比例該怎麼抓？"><i class="fas fa-chart-pie"></i> BTC / ETH 配置</button>
-            <button type="button" data-question="我該如何降低加密貨幣投資風險？"><i class="fas fa-shield-halved"></i> 降低風險</button>
+            <button type="button" data-question="我該如何降低加密貨幣投資風險？"><i class="fas fa-shield-alt"></i> 降低風險</button>
             <button type="button" data-question="現在市場適合一次進場，還是分批進場？"><i class="fas fa-chart-line"></i> 進場時機</button>
             <button type="button" data-question="加密貨幣停損和停利應該怎麼設定？"><i class="fas fa-sliders"></i> 停損停利</button>
             <button type="button" data-question="如何判斷我現在是不是因為 FOMO 在追高？"><i class="fas fa-triangle-exclamation"></i> 避免 FOMO</button>
@@ -66,65 +61,65 @@
             <button type="button" data-question="請幫我檢查目前持倉是否過度集中，並提出調整建議。"><i class="fas fa-magnifying-glass-chart"></i> 持倉健檢</button>
             <button type="button" data-question="新手投資加密貨幣最常犯的三個錯誤是什麼？"><i class="fas fa-lightbulb"></i> 新手避雷</button>
           </div>
-          <button class="coach-agent-shortcut" type="button" data-plan-example="規劃以 200 USD 模擬買入 BTC，先列出風險與建議金額。" data-plan-budget="200"><i class="fas fa-cart-shopping"></i><span>教我買：規劃模擬買入</span><i class="fas fa-arrow-right" aria-hidden="true"></i></button>
+          <button class="coach-agent-shortcut" type="button" data-coach-view-target="portfolio"><i class="fas fa-arrow-right-arrow-left" aria-hidden="true"></i><span>管理持倉：查看漲跌與賣出</span><i class="fas fa-arrow-right" aria-hidden="true"></i></button>
         </section>
 
         <section class="card coach-history-card" data-member-feature="AI 投資教練">
           <div class="coach-history-head">
             <h2>對話紀錄</h2>
-            <button class="button primary coach-history-new" id="aiCoachNewChatBtn" type="button">
-              <i class="fas fa-plus"></i> New Chat
-            </button>
+            <button class="button primary coach-history-new" id="aiCoachNewChatBtn" type="button"><i class="fas fa-plus" aria-hidden="true"></i> 新對話</button>
           </div>
           <div class="conversation-list" id="aiCoachConversationList"></div>
         </section>
       </div>
 
       <section class="card coach-chat" data-member-feature="AI 投資教練">
-        <div class="chat-head"><div><strong>你的專屬個人教練</strong><span>聊投資問題、規劃模擬買入，或查看模擬資產。</span></div></div>
-        <div class="coach-view-tabs" role="tablist" aria-label="AI 教練功能">
+        <div class="chat-head"><div><strong>AI 投資教練</strong><span>問投資、規劃買入，或管理模擬持倉。</span></div></div>
+        <div class="coach-context-row"><span class="coach-profile-badge"><i class="fas fa-sliders" aria-hidden="true"></i> 目前偏好 <b id="coachRiskLabel">穩健型</b></span></div>
+        <div class="coach-view-tabs" role="tablist" aria-label="AI 投資教練功能">
           <button class="coach-view-tab active" id="coachTabChat" type="button" role="tab" aria-selected="true" aria-controls="coachChatView" data-coach-view="chat"><i class="fas fa-comments"></i> 對話</button>
-          <button class="coach-view-tab" id="coachTabPlan" type="button" role="tab" aria-selected="false" aria-controls="coachPlanView" data-coach-view="plan"><i class="fas fa-cart-shopping"></i> 教我買</button>
-          <button class="coach-view-tab" id="coachTabPortfolio" type="button" role="tab" aria-selected="false" aria-controls="coachPortfolioView" data-coach-view="portfolio"><i class="fas fa-wallet"></i> 模擬資產</button>
+          <button class="coach-view-tab" id="coachTabPlan" type="button" role="tab" aria-label="規劃買入" aria-selected="false" aria-controls="coachPlanView" data-coach-view="plan"><i class="fas fa-cart-shopping"></i> 買入</button>
+          <button class="coach-view-tab" id="coachTabPortfolio" type="button" role="tab" aria-selected="false" aria-controls="coachPortfolioView" data-coach-view="portfolio"><i class="fas fa-arrow-right-arrow-left"></i> 持倉／賣出</button><button class="coach-view-tab" id="coachTabPerformance" type="button" role="tab" aria-selected="false" aria-controls="coachPerformanceView" data-coach-view="performance"><i class="fas fa-chart-line"></i> 教練成效</button>
         </div>
         <div class="coach-chat-view" id="coachChatView" role="tabpanel" aria-labelledby="coachTabChat">
-          <div class="chat-stream" id="chatStream">
-            <div class="chat-row ai"><div class="avatar">AI</div><div class="bubble"><b>AI 投資教練</b><p>你好，請問你現在最想解決的投資問題是什麼？例如「BTC 目前占比太高怎麼辦？」或「買入前該檢查哪些風險？」</p></div></div>
+          <div class="chat-stream" id="chatStream" role="log" aria-label="與 AI 投資教練的對話" aria-live="polite" aria-relevant="additions text">
+            <div class="chat-row ai welcome-row"><div class="avatar coach-cat"><img src="{{ url_for('static', filename='images/agent-cat-happy.png') }}" alt="貓咪投資教練" width="52" height="52"></div><div class="bubble"><b>AI 投資教練</b><p>你好，請問你現在最想解決的投資問題是什麼？例如「BTC 目前占比太高怎麼辦？」或「買入前該檢查哪些風險？」</p></div></div>
           </div>
-          <div class="chat-input-row"><input id="chatInput" aria-label="向 AI 投資教練提問" placeholder="例如：如果想買 BTC 200 USD，應注意哪些風險？"><button id="btnSend" type="button"><i class="fas fa-paper-plane"></i> 傳送</button></div>
+          <div class="chat-input-row"><input id="chatInput" aria-label="向 AI 投資教練提問" maxlength="12000" placeholder="例如：如果想買 BTC 200 USD，應注意哪些風險？"><button id="btnSend" type="button"><i class="fas fa-paper-plane" aria-hidden="true"></i> 傳送</button></div>
         </div>
         <div class="coach-tool-view" id="coachPlanView" role="tabpanel" aria-labelledby="coachTabPlan" hidden>
           <div class="coach-agent-intro">
-            <h2><i class="fas fa-cart-shopping"></i> 告訴教練你想怎麼買</h2>
-            <p>產生配置計畫後，你可以檢查幣種與金額，再確認批次建立模擬單。</p>
+            <h2><i class="fas fa-cart-shopping" aria-hidden="true"></i> 模擬買入規劃</h2>
+            <p>先設定目標與預算，再確認配置。</p>
           </div>
-          <div class="coach-agent-examples" aria-label="教我買任務範例">
-            <button type="button" data-plan-example="規劃以 200 USD 模擬買入 BTC，先列出風險與建議金額。" data-plan-budget="200"><i class="fas fa-bitcoin-sign"></i><span>規劃買入 200 USD BTC</span></button>
-            <button type="button" data-plan-example="用 500 USD 規劃 BTC 與 ETH 的模擬配置，避免單一幣種過度集中。" data-plan-budget="500"><i class="fas fa-scale-balanced"></i><span>分散配置 500 USD</span></button>
-            <button type="button" data-plan-example="以 1000 USD 規劃較保守的加密資產模擬配置，保留風險緩衝。" data-plan-budget="1000"><i class="fas fa-shield-halved"></i><span>保守配置 1,000 USD</span></button>
+          <div class="coach-agent-flow" aria-label="模擬買入流程"><span><i class="fas fa-pen" aria-hidden="true"></i> 1 設定</span><i class="fas fa-arrow-right" aria-hidden="true"></i><span><i class="fas fa-chart-pie" aria-hidden="true"></i> 2 預覽</span><i class="fas fa-arrow-right" aria-hidden="true"></i><span><i class="fas fa-check" aria-hidden="true"></i> 3 確認</span></div>
+          <div class="coach-agent-examples" aria-label="規劃買入範例">
+            <button type="button" data-plan-example="規劃以 200 USD 模擬買入 BTC，先列出風險與建議金額。" data-plan-budget="200"><i class="fas fa-bitcoin-sign" aria-hidden="true"></i><span><strong>BTC</strong><small>USD <b>200</b></small></span></button>
+            <button type="button" data-plan-example="用 500 USD 規劃 BTC 與 ETH 的模擬配置，避免單一幣種過度集中。" data-plan-budget="500"><i class="fas fa-scale-balanced" aria-hidden="true"></i><span><strong>BTC + ETH</strong><small>USD <b>500</b></small></span></button>
+            <button type="button" data-plan-example="以 1000 USD 規劃較保守的加密資產模擬配置，保留風險緩衝。" data-plan-budget="1000"><i class="fas fa-shield-alt" aria-hidden="true"></i><span><strong>保守配置</strong><small>USD <b>1,000</b></small></span></button>
           </div>
           <form id="coachPlanForm" class="coach-tool-form">
-            <label for="coachGoal"><i class="fas fa-pen"></i> 想完成的投資任務</label>
-            <textarea id="coachGoal" rows="3" maxlength="1000" required placeholder="例如：規劃用 200 USD 模擬買入 BTC，並說明進場風險"></textarea>
+            <label for="coachGoal">買入目標</label>
+            <textarea id="coachGoal" rows="2" maxlength="1000" required placeholder="例如：用 200 USD 規劃 BTC 模擬買入"></textarea>
             <label for="coachBudget">規劃預算（USD）</label>
             <div class="coach-tool-actions">
               <input id="coachBudget" type="number" min="1" step="0.01" value="1000" required>
-              <button class="button primary" id="coachPlanSubmit" type="submit"><i class="fas fa-wand-magic-sparkles"></i> 產生計畫</button>
+              <button class="button primary" id="coachPlanSubmit" type="submit"><i class="fas fa-chart-pie" aria-hidden="true"></i> 預覽配置</button>
             </div>
           </form>
-          <div class="coach-agent-flow" aria-label="模擬下單流程"><span><i class="fas fa-pen"></i> 描述任務</span><i class="fas fa-arrow-right" aria-hidden="true"></i><span><i class="fas fa-list-check"></i> 預覽配置</span><i class="fas fa-arrow-right" aria-hidden="true"></i><span><i class="fas fa-circle-check"></i> 確認模擬單</span></div>
           <p class="coach-tool-status" id="coachPlanStatus" role="status"></p>
           <div id="coachPlanResult" hidden></div>
         </div>
         <div class="coach-tool-view" id="coachPortfolioView" role="tabpanel" aria-labelledby="coachTabPortfolio" hidden>
           <div class="coach-tool-heading">
-            <h2>模擬資產概覽</h2>
-            <button class="coach-icon-button" id="coachPortfolioRefresh" type="button" title="重新整理模擬資產" aria-label="重新整理模擬資產"><i class="fas fa-rotate"></i></button>
+            <div><span class="coach-tool-kicker">PORTFOLIO ACTIONS</span><h2>模擬持倉與賣出</h2><p>檢查目前損益，再選擇 25%、50% 或全部賣出。</p></div>
+            <button class="coach-icon-button" id="coachPortfolioRefresh" type="button" title="重新整理模擬持倉" aria-label="重新整理模擬持倉"><i class="fas fa-rotate"></i></button>
           </div>
           <p class="coach-tool-status" id="coachPortfolioStatus" role="status"></p>
           <div id="coachPortfolioContent"></div>
           <a class="coach-tool-link" href="/sim-trade">前往模擬交易 <i class="fas fa-arrow-right"></i></a>
         </div>
+        <div class="coach-tool-view" id="coachPerformanceView" role="tabpanel" aria-labelledby="coachTabPerformance" hidden><div class="coach-tool-heading"><div><h2>教練成效</h2><p>只追蹤經 AI 投資教練確認買入的交易。</p></div><button class="coach-icon-button" id="coachPerformanceRefresh" type="button" aria-label="更新教練成效"><i class="fas fa-rotate"></i></button></div><p class="section-copy">按原買入數量比較成本與最新報價，不代表賣出後的實際損益。從本次更新後開始記錄，保存在此瀏覽器。</p><p id="coachPerformanceStatus" role="status"></p><div id="coachPerformanceContent"></div></div>
       </section>
       </div><!-- .ai-coach-app -->
     </div>
@@ -135,8 +130,12 @@
 {% include "partials/footer.html" %}
 <div class="toast" id="toast"><div class="t" id="toastT">提示</div><div class="m" id="toastM">--</div></div>
 <script>window.__SUPABASE_CONFIG__ = { url: '{{ supabase_url | default("https://dummy.supabase.co") }}', anonKey: '{{ supabase_anon_key | default("dummy") }}' };</script>
-<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=auth-state-20260830"></script>
-<script src="{{ url_for('static', filename='js/common.js') }}?v=member-nav-lock-20260604"></script>
-<script src="{{ url_for('static', filename='js/ai_coach.js') }}?v=confirm-check-20260929"></script>
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=join-carousel-20261013"></script>
+<script src="{{ url_for('static', filename='js/common.js') }}?v=money-type-20261013"></script>
+<script src="{{ url_for('static', filename='js/ai_coach.js') }}?v=coach-reply-colors-20261014"></script>
 </body>
 </html>
+
+
+
+

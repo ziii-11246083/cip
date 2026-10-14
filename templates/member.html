@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-Hant">
 <head>
   <style>
@@ -8,43 +8,29 @@
   <script>document.documentElement.classList.add('js-enabled');</script>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>會員中心 | Smart Invest Crypto</title>
+  <title>會員中心 | Smart Invest Crypto｜智慧虛擬貨幣平台</title>
   <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo.jpg') }}">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=profile-subscribe-20260929">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/member.css') }}?v=wallet-preview-20260929">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=brand-width-20261013">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/member.css') }}?v=orange-white-20261013">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/visual-refresh-1012.css') }}?v=orange-white-20261013">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/site-theme.css') }}?v=money-type-20261013">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/member-workspace.css') }}?v=member-workspace-20261014">
 </head>
-<body>
+<body class="member-page-body refresh-1012">
 {% include "partials/header.html" %}
 
-<main>
-  <section class="member-page">
-    <div class="container wide-container">
-      <div class="member-hero-card" data-member-feature="會員中心">
-        <div>
-          <div class="eyebrow"><i class="fas fa-user-shield"></i> Member Center</div>
-          <h1>會員中心</h1>
-          <p>記錄資金投放、模擬下單與持倉；可在本頁或模擬交易頁建立交易，再向 AI 教練諮詢配置思路。</p>
-        </div>
-        <div class="member-hero-actions">
-          <button class="member-subscribe-button" type="button" data-subscribe-open>
-            <i class="fas fa-star" aria-hidden="true"></i>
-            <span><strong id="memberSubscribeLabel">訂閱進階會員</strong><small id="memberSubscribeHint">NT$399／月 · 規劃中</small></span>
-            <i class="fas fa-arrow-right" aria-hidden="true"></i>
-          </button>
-          <div class="member-profile-mini">
-            <img id="memberAvatar" src="{{ url_for('static', filename='images/agent-cat-happy.png') }}" alt="會員頭貼">
-            <div>
-              <span id="memberEmail">尚未登入</span>
-              <strong id="memberName">會員</strong>
-            </div>
-            <button class="member-profile-edit-button" id="editProfileBtn" type="button" title="編輯個人資料"><i class="fas fa-pen"></i> 編輯</button>
-          </div>
-        </div>
+<main aria-label="會員中心">
+  <section class="member-page"><div class="container wide-container member-workspace">
+    <div class="member-page-heading"><div><span class="member-eyebrow">MY ACCOUNT</span><h1>會員中心</h1><p>管理帳戶，掌握你的資產練習。</p></div><div class="member-heading-actions"><button id="memberRefresh" type="button"><i class="fas fa-rotate" aria-hidden="true"></i> 更新資產</button><small id="memberDataStatus" role="status">登入進階會員後載入資產</small></div></div>
+    <div class="member-lock-banner">
+        <strong><i class="fas fa-lock"></i> 登入後即可使用會員中心</strong>
+        <span>登入後可管理帳號；進階會員可查看資金、模擬持倉與交易紀錄。</span>
+        <button type="button" onclick="window.authManager?.openLogin?.()">登入會員</button>
       </div>
-
-      <section class="member-profile-editor" id="profileEditor" aria-labelledby="profileEditorTitle" hidden>
+    <section class="member-identity" aria-label="會員資料"><div class="member-profile-mini"><img id="memberAvatar" src="{{ url_for('static', filename='images/agent-cat-happy.png') }}" alt="會員頭貼"><div><span id="memberEmail">尚未登入</span><strong id="memberName">會員</strong><span class="member-current-tier" id="memberCurrentTier">目前方案：訪客</span></div><button class="member-profile-edit-button" id="editProfileBtn" type="button"><i class="fas fa-pen" aria-hidden="true"></i> 編輯資料</button></div><button class="member-subscribe-button" type="button" data-subscribe-open><i class="fas fa-star" aria-hidden="true"></i><span><strong id="memberSubscribeLabel">訂閱進階會員</strong><small id="memberSubscribeHint">99 TWD／月 · 規劃中</small></span><i class="fas fa-arrow-right" aria-hidden="true"></i></button></section>
+    <section class="member-profile-editor" id="profileEditor" aria-labelledby="profileEditorTitle" hidden>
         <div class="member-profile-editor-head">
           <h2 id="profileEditorTitle">編輯個人資料</h2>
           <button class="member-profile-close" id="cancelProfileEdit" type="button" aria-label="關閉編輯個人資料"><i class="fas fa-xmark"></i></button>
@@ -66,43 +52,79 @@
           <p class="member-profile-status" id="profileStatus" role="status"></p>
         </form>
       </section>
-
-      <div class="member-lock-banner">
-        <strong><i class="fas fa-lock"></i> 登入後即可使用會員中心</strong>
-        <span>請使用測試會員或你的會員帳號登入，登入後會開啟資金與模擬交易紀錄。</span>
-        <button type="button" onclick="window.authManager?.openLogin?.()">登入會員</button>
-      </div>
-
-      <section class="member-upgrade" id="membership-plan" aria-labelledby="membership-plan-title">
+    <nav class="member-section-nav" aria-label="會員中心功能"><a href="#memberOverview"><i class="fas fa-chart-pie" aria-hidden="true"></i> 資產總覽</a><a href="#memberHoldings"><i class="fas fa-wallet" aria-hidden="true"></i> 模擬持倉</a><a href="#memberActions"><i class="fas fa-right-left" aria-hidden="true"></i> 資金與下單</a><a href="#memberWallet"><i class="fas fa-link" aria-hidden="true"></i> 錢包預覽</a><a href="#membership-plan"><i class="fas fa-star" aria-hidden="true"></i> 會員方案</a></nav>
+    <section class="member-kpi-grid" id="memberOverview" data-member-feature="會員資產紀錄">
+      <article class="member-kpi member-kpi-primary"><span><i class="fas fa-wallet" aria-hidden="true"></i> 模擬總資產</span><strong id="kpiCapital">--</strong><small id="kpiCapitalCount">含現金與持倉市值</small></article>
+      <article class="member-kpi"><span><i class="fas fa-coins" aria-hidden="true"></i> 可用虛擬現金</span><strong id="kpiCash">--</strong><small>可用於模擬買入</small></article>
+      <article class="member-kpi"><span><i class="fas fa-chart-pie" aria-hidden="true"></i> 模擬持倉市值</span><strong id="kpiHoldings">--</strong><small id="kpiHoldingCount">等待資產資料</small></article>
+      <article class="member-kpi"><span><i class="fas fa-right-left" aria-hidden="true"></i> 已載入交易</span><strong id="kpiOrders">--</strong><small>最近 50 筆紀錄內</small></article>
+    </section>
+    <section class="member-visual-grid" data-member-feature="會員資產配置與走勢">
+      <article class="member-card member-mix-card"><div class="member-chart-head"><div><span class="member-eyebrow">ASSET MIX</span><h2>配置一眼看懂</h2></div><div class="member-segments" role="group" aria-label="配置比例比較基準"><button type="button" data-allocation-mode="all" aria-pressed="true">全部資產</button><button type="button" data-allocation-mode="holdings" aria-pressed="false">持倉內</button></div></div><div class="member-allocation-layout"><div class="member-allocation-ring" id="memberAllocationRing" role="img" aria-label="等待配置資料"><div><small id="memberAllocationLabel">已投入</small><strong id="memberAllocationValue">--</strong><span id="memberAllocationCaption">含虛擬現金</span></div></div><div class="member-allocation-legend" id="memberAllocationLegend"></div></div><p class="member-chart-note" id="memberAllocationNote" role="status">等待帳戶資料</p></article>
+      <article class="member-card member-trend-card"><div class="member-chart-head"><div><span class="member-eyebrow">ACCOUNT SNAPSHOTS</span><h2>資產快照走勢</h2></div><div class="member-segments" role="group" aria-label="資產快照期間"><button type="button" data-member-days="all" aria-pressed="true">全部</button><button type="button" data-member-days="7" aria-pressed="false">7 天</button><button type="button" data-member-days="30" aria-pressed="false">30 天</button></div></div><div class="member-trend-stage" id="memberTrendChart" role="region" aria-label="帳戶資產快照圖"></div><div class="member-chart-foot"><span id="memberTrendCaption">等待帳戶資料</span><small>含資金變動，不等同投資報酬</small></div></article>
+    </section>
+    <section class="member-card holdings-card" id="memberHoldings" data-member-feature="持倉紀錄"><div class="member-card-head"><div><span class="member-eyebrow">MY HOLDINGS</span><h2>目前模擬持倉</h2><p>比較幣種市值與持倉內占比。</p></div><a href="/sim-trade"><i class="fas fa-right-left" aria-hidden="true"></i> 前往模擬交易</a></div><div class="member-holdings-summary"><span>持倉內占比 · 不含現金</span><span>未實現損益 <strong id="memberHoldingPnl">--</strong></span></div><div class="member-holding-cards" id="memberHoldingCards"></div><details class="member-holding-details"><summary>查看數量、價格與資產占比</summary><div class="holding-table" id="holdingTable"></div></details><div class="member-holdings-footer"><a href="/ai-coach"><i class="fas fa-cat" aria-hidden="true"></i> 用 AI 教練檢視配置</a><button class="ghost-danger" id="clearMemberData" type="button"><i class="fas fa-rotate-left" aria-hidden="true"></i> 重置模擬帳戶</button></div></section>
+    <div class="member-grid" id="memberActions">
+      <section class="member-card" data-member-feature="資金投放紀錄"><div class="member-card-head"><div><span class="member-eyebrow">FUND YOUR PRACTICE</span><h2>資金投放</h2><p>新增可用於交易練習的虛擬現金。</p></div><i class="fas fa-coins member-section-icon" aria-hidden="true"></i></div><form class="member-form" id="capitalForm"><div><label for="capitalAmount">金額（USD）</label><input id="capitalAmount" type="number" min="1" step="1" placeholder="例如 10000" inputmode="decimal"></div><div><label for="capitalNote">備註</label><input id="capitalNote" placeholder="例如：本月定投資金"></div><button type="submit"><i class="fas fa-plus" aria-hidden="true"></i> 新增資金</button></form><p id="memberCapitalStatus" class="member-action-status" role="status"></p><div class="member-record-head"><strong>資金紀錄</strong><small id="memberCapitalRecordCount">--</small></div><div class="member-list" id="capitalList"></div></section>
+      <section class="member-card" data-member-feature="模擬下單"><div class="member-card-head"><div><span class="member-eyebrow">QUICK TRADE</span><h2>快速模擬下單</h2><p>建立後會同步更新模擬交易帳戶。</p></div><i class="fas fa-right-left member-section-icon" aria-hidden="true"></i></div><form class="member-form order-form" id="orderForm"><div><label for="orderSide">方向</label><select id="orderSide"><option value="buy">買入</option><option value="sell">賣出</option></select></div><div><label for="orderSymbol">幣種</label><select id="orderSymbol"><option>BTC</option><option>ETH</option><option>SOL</option><option>XRP</option><option>BNB</option><option>DOGE</option><option>USDT</option><option>USDC</option></select></div><div class="member-field-wide"><label for="orderAmount">金額（USD）</label><input id="orderAmount" type="number" min="1" step="1" placeholder="例如 5000" inputmode="decimal"></div><button type="submit"><i class="fas fa-paper-plane" aria-hidden="true"></i> 建立模擬單</button></form><p id="memberOrderStatus" class="member-action-status" role="status"></p><div class="member-record-head"><strong>最近交易</strong><a href="/sim-trade#simHistory">完整紀錄 <i class="fas fa-arrow-right" aria-hidden="true"></i></a></div><div class="member-list" id="orderList"></div></section>
+    </div>
+    <section id="memberWallet" class="member-card real-asset-card" data-member-feature="真實資產唯讀同步">
+        <div class="member-card-head">
+          <div>
+            <div class="eyebrow"><i class="fas fa-wallet"></i> Read-only Beta</div>
+            <h2>錢包連結預覽</h2>
+            <p>Ethereum 公開地址流程預覽，與模擬帳戶分開呈現。</p>
+          </div>
+          <span class="real-asset-safety"><i class="fas fa-shield-alt"></i> 不會代下單</span>
+        </div>
+        <div class="member-wallet-flow" aria-label="唯讀錢包預覽流程"><div><i class="fas fa-wallet" aria-hidden="true"></i><strong>公開地址</strong><small>Ethereum</small></div><i class="fas fa-arrow-right" aria-hidden="true"></i><div><i class="fas fa-shield-alt" aria-hidden="true"></i><strong>唯讀流程</strong><small>連結預覽</small></div><i class="fas fa-arrow-right" aria-hidden="true"></i><div><i class="fas fa-eye-slash" aria-hidden="true"></i><strong>未取得餘額</strong><small>預覽不查詢資產</small></div></div><div class="real-asset-notice">
+          此區目前提供連結流程預覽，不會查詢真實餘額或建立正式連結。只輸入公開地址；不要輸入助記詞、私鑰或交易所 API Secret。
+        </div>
+        <div class="real-asset-access" id="realAssetAccess">
+          <strong id="realAssetAccessTitle">登入後查看使用資格</strong>
+          <p id="realAssetAccessText">錢包連結流程預覽開放給進階會員。</p>
+          <a href="#membership-plan" id="realAssetPlanLink">查看方案比較 <i class="fas fa-arrow-right"></i></a>
+        </div>
+        <form class="real-asset-connect" id="realAssetForm" hidden>
+          <label for="realAssetAddress">Ethereum 公開地址</label>
+          <div>
+            <input id="realAssetAddress" autocomplete="off" spellcheck="false" maxlength="42" placeholder="0x…（40 個十六進位字元）" aria-describedby="realAssetStatus">
+            <button type="submit"><i class="fas fa-link"></i> 預覽錢包連結</button>
+          </div>
+        </form>
+        <div class="real-asset-status" id="realAssetStatus" role="status" aria-live="polite">登入後可預覽錢包連結流程。</div>
+        <div class="real-asset-accounts" id="realAssetAccounts"></div>
+      </section>
+    <section class="member-upgrade" id="membership-plan" aria-labelledby="membership-plan-title">
         <div class="member-plan-head">
           <div>
             <span class="member-upgrade-eyebrow"><i class="fas fa-star" aria-hidden="true"></i> 會員方案</span>
             <h2 id="membership-plan-title">選擇適合你的練習方式</h2>
-            <p>原有會員與 TEST 帳號為進階會員；新註冊帳號為免費會員。正式付款功能尚未上線。</p>
+            <p>公開功能免登入；個人持倉、模擬交易與對話紀錄屬於進階會員。付款目前提供流程預覽。</p>
           </div>
-          <span class="member-current-tier" id="memberCurrentTier">目前方案：訪客</span>
+          
         </div>
         <div class="member-plan-grid">
           <article class="member-plan" id="memberFreePlan">
             <span class="member-plan-tag" id="memberFreeTag" hidden>目前方案</span>
-            <h3>免費會員</h3>
-            <p class="member-plan-price">NT$0 <span>／月</span></p>
+            <h3>公開使用</h3>
+            <p class="member-plan-price">免費 <span>免登入</span></p>
             <ul>
               <li><i class="fas fa-check"></i> 市場資訊與防詐提醒</li>
-              <li><i class="fas fa-check"></i> 模擬資金、下單與持倉</li>
-              <li><i class="fas fa-check"></i> 基礎 AI 教練</li>
+              <li><i class="fas fa-check"></i> 社群分析、敘事雷達與幣種分析</li>
+              <li><i class="fas fa-check"></i> Podcast 生成與播放</li>
               <li><i class="fas fa-minus"></i> 不含真實資產同步</li>
             </ul>
-            <a class="member-plan-action member-plan-action-secondary" href="/sim-trade">使用免費模擬交易 <i class="fas fa-arrow-right"></i></a>
+            <a class="member-plan-action member-plan-action-secondary" href="/market">開始看市場 <i class="fas fa-arrow-right"></i></a>
           </article>
           <article class="member-plan member-plan-premium" id="memberPremiumPlan">
             <span class="member-plan-tag" id="memberPremiumTag">規劃中</span>
             <h3>進階會員</h3>
-            <p class="member-plan-price">NT$399 <span>／月</span></p>
+            <p class="member-plan-price">99 TWD <span>／月</span></p>
             <ul>
-              <li><i class="fas fa-check"></i> 包含免費會員功能</li>
-              <li><i class="fas fa-check"></i> AI 教練與現有情境分析</li>
-              <li><i class="fas fa-clock"></i> 更多使用額度與唯讀資產同步規劃中</li>
+              <li><i class="fas fa-check"></i> 包含所有公開功能</li>
+              <li><i class="fas fa-check"></i> 投資健康度、AI 投資教練與對話紀錄</li>
+              <li><i class="fas fa-clock"></i> 模擬交易、個人持倉與交易紀錄</li>
               <li><i class="fas fa-shield-alt"></i> 同步不會取得交易權限</li>
             </ul>
             <button class="member-plan-action" id="memberPremiumAction" type="button" data-subscribe-open>了解訂閱進度 <i class="fas fa-arrow-right"></i></button>
@@ -119,124 +141,15 @@
           <button class="member-subscription-status-button" type="button" data-subscribe-open><i class="fas fa-id-card"></i> 查看目前訂閱狀態</button>
         </div>
       </section>
-
-      <section class="member-card real-asset-card" data-member-feature="真實資產唯讀同步">
-        <div class="member-card-head">
-          <div>
-            <div class="eyebrow"><i class="fas fa-wallet"></i> Read-only Beta</div>
-            <h2>真實資產</h2>
-            <p>Ethereum Mainnet 公開地址唯讀同步，與下方模擬資產完全分開。</p>
-          </div>
-          <span class="real-asset-safety"><i class="fas fa-shield-alt"></i> 不會代下單</span>
-        </div>
-        <div class="real-asset-notice">
-          此區目前是連結流程示範，不會查詢真實餘額或建立正式連結。只輸入公開地址；不要輸入助記詞、私鑰或交易所 API Secret。
-        </div>
-        <div class="real-asset-access" id="realAssetAccess">
-          <strong id="realAssetAccessTitle">登入後查看使用資格</strong>
-          <p id="realAssetAccessText">錢包連結流程示範開放給進階會員。</p>
-          <a href="#membership-plan" id="realAssetPlanLink">查看方案比較 <i class="fas fa-arrow-right"></i></a>
-        </div>
-        <form class="real-asset-connect" id="realAssetForm" hidden>
-          <label for="realAssetAddress">Ethereum 公開地址</label>
-          <div>
-            <input id="realAssetAddress" autocomplete="off" spellcheck="false" maxlength="42" placeholder="0x…（40 個十六進位字元）" aria-describedby="realAssetStatus">
-            <button type="submit"><i class="fas fa-link"></i> 示範連結錢包</button>
-          </div>
-        </form>
-        <div class="real-asset-status" id="realAssetStatus" role="status" aria-live="polite">登入後可查看連結流程示範。</div>
-        <div class="real-asset-accounts" id="realAssetAccounts"></div>
-      </section>
-
-      <section class="member-kpi-grid" data-member-feature="會員資產紀錄">
-        <article class="member-kpi">
-          <span>模擬累積投放資金</span>
-          <strong id="kpiCapital">TWD 0</strong>
-          <small id="kpiCapitalCount">0 筆資金紀錄</small>
-        </article>
-        <article class="member-kpi">
-          <span>模擬持倉市值</span>
-          <strong id="kpiHoldings">TWD 0</strong>
-          <small id="kpiHoldingCount">0 種資產</small>
-        </article>
-        <article class="member-kpi">
-          <span>模擬下單次數</span>
-          <strong id="kpiOrders">0</strong>
-          <small>會員中心與模擬交易頁共用紀錄</small>
-        </article>
-      </section>
-
-      <div class="member-grid">
-        <section class="member-card" data-member-feature="資金投放紀錄">
-          <div class="member-card-head">
-            <div>
-              <h2>資金投放</h2>
-              <p>新增你打算投入模擬交易的資金來源與用途。</p>
-            </div>
-          </div>
-          <form class="member-form" id="capitalForm">
-            <label for="capitalAmount">金額（TWD）</label>
-            <input id="capitalAmount" type="number" min="1" step="1" placeholder="例如 10000">
-            <label for="capitalNote">備註</label>
-            <input id="capitalNote" placeholder="例如：本月定投資金">
-            <button type="submit"><i class="fas fa-plus"></i> 新增資金</button>
-          </form>
-          <div class="member-list" id="capitalList"></div>
-        </section>
-
-        <section class="member-card" data-member-feature="模擬下單">
-          <div class="member-card-head">
-            <div>
-              <h2>模擬下單</h2>
-              <p>下單後會更新模擬帳本，也可在 AI 教練查看資產摘要。</p>
-            </div>
-            <a href="/ai-coach">前往 AI 教練 <i class="fas fa-arrow-right"></i></a>
-          </div>
-          <form class="member-form order-form" id="orderForm">
-            <label for="orderSide">方向</label>
-            <select id="orderSide">
-              <option value="buy">買入</option>
-              <option value="sell">賣出</option>
-            </select>
-            <label for="orderSymbol">幣種</label>
-            <select id="orderSymbol">
-              <option>BTC</option>
-              <option>ETH</option>
-              <option>SOL</option>
-              <option>XRP</option>
-              <option>BNB</option>
-              <option>DOGE</option>
-              <option>USDT</option>
-              <option>USDC</option>
-            </select>
-            <label for="orderAmount">金額（TWD）</label>
-            <input id="orderAmount" type="number" min="1" step="1" placeholder="例如 5000">
-            <button type="submit"><i class="fas fa-paper-plane"></i> 建立模擬單</button>
-          </form>
-          <div class="member-list" id="orderList"></div>
-        </section>
-      </div>
-
-      <section class="member-card holdings-card" data-member-feature="持倉紀錄">
-        <div class="member-card-head">
-          <div>
-            <h2>目前模擬持倉</h2>
-            <p>AI Agent 會根據這份持倉判斷是否過度集中。</p>
-          </div>
-          <button class="ghost-danger" id="clearMemberData" type="button"><i class="fas fa-trash"></i> 重置模擬帳戶</button>
-        </div>
-        <div class="holding-table" id="holdingTable"></div>
-      </section>
-    </div>
-  </section>
+  </div></section>
 </main>
 
 <dialog class="member-subscribe-dialog" id="subscriptionDialog" aria-labelledby="subscriptionDialogTitle">
   <button class="member-profile-close" id="subscriptionClose" type="button" aria-label="關閉訂閱方案視窗"><i class="fas fa-xmark"></i></button>
   <div class="member-subscribe-dialog-icon"><i class="fas fa-star"></i></div>
-  <h2 id="subscriptionDialogTitle">進階會員 · NT$399／月</h2>
+  <h2 id="subscriptionDialogTitle">進階會員 · 99 TWD／月</h2>
   <p class="member-subscription-account-status" id="subscriptionAccountStatus">目前狀態：尚未登入</p>
-  <p>原有會員與 TEST 帳號屬進階會員，可操作錢包連結畫面示範；目前不會讀取真實資產。新註冊帳號為免費會員。訂閱與付款尚未開放，點擊不會建立訂單或收費。</p>
+  <p>公開功能免登入；建立帳號後需完成付款，才會開通進階會員。錢包連結目前提供流程預覽，不會讀取真實資產；訂閱與付款尚未開放。</p>
   <div class="member-subscribe-dialog-actions">
     <a href="#membership-plan" id="subscriptionViewPlan">查看方案比較 <i class="fas fa-arrow-right"></i></a>
     <button type="button" id="subscriptionContinueFree">關閉</button>
@@ -257,8 +170,14 @@
     anonKey: '{{ supabase_anon_key | default("dummy") }}'
   };
 </script>
-<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=wallet-preview-20260929"></script>
-<script src="{{ url_for('static', filename='js/common.js') }}?v=member-nav-lock-20260604"></script>
-<script src="{{ url_for('static', filename='js/member.js') }}?v=20261001-price-label"></script>
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=join-carousel-20261013"></script>
+<script src="{{ url_for('static', filename='js/common.js') }}?v=money-type-20261013"></script>
+<script src="{{ url_for('static', filename='js/member.js') }}?v=member-workspace-20261014"></script>
 </body>
 </html>
+
+
+
+
+
+

@@ -1,0 +1,329 @@
+/* The simulation workspace keeps the shared orange and cream visual system. */
+.sim-page.refresh-1012 main {--sim-up:#247c66;--sim-down:#c34b42;--sim-soft:#fff7ed;}
+.sim-page.refresh-1012 .sim-shell {gap:24px;}
+.sim-page.refresh-1012 .sim-app {display:flex;flex-direction:column;align-items:stretch;gap:28px;}
+.sim-page.refresh-1012 .sim-app>* {order:0!important;min-width:0;}
+.sim-page .sim-page-heading,.sim-page .sim-heading-actions,.sim-page .sim-section-head,.sim-page .sim-chart-head {display:flex;align-items:center;justify-content:space-between;gap:16px;}
+.sim-page .sim-page-heading h1 {margin:6px 0 8px;}
+.sim-page .sim-page-heading p {margin:0;color:var(--muted);}
+.sim-page.refresh-1012 main .sim-eyebrow {display:block;font-size:12px!important;color:#ae6736;letter-spacing:.1em;font-weight:700;}
+.sim-page .sim-eyebrow i {margin-right:7px;}
+.sim-page .sim-heading-actions {justify-content:flex-end;flex-wrap:wrap;max-width:420px;}
+.sim-page.refresh-1012 main .sim-heading-actions small {width:100%;text-align:right;font-size:12px!important;color:var(--muted);}
+.sim-page.refresh-1012 main .sim-account-badge {display:inline-flex;gap:7px;align-items:center;border:1px solid #efddc8;border-radius:30px;padding:7px 12px;background:#fff8ef;font-size:13px!important;white-space:normal;color:#9c6a43;}
+.sim-page .sim-account-badge .fa-circle {font-size:6px;}
+.sim-page .sim-icon-button {border:1px solid var(--line);border-radius:11px;background:#fff;padding:10px 14px;cursor:pointer;color:#795942;}
+.sim-page .sim-icon-button i {margin-right:7px;}
+.sim-page .sim-section-nav {display:flex;gap:8px;padding:7px;border:1px solid var(--line);border-radius:15px;background:#fff;}
+.sim-page.refresh-1012 main .sim-section-nav a {flex:1;display:flex;gap:8px;align-items:center;justify-content:center;padding:11px 8px;font-size:14px!important;border-radius:10px;color:#806348;text-decoration:none;white-space:nowrap;}
+.sim-page .sim-section-nav a:hover,.sim-page .sim-section-nav a:focus-visible {background:#fff1df;color:#c56e31;}
+.sim-page .sim-section-head {margin-bottom:20px;}
+.sim-page .sim-section-head :is(h2,.sim-title) {margin:4px 0 0;}
+.sim-page.refresh-1012 main .sim-muted {color:var(--muted);font-size:13px!important;font-weight:400;}
+.sim-page.refresh-1012 .sim-dashboard {background:transparent;}
+.sim-page.refresh-1012 .sim-kpi-grid {grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:20px;}
+.sim-page.refresh-1012 .sim-kpi-grid>.sim-kpi {padding:21px 20px;background:#fff;border:1px solid var(--line);border-radius:16px;}
+.sim-page.refresh-1012 .sim-kpi-grid>.sim-kpi-primary {background:linear-gradient(125deg,#ffeddb,#fff8ee);border-color:#f0c9a6;}
+.sim-page.refresh-1012 main .sim-kpi>span {font-size:13px!important;color:#856b57;font-weight:500;}
+.sim-page .sim-kpi>span i {margin-right:7px;color:#c68a59;}
+.sim-page.refresh-1012 main .sim-kpi>strong {font-size:28px!important;font-family:Arial,sans-serif;font-weight:700;line-height:1.35;margin:13px 0 10px;}
+.sim-page.refresh-1012 main .sim-kpi>small {font-size:12px!important;color:#9a8571;font-weight:400;}
+.sim-page.refresh-1012 main .money-amount {font-size:inherit!important;font-weight:inherit;}
+.sim-page.refresh-1012 main .money-currency {font-size:11px!important;color:inherit;opacity:.72;font-weight:500;}
+.sim-page.refresh-1012 main :is(.ok,.gain .position-change,.gain .position-card-bottom strong) {color:var(--sim-up)!important;}
+.sim-page.refresh-1012 main :is(.bad,.loss .position-change,.loss .position-card-bottom strong) {color:var(--sim-down)!important;}
+.sim-page .sim-overview-grid {display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:20px;}
+.sim-page.refresh-1012 main .sim-overview-grid>.card {padding:22px;min-width:0;margin:0!important;}
+.sim-page.refresh-1012 main .sim-chart-head h3 {font-size:21px!important;margin:5px 0 0;}
+.sim-page .sim-range-buttons {display:flex;gap:3px;padding:3px;border-radius:10px;background:#f8f2ec;}
+.sim-page.refresh-1012 main .sim-range-buttons button {font-size:12px!important;min-height:32px;padding:5px 10px;border:0;border-radius:7px;background:transparent;color:#9a8069;white-space:nowrap;cursor:pointer;}
+.sim-page .sim-range-buttons button[aria-pressed=true] {background:#fff;color:#a45f2c;box-shadow:0 1px 5px #6345260b;}
+.sim-page .sim-chart-stage {height:245px;position:relative;margin-top:20px;}
+.sim-page .sim-chart-empty {position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:22px;text-align:center;border-radius:12px;background:#fffaf4;color:#9c8066;}
+.sim-page .sim-chart-foot {display:flex;align-items:flex-start;justify-content:space-between;gap:10px;border-top:1px solid #f1e8dd;padding-top:13px;margin-top:10px;}
+.sim-page.refresh-1012 main .sim-chart-foot :is(span,small) {font-size:11px!important;color:#9a8775;font-weight:400;}
+.sim-page .sim-chart-foot small {text-align:right;max-width:240px;}
+.sim-page .sim-allocation-visual {display:grid;grid-template-columns:minmax(130px,.9fr) minmax(0,1fr);align-items:center;gap:18px;min-height:270px;}
+.sim-page .sim-donut-stage {position:relative;min-width:0;aspect-ratio:1;max-height:200px;}
+.sim-page .sim-donut-center {position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;pointer-events:none;}
+.sim-page.refresh-1012 main .sim-donut-center small {font-size:11px!important;color:#9a8672;}
+.sim-page .sim-donut-center strong {font:700 26px Arial,sans-serif;color:#6c4730;margin:4px 0;}
+.sim-page.refresh-1012 main .sim-donut-center span {font-size:10px!important;color:#ad9781;}
+.sim-page .sim-allocation-legend {display:grid;gap:12px;min-width:0;}
+.sim-page .sim-allocation-row {display:grid;grid-template-columns:8px minmax(0,1fr) auto;gap:7px;align-items:center;}
+.sim-page .sim-allocation-dot {width:7px;height:7px;border-radius:50%;}
+.sim-page.refresh-1012 main .sim-allocation-row :is(span,b) {font-size:12px!important;}
+.sim-page .sim-allocation-row>small {grid-column:2/-1;font-size:11px!important;color:#9f8972;text-align:right;}
+.sim-page .sim-inline-note {padding:12px;border-radius:11px;background:#fff7ec;color:#9a724d;font-size:13px;}
+.sim-page .sim-section-head>div {min-width:0;}
+.sim-page.refresh-1012 .order-workspace {grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:30px;}
+.sim-page .order-form-area {padding-right:28px;border-right:1px solid #f0e3d5;}
+.sim-page .sim-order-direction {display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:5px;background:#f7f1eb;border-radius:13px;margin-bottom:20px;}
+.sim-page .sim-order-direction button {background:none;border:0;border-radius:9px;color:#91785f;cursor:pointer;}
+.sim-page .sim-order-direction button i {margin-right:6px;}
+.sim-page .sim-order-direction button[aria-pressed=true] {color:#fff;background:var(--sim-up);box-shadow:0 3px 10px #247c6620;}
+.sim-page .sim-order-direction button[data-order-side=sell][aria-pressed=true] {background:var(--sim-down);}
+.sim-page.refresh-1012 main .sim-sr-only {position:absolute;width:1px!important;height:1px!important;min-height:0!important;clip-path:inset(50%);overflow:hidden;white-space:nowrap;padding:0!important;border:0!important;}
+.sim-page .order-grid {gap:14px;grid-template-columns:repeat(2,minmax(0,1fr));}
+.sim-page .order-symbol-field {grid-column:1/-1;}
+.sim-page .order-grid label {display:block;margin-bottom:7px;color:#927257;font-size:13px!important;}
+.sim-page .order-grid :is(input,select) {width:100%;padding:12px;}
+.sim-page .sim-sizing-head {display:flex;justify-content:space-between;gap:10px;margin:19px 0 8px;}
+.sim-page.refresh-1012 main .sim-sizing-head :is(span,small) {font-size:12px!important;color:#967a62;font-weight:400;}
+.sim-page .sim-quick-sizes {display:grid;grid-template-columns:repeat(4,1fr);gap:7px;}
+.sim-page.refresh-1012 main .sim-quick-sizes button {min-height:34px;border:1px solid var(--line);border-radius:8px;background:#fffaf5;color:#96704e;font-size:12px!important;cursor:pointer;}
+.sim-page .sim-quick-sizes button:hover {border-color:#c7ad8e;background:#fff0df;}
+.sim-page .sim-order-ticket {border:1px solid #efdecb;border-radius:13px;background:#fff8ed;padding:16px;margin:18px 0 12px;}
+.sim-page .sim-order-ticket>div:not(.sim-order-capacity) {display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px;}
+.sim-page.refresh-1012 main .sim-order-ticket span {font-size:12px!important;color:#947459;}
+.sim-page .sim-order-ticket strong {font:600 14px Arial,"Microsoft JhengHei",sans-serif;text-align:right;max-width:72%;}
+.sim-page .sim-order-capacity {height:5px;background:#ebdfcf;border-radius:5px;overflow:hidden;margin:14px 0 6px;}
+.sim-page .sim-order-capacity span {display:block;width:0;height:100%;background:var(--sim-up);transition:width .2s;}
+.sim-page .order-panel[data-side=sell] .sim-order-capacity span {background:var(--sim-down);}
+.sim-page.refresh-1012 main .sim-order-ticket>small {font-size:11px!important;color:#9e846a;}
+.sim-page.refresh-1012 main .coin-order-advice {padding:10px 12px;font-size:12px!important;line-height:1.6;border-radius:10px;margin:0;background:#f9f5f0;border:1px solid var(--line);font-weight:400;}
+.sim-page .order-actions {margin:14px 0 0;display:block;}
+.sim-page.refresh-1012 main #btnPlaceOrder {width:100%;background:var(--sim-up)!important;border:0;border-radius:11px;color:#fff;padding:13px;font-weight:600;cursor:pointer;}
+.sim-page.refresh-1012 main .order-panel[data-side=sell] #btnPlaceOrder {background:var(--sim-down)!important;}
+.sim-page main button:disabled {opacity:.45;cursor:not-allowed;}
+.sim-page.refresh-1012 main .status {font-size:12px!important;font-weight:400;margin-top:12px;}
+.sim-page .sim-account-tools {display:flex;gap:16px;justify-content:space-between;padding-top:16px;margin-top:16px;border-top:1px solid var(--line);}
+.sim-page.refresh-1012 main .sim-account-tools button {padding:0;min-height:34px;font-size:12px!important;background:transparent;border:0;box-shadow:none;color:#9b7857;cursor:pointer;}
+.sim-page .sim-account-tools button i {margin-right:5px;}
+.sim-page .sim-account-tools #btnReset {color:#b86a55;}
+.sim-page.refresh-1012 .coin-market-panel {padding:4px 0 0;border:0;border-radius:0;background:#fff;box-shadow:none;}
+.sim-page .coin-market-head {display:flex;gap:11px;margin:0 0 15px;align-items:center;}
+.sim-page .sim-coin-icon {display:grid;place-items:center;width:45px;height:45px;border-radius:14px;background:#fff0dd;color:#d48438;font:700 25px Arial,sans-serif;flex-shrink:0;}
+.sim-page .coin-market-head>div {flex:1;min-width:0;}
+.sim-page .coin-market-head>div strong {display:block;font-size:20px;}
+.sim-page.refresh-1012 main .coin-market-head small {font-size:12px!important;color:#a0856b;}
+.sim-page .coin-market-head #quoteChange {font:650 16px Arial,sans-serif;background:#f3f7f3;padding:6px 10px;border-radius:9px;}
+.sim-page .coin-market-head #quoteChange.bad {background:#fff1ec;}
+.sim-page .sim-quote-price {display:block;font:700 30px Arial,sans-serif;margin:4px 0 22px;}
+.sim-page .sim-market-chart-stage {position:relative;height:225px;margin:15px 0 8px;}
+.sim-page .coin-market-grid {grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:20px;padding-top:18px;border-top:1px solid var(--line);}
+.sim-page .coin-market-grid>div {padding:0;border:0;background:none;}
+.sim-page.refresh-1012 main .coin-market-grid span {font-size:11px!important;color:#9b8068;}
+.sim-page .coin-market-grid strong {font:600 15px Arial,sans-serif;overflow-wrap:anywhere;}
+.sim-page .position-performance-head {margin-bottom:22px;gap:16px;}
+.sim-page .position-performance-head .sim-title {margin:6px 0 0;}
+.sim-page.refresh-1012 main .position-performance-head p {font-size:14px!important;color:var(--muted);margin:8px 0 0;}
+.sim-page .position-performance-grid {grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;}
+.sim-page.refresh-1012 main .position-performance-card {padding:20px;border-radius:15px;background:#fffaf5;}
+.sim-page .position-card-top {grid-template-columns:37px minmax(0,1fr) auto;gap:8px;}
+.sim-page .position-symbol-icon {width:37px;height:37px;border-radius:11px;background:#fff0dc;color:#d17d35;}
+.sim-page.refresh-1012 main .position-card-top strong {font-size:17px!important;}
+.sim-page.refresh-1012 main .position-card-top small {font-size:11px!important;}
+.sim-page.refresh-1012 main .position-change {font-size:14px!important;border-radius:8px;padding:5px 7px;background:#eaf3ed;}
+.sim-page .loss .position-change {background:#fbedeb;}
+.sim-page .position-price-compare {gap:8px;}
+.sim-page.refresh-1012 main .position-price-compare small {font-size:11px!important;}
+.sim-page .position-price-compare strong {font:600 14px Arial,sans-serif;}
+.sim-page .position-card-bottom {gap:8px;align-items:center;}
+.sim-page.refresh-1012 main .position-card-bottom>span {font-size:11px!important;}
+.sim-page .position-card-bottom strong {font:650 18px Arial,sans-serif;}
+.sim-page .position-card-bottom button {font-size:12px!important;min-height:36px;padding:7px 9px;}
+.sim-page .position-price-bars {margin-bottom:5px;}
+.sim-page.refresh-1012 main .position-price-bar-legend {display:flex;gap:12px;font-size:10px!important;color:#ad937b;}
+.sim-page .position-price-bar-legend span {font-size:10px!important;}
+.sim-page .sim-position-details {margin-top:22px;border-top:1px solid var(--line);padding-top:17px;}
+.sim-page .sim-position-details summary {color:#ac7445;cursor:pointer;font-size:14px;}
+.sim-page .sim-position-details .table-wrap {margin-top:15px;}
+.sim-page.refresh-1012 main :is(.positions-panel,.trades-panel,.sim-scenario-card) table :is(td,th) {font-size:13px!important;padding:13px;}
+.sim-page :is(.positions-panel,.trades-panel,.sim-scenario-card) tbody tr:nth-child(even) {background:#fff9f2;}
+.sim-page .sim-scenario-card .sim-section-head {margin-bottom:10px;}
+.sim-page.refresh-1012 main .sim-scenario-desc {font-size:14px!important;margin-bottom:22px;}
+.sim-page .sim-scenario-selector {gap:12px;}
+.sim-page .scenario-btn {display:grid;grid-template-columns:auto 1fr;gap:5px 12px;align-items:center;text-align:left;padding:17px;border-radius:14px;}
+.sim-page .scenario-btn i {grid-row:1/3;color:#b39d87;font-size:24px;}
+.sim-page .scenario-btn strong {font-size:14px;}
+.sim-page.refresh-1012 main .scenario-btn>span {font:650 22px Arial,sans-serif!important;color:#7f6248;}
+.sim-page.refresh-1012 main .scenario-btn>small {grid-column:1/-1;font-size:10px!important;color:#a28b75;margin-top:4px;}
+.sim-page .scenario-btn.active {border-color:#e6b58a;background:#fff4e5;box-shadow:none;transform:none;}
+.sim-page .scenario-btn[data-scenario=bull] i {color:var(--sim-up);}
+.sim-page .scenario-btn[data-scenario=bear] i {color:#d18c42;}
+.sim-page .scenario-btn[data-scenario=black_swan] i {color:var(--sim-down);}
+.sim-page .sim-scenario-info {display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin:14px 0 22px;padding:0;background:none;border:0;}
+.sim-page.refresh-1012 main .sim-scenario-info :is(span,small) {font-size:12px!important;color:#9c7f65;}
+.sim-page .stress-controls {grid-template-columns:minmax(0,1.3fr) minmax(0,.7fr) minmax(0,.8fr) auto;gap:14px;border-radius:14px;padding:18px;background:#fff8ef;border:1px solid var(--line);}
+.sim-page.refresh-1012 main .stress-controls label {font-size:12px!important;}
+.sim-page .stress-controls :is(input,select) {width:100%;min-width:0;margin-top:7px;padding:10px;}
+.sim-page .stress-controls button {align-self:end;padding:11px 17px;border-radius:10px;cursor:pointer;}
+.sim-page .stress-result-meta {display:flex;gap:10px;flex-wrap:wrap;margin:24px 0 16px;}
+.sim-page.refresh-1012 main .stress-result-meta span {font-size:12px!important;color:#9d826a;}
+.sim-page .sim-stress-chart {height:290px;position:relative;margin:20px 0;}
+.sim-page .sim-stress-legend {display:flex;flex-wrap:wrap;gap:15px;margin:10px 0 15px;}
+.sim-page.refresh-1012 main .sim-stress-legend span {font-size:12px!important;display:flex;align-items:center;gap:6px;color:#8a7058;}
+.sim-page .sim-stress-legend i {width:15px;height:3px;display:block;border-radius:3px;}
+.sim-page .sim-stress-cards {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;}
+.sim-page .sim-stress-metric {padding:16px;border:1px solid var(--line);border-radius:14px;background:#fffaf5;}
+.sim-page .sim-stress-metric.selected {border-color:#d6a678;box-shadow:0 0 0 1px #d6a678;}
+.sim-page .sim-stress-metric>strong {display:block;font-size:14px;}
+.sim-page .sim-stress-metric>b {display:block;margin:12px 0 6px;font:700 25px Arial,sans-serif;}
+.sim-page.refresh-1012 main .sim-stress-metric>small {font-size:11px!important;display:block;color:#9b8168;}
+.sim-page .sim-stress-metric dl {display:grid;grid-template-columns:1fr auto;gap:7px;margin:15px 0 0;padding-top:12px;border-top:1px solid var(--line);font-size:11px;}
+.sim-page .sim-stress-metric dt {color:#9b8168;}
+.sim-page .sim-stress-metric dd {margin:0;font:600 12px Arial,sans-serif;text-align:right;}
+.sim-page.refresh-1012 main .stress-interpretation {border-radius:12px;padding:16px;margin:18px 0;background:#fff8ed;border:1px solid #efddc3;}
+.sim-page.refresh-1012 main .stress-interpretation :is(p,h3) {font-size:13px!important;margin:6px 0;}
+.sim-page.refresh-1012 main .stress-risk-label {font-size:11px!important;padding:4px 8px;}
+.sim-page .sim-stress-allocation {display:flex;height:8px;gap:3px;border-radius:8px;overflow:hidden;margin:14px 0 10px;background:#efe4d6;}
+.sim-page .sim-stress-allocation span {height:100%;}
+.sim-page .sim-stress-allocation-note {font-size:12px!important;color:#997f63;}
+.sim-page .stress-results .compact-explain {margin-top:20px;}
+.sim-page .trade-filter-bar {display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin-bottom:15px;}
+.sim-page .trade-filter-bar label {font-size:12px!important;min-width:145px;flex:1;}
+.sim-page .trade-filter-bar label select {display:block;width:100%;margin-top:6px;padding:10px;}
+.sim-page .trade-side-filters {display:flex;gap:4px;padding:4px;background:#faf3eb;border-radius:11px;}
+.sim-page.refresh-1012 main .trade-side-filters button {min-height:40px;border:0;border-radius:8px;padding:6px 14px;background:none;color:#99795c;font-size:13px!important;cursor:pointer;}
+.sim-page .trade-side-filters button[aria-pressed=true] {background:#fff;border:1px solid #ebd7be;color:#aa6630;}
+.sim-page.refresh-1012 main #tradeFilterReset {font-size:12px!important;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px;color:#937154;cursor:pointer;}
+.sim-page.refresh-1012 main #tradeFilterCount {font-size:12px!important;color:#a38b74;padding-bottom:12px;}
+.sim-page .sim-trade-totals {display:flex;gap:24px;flex-wrap:wrap;padding:14px 0;margin-bottom:8px;border-top:1px solid var(--line);}
+.sim-page.refresh-1012 main .sim-trade-totals>span {font-size:12px!important;color:#a1876c;}
+.sim-page .sim-trade-totals strong {font:600 14px Arial,sans-serif;margin-left:8px;}
+.sim-page .trade-date-group td {background:#fff3e2!important;color:#a16d40!important;font-weight:600;}
+.sim-page.refresh-1012 main :is(button,a,summary):focus-visible {outline:3px solid #e8ae75;outline-offset:3px;}
+.sim-page .sim-locked {display:none!important;}
+@media(max-width:1100px){
+ .sim-page .sim-overview-grid {grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);}
+ .sim-page .sim-allocation-visual {grid-template-columns:1fr;gap:12px;padding-top:16px;}
+ .sim-page .sim-donut-stage {width:155px;margin:auto;}
+ .sim-page .sim-allocation-legend {grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+ .sim-page .position-performance-grid {grid-template-columns:repeat(2,minmax(0,1fr));}
+ .sim-page .stress-controls {grid-template-columns:1fr 1fr;}
+ .sim-page .sim-stress-cards {grid-template-columns:repeat(2,minmax(0,1fr));}
+}
+@media(max-width:800px){
+ .sim-page.refresh-1012 .sim-kpi-grid {grid-template-columns:repeat(2,minmax(0,1fr));}
+ .sim-page .sim-overview-grid,.sim-page.refresh-1012 .order-workspace {grid-template-columns:1fr;}
+ .sim-page .sim-allocation-visual {grid-template-columns:minmax(150px,.65fr) 1fr;min-height:205px;padding:0;}
+ .sim-page .sim-allocation-legend {grid-template-columns:1fr;}
+ .sim-page .order-form-area {padding-right:0;border-right:0;}
+ .sim-page .coin-market-panel {padding-top:24px;border-top:1px solid var(--line);}
+ .sim-page .sim-section-head {align-items:flex-start;flex-wrap:wrap;gap:8px;}
+ .sim-page .sim-chart-foot small {max-width:none;}
+}
+@media(max-width:550px){
+ .sim-page .float-actions {position:static;flex-direction:row;justify-content:center;gap:12px;margin:0 auto 24px;width:auto;}
+ .sim-page .float-actions .float-btn {width:auto;min-width:130px;height:48px;gap:8px;padding:8px 14px;border-radius:12px;}
+ .sim-page .float-actions .float-btn::after {content:attr(title);font-size:13px;}
+ .sim-page .sim-page-heading {align-items:flex-start;flex-direction:column;gap:14px;}
+ .sim-page .sim-heading-actions {width:100%;justify-content:space-between;gap:8px;}
+ .sim-page.refresh-1012 main .sim-heading-actions small {text-align:left;}
+ .sim-page .sim-section-nav {gap:2px;padding:5px;}
+ .sim-page.refresh-1012 main .sim-section-nav a {font-size:11px!important;flex-direction:column;padding:7px 3px;gap:5px;}
+ .sim-page.refresh-1012 main .sim-kpi-grid>.sim-kpi {padding:16px 12px;}
+ .sim-page.refresh-1012 main .sim-kpi>strong {font-size:21px!important;}
+ .sim-page.refresh-1012 main .sim-kpi>span {font-size:11px!important;}
+ .sim-page.refresh-1012 main .sim-kpi>small {font-size:10px!important;}
+ .sim-page .sim-kpi>span i {margin-right:4px;}
+ .sim-page .sim-chart-head {align-items:flex-start;gap:8px;flex-wrap:wrap;}
+ .sim-page.refresh-1012 main :is(.order-panel,.positions-panel,.sim-scenario-card,.trades-panel,.sim-overview-grid>.card) {padding:18px;}
+ .sim-page .sim-chart-stage {height:220px;}
+ .sim-page .sim-allocation-visual {grid-template-columns:1fr;gap:18px;margin-top:15px;}
+ .sim-page .sim-allocation-legend {grid-template-columns:repeat(2,minmax(0,1fr));}
+ .sim-page .sim-chart-foot {flex-direction:column;}
+ .sim-page .sim-chart-foot small {text-align:left;}
+ .sim-page .position-performance-grid {grid-template-columns:1fr;}
+ .sim-page .coin-market-grid {grid-template-columns:1fr;gap:10px;}
+ .sim-page .coin-market-grid>div {display:flex;justify-content:space-between;align-items:center;gap:8px;}
+ .sim-page .sim-scenario-selector {grid-template-columns:1fr 1fr;gap:8px;}
+ .sim-page .scenario-btn {padding:12px;gap:5px 8px;}
+ .sim-page .scenario-btn i {font-size:18px;}
+ .sim-page.refresh-1012 main .scenario-btn>span {font-size:18px!important;}
+ .sim-page .sim-stress-cards {gap:8px;}
+ .sim-page .sim-stress-metric {padding:12px;}
+ .sim-page .sim-stress-metric>b {font-size:21px;}
+ .sim-page .sim-stress-metric dl {grid-template-columns:1fr;gap:3px;}
+ .sim-page .sim-stress-metric dd {text-align:left;margin-bottom:6px;}
+ .sim-page .stress-controls {gap:10px;padding:13px;}
+ .sim-page .stress-controls label:first-child {grid-column:1/-1;}
+ .sim-page .stress-controls button {grid-column:1/-1;}
+ .sim-page .sim-trade-totals {gap:10px;}
+ .sim-page .trade-filter-bar label {min-width:110px;}
+ .sim-page .trade-side-filters {order:3;}
+ .sim-page #tradeFilterReset {order:4;}
+ .sim-page #tradeFilterCount {order:5;}
+}
+@media(prefers-reduced-motion:reduce){.sim-page .sim-order-capacity span{transition:none;}}
+
+/* Follow one decision from market observation to the completed practice order. */
+.sim-page.refresh-1012 .sim-workflow-nav {gap:0;padding:12px 14px;background:#fffdf9;}
+.sim-page.refresh-1012 main .sim-workflow-nav a {justify-content:flex-start;gap:12px;padding:13px 16px;white-space:normal;}
+.sim-page .sim-workflow-nav a>b {display:grid;place-items:center;flex-shrink:0;width:38px;height:38px;border-radius:12px;background:#fff0df;color:#c17639;font:600 15px Arial,sans-serif;}
+.sim-page .sim-workflow-nav a>span {display:block;font-weight:650;}
+.sim-page.refresh-1012 main .sim-workflow-nav a small {display:block;margin-top:4px;font-size:11px!important;font-weight:400;color:#a48d76;}
+.sim-page .sim-workflow-nav a>i {margin-left:auto;color:#d5bc9f;font-size:11px;}
+.sim-page .sim-member-handoff {display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:-14px;color:#997d63;}
+.sim-page.refresh-1012 main .sim-member-handoff :is(span,a) {font-size:12px!important;}
+.sim-page .sim-member-handoff span>i {margin-right:6px;color:#dba45c;}
+.sim-page .sim-member-handoff a {color:#ae7443;text-decoration:none;}
+.sim-page.refresh-1012 .sim-market-card {padding:26px;}
+.sim-page .sim-market-select {display:grid;gap:6px;width:240px;flex-shrink:0;color:#a17e5e;font-size:12px;}
+.sim-page .sim-market-select select {width:100%;padding:11px 13px;}
+.sim-page .sim-market-workspace {display:grid;grid-template-columns:minmax(240px,.65fr) minmax(0,1.7fr);gap:30px;align-items:stretch;}
+.sim-page .sim-market-quote {border-right:1px solid var(--line);padding:12px 30px 5px 0;}
+.sim-page .sim-market-quote .sim-quote-price {font-size:34px;margin:10px 0 24px;overflow-wrap:anywhere;}
+.sim-page .sim-market-history {min-width:0;padding:8px 0;}
+.sim-page .sim-market-history .sim-market-chart-stage {height:260px;}
+.sim-page .sim-market-facts {display:grid;gap:16px;}
+.sim-page .sim-market-facts>div {display:flex;gap:12px;align-items:center;justify-content:space-between;}
+.sim-page.refresh-1012 main .sim-market-facts span {font-size:12px!important;color:#a38970;}
+.sim-page .sim-market-facts strong {font:600 16px Arial,sans-serif;}
+.sim-page .sim-next-step {display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:21px;padding-top:16px;border-top:1px solid var(--line);text-decoration:none;color:#b3763d;font-size:13px;}
+.sim-page .sim-next-step[hidden] {display:none;}
+.sim-page.refresh-1012 #orderPanel .order-workspace {display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:32px;}
+.sim-page #orderPanel .order-form-area {border-right:0;padding:0;}
+.sim-page .sim-cash-available {display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 17px;margin-bottom:18px;border:1px solid #efd7ba;border-radius:12px;background:#fff5e7;}
+.sim-page.refresh-1012 main .sim-cash-available>span {font-size:12px!important;color:#a17d59;}
+.sim-page .sim-cash-available strong {font:700 21px Arial,sans-serif;}
+.sim-page.refresh-1012 main .sim-input-hint {font-size:12px!important;color:#9d8670;margin:12px 0 0;}
+.sim-page .sim-order-preview {align-self:start;padding:22px;border:1px solid #eddcc5;border-radius:18px;background:linear-gradient(135deg,#fffcf7,#fff7ec);min-width:0;}
+.sim-page .sim-preview-head {display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 22px;}
+.sim-page .sim-preview-head h3 {margin:0;font-size:21px;}
+.sim-page.refresh-1012 main .sim-preview-head>strong {font-size:13px!important;color:#8f745c;padding:5px 9px;border:1px solid #e9d6bd;border-radius:8px;font-weight:600;overflow-wrap:anywhere;}
+.sim-page .sim-preview-numbers {display:grid;grid-template-columns:minmax(0,1fr) 12px minmax(0,1fr);gap:16px;align-items:center;padding-bottom:6px;}
+.sim-page.refresh-1012 main .sim-preview-numbers span {display:block;font-size:12px!important;color:#9a8065;margin-bottom:9px;}
+.sim-page.refresh-1012 main .sim-preview-numbers strong {font:600 20px Arial,sans-serif!important;overflow-wrap:anywhere;}
+.sim-page .sim-preview-numbers>i {color:#c0a58b;font-size:11px;}
+.sim-page .sim-order-preview .sim-order-ticket {background:#fff;border-color:#f0e1cf;margin-top:21px;}
+.sim-page .sim-order-preview .sim-order-ticket strong {font-size:17px;}
+.sim-page .sim-review-summary {display:flex;gap:25px;align-items:center;flex-wrap:wrap;padding:18px 0;margin-bottom:20px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+.sim-page .sim-review-summary>div {flex:1;min-width:180px;}
+.sim-page.refresh-1012 main .sim-review-summary span {display:block;font-size:12px!important;color:#a18974;margin-bottom:9px;}
+.sim-page.refresh-1012 main .sim-review-summary strong {font:600 24px Arial,sans-serif!important;}
+.sim-page.refresh-1012 main .sim-review-summary small {font-size:12px!important;margin-left:12px;}
+.sim-page .sim-review-summary>a {font-size:12px;color:#ad7745;text-decoration:none;}
+.sim-page.refresh-1012 main :is(.sim-preview-numbers,.sim-order-ticket,.sim-review-summary) .money-amount {font-size:inherit!important;}
+@media(max-width:1024px){
+ .sim-page.refresh-1012 main .sim-workflow-nav a {padding:10px;gap:8px;}
+ .sim-page .sim-workflow-nav a>i {display:none;}
+ .sim-page .sim-market-workspace {grid-template-columns:minmax(210px,.7fr) minmax(0,1.3fr);gap:20px;}
+ .sim-page .sim-market-quote {padding-right:20px;}
+}
+@media(max-width:768px){
+ .sim-page.refresh-1012 .sim-workflow-nav {display:grid;grid-template-columns:1fr 1fr;padding:7px;gap:5px;}
+ .sim-page .sim-member-handoff {align-items:flex-start;flex-direction:column;}
+ .sim-page .sim-market-workspace {grid-template-columns:1fr;gap:18px;}
+ .sim-page .sim-market-quote {padding:0 0 18px;border-right:0;border-bottom:1px solid var(--line);}
+ .sim-page .sim-market-facts {grid-template-columns:1fr 1fr;gap:22px;}
+ .sim-page .sim-market-quote .sim-next-step {display:none;}
+ .sim-page .sim-market-quote .sim-quote-price {margin-bottom:18px;}
+ .sim-page.refresh-1012 #orderPanel .order-workspace {grid-template-columns:1fr;gap:22px;}
+}
+@media(max-width:550px){
+ .sim-page.refresh-1012 .sim-market-card {padding:18px;}
+ .sim-page .sim-market-card .sim-section-head {align-items:flex-start;flex-direction:column;}
+ .sim-page .sim-market-select {width:100%;}
+ .sim-page .sim-market-quote .sim-quote-price {font-size:28px;}
+ .sim-page .sim-market-facts {gap:15px;}
+ .sim-page .sim-market-facts>div {flex-direction:column;align-items:flex-start;gap:7px;}
+ .sim-page .sim-order-preview {padding:17px;}
+ .sim-page .sim-preview-numbers {gap:10px;}
+ .sim-page.refresh-1012 main .sim-preview-numbers strong {font-size:16px!important;}
+ .sim-page .sim-order-preview .sim-order-ticket strong {font-size:14px;}
+ .sim-page .sim-preview-head {flex-wrap:wrap;}
+ .sim-page .sim-review-summary {gap:17px;}
+ .sim-page.refresh-1012 main .sim-review-summary strong {font-size:21px!important;}
+}

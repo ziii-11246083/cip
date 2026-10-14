@@ -1,6 +1,106 @@
 document.documentElement.classList.add("js-enabled");
 window.__COMMON_UI_ACTIVE__ = true;
 
+// Separate currency labels from amounts without changing the text, values or forms.
+function enhanceCurrencyLabels(root) {
+  const skip = 'script,style,textarea,input,select,code,pre,[contenteditable],.money-currency,.money-amount';
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    if (node.parentElement?.closest(skip) || !/(?:\bUSD\s*[+−-]?\d|\d\s*TWD\b)/.test(node.nodeValue)) continue;
+    nodes.push(node);
+  }
+  nodes.forEach(node => {
+    const pattern = /\b(USD)(\s*)([+−-]?\d[\d,.]*(?:[KMBT])?)|([+−-]?\d[\d,.]*)(\s*)(TWD)\b/g;
+    const text = node.nodeValue;
+    const fragment = document.createDocumentFragment();
+    let last = 0;
+    for (const match of text.matchAll(pattern)) {
+      fragment.append(document.createTextNode(text.slice(last,match.index)));
+      const currency = document.createElement('span');currency.className='money-currency';currency.textContent=match[1]||match[6];
+      const amount = document.createElement('span');amount.className='money-amount';amount.textContent=match[3]||match[4];
+      const space = document.createTextNode(match[1]?match[2]:match[5]);
+      fragment.append(...(match[1]?[currency,space,amount]:[amount,space,currency]));
+      last=match.index+match[0].length;
+    }
+    if(last){fragment.append(document.createTextNode(text.slice(last)));node.replaceWith(fragment);}
+  });
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  const main = document.querySelector('main');
+  if(!main)return;
+  enhanceCurrencyLabels(main);
+  const pending = new Set();let scheduled=false;
+  const observer = new MutationObserver(records=>{
+    records.forEach(record=>{
+      const target=record.target.nodeType===Node.TEXT_NODE?record.target.parentElement:record.target;
+      if(target?.closest?.('.money-currency,.money-amount'))return;
+      if(record.type==='characterData')pending.add(target);
+      else record.addedNodes.forEach(node=>pending.add(node.nodeType===Node.TEXT_NODE?node.parentElement:node));
+    });
+    if(scheduled||!pending.size)return;
+    scheduled=true;
+    requestAnimationFrame(()=>{
+      pending.forEach(node=>{if(node?.isConnected)enhanceCurrencyLabels(node);});
+      pending.clear();observer.takeRecords();scheduled=false;
+    });
+  });
+  observer.observe(main,{subtree:true,childList:true,characterData:true});
+});
+
+// API timestamps without an offset are UTC (the existing service uses utcnow).
+window.SIFormat = {
+  date(value) {
+    if (value === null || value === undefined || value === "") return null;
+    let raw = value;
+    if (typeof raw === "number") raw *= raw < 1e12 ? 1000 : 1;
+    if (typeof raw === "string") {
+      raw = raw.trim().replace(/^(\d{4}-\d{2}-\d{2}) /, "$1T");
+      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(raw) && !/(Z|[+-]\d{2}:?\d{2})$/i.test(raw)) raw += "Z";
+    }
+    const date = new Date(raw);
+    return Number.isFinite(date.getTime()) ? date : null;
+  },
+  dateText(value) {
+    const date = this.date(value);
+    if (!date) return "--";
+    return new Intl.DateTimeFormat("zh-TW", {
+      timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
+    }).format(date);
+  },
+  dateKey(value) {
+    const date = this.date(value);
+    if (!date) return "unknown";
+    const parts = new Intl.DateTimeFormat("en-CA", {timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(date);
+    const get = key => parts.find(part => part.type === key).value;
+    return `${get("year")}-${get("month")}-${get("day")}`;
+  },
+  quantity(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return "--";
+    if (number > 0 && number < .005) return "<0.01";
+    return number.toLocaleString("zh-TW", {minimumFractionDigits:2,maximumFractionDigits:2});
+  },
+};
+
+// Keep table labels left aligned and monetary/quantity columns right aligned.
+document.addEventListener("DOMContentLoaded", () => {
+  const main = document.querySelector("main");
+  if (!main) return;
+  const alignTables = () => main.querySelectorAll("table").forEach(table => {
+    const columns = Array.from(table.querySelectorAll("thead th"));
+    const numeric = columns.map(th => /金額|價格|均價|現價|市值|數量|占比|比例|損益|報酬|波動|回撤|分數|熱度|成交量|市占率|漲跌|預計金額/.test(th.textContent));
+    columns.forEach((th, index) => th.classList.toggle("numeric", numeric[index]));
+    table.querySelectorAll("tbody tr").forEach(row => Array.from(row.children).forEach((td, index) => {
+      if (!td.hasAttribute("colspan")) td.classList.toggle("numeric", Boolean(numeric[index]));
+    }));
+  });
+  alignTables();
+  new MutationObserver(alignTables).observe(main, {childList:true,subtree:true});
+});
+
 function restoreOriginalSiteIcon() {
   const iconUrl = "/static/img/logo.jpg";
   let icon = document.querySelector('link[rel="icon"]');
@@ -185,16 +285,14 @@ function initCommonUI() {
       if (!window.authManager || !window.authManager?.isReady?.()) {
         event.preventDefault();
         await window.waitForSmartInvestAuth();
-        const loggedInAfterReady = Boolean(window.authManager?.isLoggedIn?.() || window.smartInvestMembership?.isMember);
-        if (loggedInAfterReady) {
+        if (hasFeatureAccess(link.dataset.memberRequired)) {
           window.location.href = link.href;
         } else {
           window.authManager?.requireMember?.(link.dataset.memberRequired || "會員功能");
         }
         return;
       }
-      const loggedIn = Boolean(window.authManager?.isLoggedIn?.() || window.smartInvestMembership?.isMember);
-      if (loggedIn) return;
+      if (hasFeatureAccess(link.dataset.memberRequired)) return;
       event.preventDefault();
       window.authManager?.requireMember?.(link.dataset.memberRequired || "會員功能");
     });
@@ -216,17 +314,19 @@ function initCommonUI() {
   }
 }
 
+function hasFeatureAccess(featureName) {
+  if (featureName === "會員中心") return Boolean(window.authManager?.isLoggedIn?.() || window.smartInvestMembership?.isMember);
+  return Boolean(window.authManager?.hasPremiumAccess?.() ?? (window.authManager?.getMembershipTier?.() === "premium"));
+}
+
 function applyMemberFeatureGating() {
     const features = document.querySelectorAll("[data-member-feature]");
     if (!features.length) return;
 
-    const loggedIn = Boolean(
-      window.authManager?.isLoggedIn?.() ||
-      window.smartInvestMembership?.isMember
-    );
+    const allowed = hasFeatureAccess();
 
     features.forEach((el) => {
-      if (loggedIn) {
+      if (allowed) {
         el.classList.remove("member-feature-locked");
         const overlay = el.querySelector(".member-lock-overlay");
         if (overlay) overlay.remove();
@@ -235,10 +335,9 @@ function applyMemberFeatureGating() {
         if (!el.querySelector(".member-lock-overlay")) {
           const overlay = document.createElement("div");
           overlay.className = "member-lock-overlay";
-          overlay.setAttribute("data-open-login", "");
-          overlay.innerHTML = '<i class="fas fa-lock"></i><strong>會員限定功能</strong>';
+          overlay.innerHTML = '<i class="fas fa-lock"></i><strong>進階會員限定</strong><span>付款開通後即可使用</span>';
           overlay.addEventListener("click", () => {
-            window.authManager?.openLogin?.();
+            window.location.assign(window.authManager?.isLoggedIn?.() ? "/register?step=payment" : "/register");
           });
           el.appendChild(overlay);
         }
@@ -248,6 +347,14 @@ function applyMemberFeatureGating() {
 
   document.addEventListener("DOMContentLoaded", () => {
     initCommonUI();
+    if (window.Chart) {
+      Chart.defaults.font.size = 16;
+      Chart.defaults.font.family = 'Arial, "Microsoft JhengHei", sans-serif';
+      Chart.defaults.color = '#796b60';
+      Chart.defaults.plugins.legend.labels.usePointStyle = true;
+      Chart.defaults.plugins.legend.labels.padding = 20;
+    }
     window.waitForSmartInvestAuth?.().then(applyMemberFeatureGating);
     window.addEventListener("smartinvest:auth-state", applyMemberFeatureGating);
   });
+

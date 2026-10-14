@@ -1,0 +1,451 @@
+/* Smart Invest Crypto: one visual system, based on preview-index.png.
+   Loaded last. Header, footer and home layout retain their own styles. */
+.refresh-1012 {
+  --font:Arial,"Iansui","Microsoft JhengHei","PingFang TC",sans-serif;
+  --r12-canvas:#fff8f0; --r12-paper:#fff; --r12-ink:#342b25;
+  --r12-muted:#796b60; --r12-line:#ecdfd2; --r12-accent:#ef7d2d; --r12-soft:#fff0e1;
+  --brand:#ef7d2d; --brand-2:#c96b2c; --brand-3:#f4bc8f; --blue:#c96b2c;
+  --ink:#342b25; --ink-2:#594b40; --text:#342b25; --muted:#796b60;
+  --line:#ecdfd2; --border:#ecdfd2; --surface:#fff; --surface-2:#fff4e8;
+  --good:#3b8070; --bad:#c45447; --accent:#ef7d2d;
+  --market-paper:#fff; --market-canvas:#fff8f0; --market-ink:#342b25;
+  --market-muted:#796b60; --market-rule:#ecdfd2; --market-orange:#ef7d2d;
+  color:var(--ink); background:var(--r12-canvas); font-size:17px; line-height:1.6;
+}
+.refresh-1012:not(.home-page) main {
+  background:radial-gradient(ellipse 1100px 380px at 14% 215px,#ffead2 0%,transparent 100%),#fff8f0;
+}
+.refresh-1012:not(.home-page) main .container,
+.refresh-1012:not(.home-page) main .wide-container,
+.refresh-1012 .market-editorial-container {
+  width:min(1280px,calc(100% - 96px))!important; max-width:1280px!important; margin-inline:auto;
+}
+.refresh-1012:not(.home-page) main :is(p,li) {font-size:17px!important;line-height:1.7}
+.refresh-1012:not(.home-page) main :is(span,small,em,label,td,th,a) {font-size:16px!important;line-height:1.55}
+.refresh-1012:not(.home-page) main :is(button,input,select,textarea) {font:inherit;font-size:16px!important;line-height:1.5}
+.refresh-1012 main [hidden]{display:none!important}
+.refresh-1012:not(.home-page) main :is(input:not([type=checkbox]):not([type=radio]):not([type=hidden]),select,button,.button) {min-height:48px}
+.refresh-1012:not(.home-page) main :is(input,select,textarea) {border-color:var(--line);background:#fff;color:var(--ink);border-radius:10px}
+.refresh-1012:not(.home-page) main :is(input,select,textarea):focus {outline:2px solid #ef7d2d44;outline-offset:2px;box-shadow:none;border-color:#ef7d2d}
+.refresh-1012:not(.home-page) main :is(h1,h2,h3) {font-family:var(--font)!important}
+.refresh-1012:not(.home-page) main h1 {font-size:36px!important;line-height:1.25;letter-spacing:-.025em;color:var(--ink)}
+.refresh-1012:not(.home-page) main h2 {font-size:26px!important;line-height:1.35;letter-spacing:0;color:var(--ink)}
+.refresh-1012:not(.home-page) main h3 {font-size:22px!important;line-height:1.4;color:var(--ink)}
+.refresh-1012:not(.home-page) main :is(.eyebrow,.position-performance-eyebrow,.coach-tool-kicker,.membership-eyebrow,.member-upgrade-eyebrow) {
+  font-size:15px!important;color:#a76032;letter-spacing:.1em;font-weight:700;border:0;background:none;padding:0;border-radius:0;box-shadow:none;
+}
+.refresh-1012:not(.home-page) main :is(.section-copy,.hero-lead) {
+  color:var(--muted);white-space:normal!important;overflow:visible;display:block;-webkit-line-clamp:unset;max-width:760px;margin:8px 0 0;
+}
+
+/* All title strips have the same image treatment and dimensions. */
+.refresh-1012:not(.home-page) main .hero,
+.refresh-1012 .membership-overview {
+  position:relative;isolation:isolate;display:flex;align-items:center;min-height:200px!important;
+  padding:28px 0!important;overflow:hidden;background:#fffaf4!important;border:0;border-bottom:1px solid var(--line);border-radius:0;
+}
+.refresh-1012:not(.home-page) main .hero::before,
+.refresh-1012 .membership-overview::before {
+  content:"";position:absolute;inset:0!important;z-index:-2;width:100%!important;height:100%!important;border-radius:0!important;
+  background:url('../img/market-line-art.svg?v=orange-white-20261013') center / 1440px 220px repeat-x!important;
+  opacity:.32!important;filter:saturate(.5)!important;transform:none!important;
+}
+.refresh-1012:not(.home-page) main .hero::after,
+.refresh-1012 .membership-overview::after {
+  content:"";position:absolute;inset:0;z-index:-1;width:auto;height:auto;
+  background:linear-gradient(90deg,#fffaf4ee,#fffaf4a8 60%,#fffaf438)!important;
+}
+.refresh-1012:not(.home-page) main .hero>.container {
+  display:flex!important;align-items:center;justify-content:space-between;gap:32px;min-height:142px!important;padding:0;
+}
+.refresh-1012:not(.home-page) main .hero-grid>div:first-child {
+  position:relative;flex:1;max-width:900px;padding:0 0 0 76px!important;
+}
+.refresh-1012:not(.home-page) main .hero-grid>div:first-child::before {
+  content:"";display:block!important;position:absolute;left:0;top:50%;transform:translateY(-50%);
+  width:56px;height:56px;border:1px solid var(--line);border-radius:16px;background:#fff;box-shadow:0 6px 24px #65431d08;
+}
+.refresh-1012:not(.home-page) main .hero-grid>div:first-child::after {
+  content:"✦";display:block!important;position:absolute;left:18px;top:50%;transform:translateY(-50%);font-size:25px;color:#c96b2c;
+}
+.refresh-1012.market-page main .hero-grid>div:first-child::after{content:"▥"}
+.refresh-1012.health-page main .hero-grid>div:first-child::after{content:"♡"}
+.refresh-1012.sim-page main .hero-grid>div:first-child::after{content:"⇄"}
+.refresh-1012.scam-page main .hero-grid>div:first-child::after{content:"♢"}
+.refresh-1012.podcast-page main .hero-grid>div:first-child::after{content:"♫"}
+.refresh-1012 .hero-title {margin:7px 0 0!important}
+.refresh-1012 .hero .eyebrow i{display:none}
+.refresh-1012 .hero .hero-card,
+.refresh-1012 .hero .market-hero-tags,
+.refresh-1012 .hero .podcast-hero-tags{display:none!important}
+.refresh-1012 .market-header-action {flex:none}
+.refresh-1012 .market-header-action button {white-space:nowrap;min-width:240px}
+
+/* Feature pages begin with their working content, without a title banner. */
+.refresh-1012 .market-snapshot-tools{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:12px}
+.refresh-1012 .market-snapshot-tools .market-refresh-button{white-space:nowrap;width:auto;margin:0}
+.refresh-1012 .narrative-summary{display:flex;align-items:center;flex-wrap:wrap;justify-content:space-between;gap:12px;margin-bottom:18px;padding:12px 16px;background:#fff1e2;border-radius:12px;color:#8f4b1f}
+.refresh-1012 .membership-plan .membership-account-status{position:static;margin:0 0 18px;padding:12px 16px;background:#fff1e2;border:1px solid #f4d9c2;border-radius:12px;color:#8f4b1f}
+.refresh-1012.podcast-page .podcast-player-section{padding-top:32px}
+@media(max-width:700px){
+  .refresh-1012 .market-snapshot-tools{justify-content:flex-start;width:100%}
+  .refresh-1012 .market-snapshot-tools .market-refresh-button{width:100%}
+  .refresh-1012.podcast-page .podcast-player-section{padding-top:24px}
+}
+
+/* Quiet white cards on a warm canvas. Meaningful content replaces decorative strips. */
+.refresh-1012:not(.home-page) main :is(.section,.health-section,.member-page,.membership-comparison,.membership-next,.market-snapshot-section,.market-content-section,.podcast-workspace-section) {background:transparent!important;padding-block:40px}
+.refresh-1012:not(.home-page) main .section+.section{padding-top:0}
+.refresh-1012 .health-section::before,.refresh-1012 .health-section::after{display:none}
+.refresh-1012:not(.home-page) main :is(.card,.coin-card,.precheck-card,.member-card,.member-kpi,.member-upgrade,.member-profile-editor,.membership-plan,.analysis-chart-panel,.coach-panel,.coach-chat,.coach-history-card,.podcast-studio-card) {
+  border:1px solid var(--line);border-radius:18px;background:#fff;box-shadow:0 5px 18px #67412205;backdrop-filter:none;
+}
+.refresh-1012:not(.home-page) main :is(.card,.member-card,.member-upgrade,.membership-plan) {padding:26px}
+.refresh-1012:not(.home-page) main :is(.card,.coin-card,.member-card):hover{border-color:#dec6ae;box-shadow:0 5px 18px #67412205;transform:none}
+.refresh-1012:not(.home-page) main .section-head{margin-bottom:24px;padding-bottom:0;border:0;gap:20px}
+.refresh-1012 main :is(.precheck-grid,.health-workspace,.social-grid,.social-columns,.analysis-chart-grid,.sim-app,.member-grid)>section{margin-top:0!important}
+.refresh-1012 .precheck-card + .precheck-card{margin-top:0!important}
+.refresh-1012 .section-title::before,.refresh-1012 .sim-title::before,.refresh-1012 .member-card-head h2::before{content:none}
+.refresh-1012:not(.home-page) main :is(.button.primary,.btn-main,#runStressTest,.chat-input-row button,.podcast-generate-bubble) {
+  background:#ef7d2d!important;color:#fff!important;border-color:#ef7d2d!important;box-shadow:none;border-radius:12px;
+}
+.refresh-1012:not(.home-page) main :is(.button,.btn-ghost,.coach-view-tab){border-radius:12px;box-shadow:none}
+.refresh-1012:not(.home-page) main :is(.market-badge,.score-status,.sim-scenario-badge,.currency-standard-badge){font-size:16px!important;background:#fff1e2;color:#9e582c;border:1px solid #ecd9c6;border-radius:10px;padding:8px 12px}
+.refresh-1012 .currency-standard-badge {display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.refresh-1012 :is(.ok,.positive){color:#3b8070}
+.refresh-1012 :is(.bad,.negative){color:#c45447}
+.refresh-1012:not(.home-page) main table {font-size:16px}
+.refresh-1012:not(.home-page) main th {background:#fff8f0;color:#6d5b4c;padding:14px}
+.refresh-1012:not(.home-page) main td {padding:14px;color:#44392f}
+.refresh-1012 :is(.table-wrap,.chart-box){min-width:0}
+.refresh-1012 .table-wrap{overflow:auto}
+.refresh-1012 canvas{filter:none;max-width:100%}
+.compact-explain{margin-top:20px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.compact-explain summary{padding:16px;color:#c96b2c;font-size:16px;cursor:pointer;font-weight:700}
+.compact-explain>div{padding:0 18px 18px}
+
+/* Market overview */
+.refresh-1012 .coin-stats{gap:18px}
+.refresh-1012 .coin-card{padding:24px;min-height:188px}
+.refresh-1012 .coin-card>strong{font-size:32px!important;color:var(--ink);margin-block:18px 8px;font-variant-numeric:tabular-nums}
+.refresh-1012 .coin-card::after{opacity:.45}
+.refresh-1012 .radar-feature {padding:28px;border:1px solid #e0d6cf;border-radius:18px;background:#f5f0ed;color:var(--ink);box-shadow:none}
+.refresh-1012 .radar-feature :is(h2,strong){color:#5e4431}
+.refresh-1012 .radar-feature :is(p,small,span){color:#6c6058}
+.refresh-1012 .radar-feature .radar-feature-copy>p{max-width:740px}
+.refresh-1012 .radar-feature .eyebrow{color:#c96b2c}
+.refresh-1012 .radar-chip{background:#ffffff9e;border-color:#e3dbd5}
+.refresh-1012 .radar-feature-cta{background:#c96b2c;color:#fff;border-radius:12px}
+.refresh-1012 .radar-feature-cta span{color:#fff}
+.refresh-1012 .market-tools{gap:18px;margin-block:20px 34px}
+.refresh-1012 .tool-link-card{padding:20px;border-color:var(--line);border-radius:16px;background:#fff;box-shadow:none}
+.refresh-1012 .tool-link-card>span{background:#fff0e1;color:#c96b2c}
+.refresh-1012 .market-info-strip{background:#fff7ee;border-color:var(--line)}
+.refresh-1012 .chart-insight,.refresh-1012 .analysis-panel-head span{font-size:16px;color:var(--muted)}
+.refresh-1012 main :is(.hotName,.hotChange,.hotSymbol,.hotMeta,.status,.analysis-chart-empty,.empty-state,.score-reason){font-size:16px!important}
+.refresh-1012 main .hotPrice{font-size:23px;color:var(--ink)}
+
+/* Health: readable inputs + a large donut, as in the approved reference. */
+.refresh-1012 .health-stage-head{align-items:center;margin-bottom:26px}
+.refresh-1012 main .health-stage-head .section-copy{display:none}
+.refresh-1012 .precheck-grid{gap:20px;margin-bottom:28px;align-items:stretch}
+.refresh-1012 .precheck-card{padding:22px;min-height:0;grid-template-columns:44px minmax(0,1fr);gap:16px;transform:none!important}
+.refresh-1012 .precheck-icon{width:44px;height:44px;background:#fff0e1!important;color:#d17432!important;box-shadow:none;font-size:20px}
+.refresh-1012 .precheck-icon.success{background:#eaf3ec!important;color:#4b8278!important}
+.refresh-1012 .precheck-content h2{font-size:22px!important;margin:6px 0}
+.refresh-1012 .precheck-content h2 span{background:none;color:inherit;padding:0}
+.refresh-1012 .precheck-content>p{margin:0;min-height:0}
+.refresh-1012 .precheck-form{padding:0;border:0;background:none;gap:12px;grid-template-columns:minmax(0,1fr) 115px auto}
+.refresh-1012 .precheck-form .button{grid-column:auto;background:#ef7d2d;color:#fff;border:0;white-space:nowrap}
+.refresh-1012 .allocate-form{grid-template-columns:minmax(0,1fr) auto}
+.refresh-1012 .allocate-form .button{background:#c96b2c}
+.refresh-1012 .health-workspace{grid-template-columns:minmax(340px,.7fr) minmax(0,1.3fr);gap:22px;align-items:start}
+.refresh-1012 .setup-card,.refresh-1012 .preview-card{min-height:0;min-width:0;margin:0;transform:none!important}
+.refresh-1012 .summary-row{display:grid;grid-template-columns:1fr;gap:0;margin:16px 0;border-block:1px solid var(--line)}
+.refresh-1012 .summary-row>div{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border:0;border-radius:0;background:none}
+.refresh-1012 .summary-row strong{font-size:23px!important;color:var(--ink);margin:0}
+.refresh-1012 .control-row.three{grid-template-columns:1fr}
+.refresh-1012 .amount-row{grid-template-columns:1fr 1fr}
+.refresh-1012 .amount-row>div{grid-column:1/-1}
+.refresh-1012 main .asset-chip :is(b,strong){font-size:17px!important}
+.refresh-1012 main .coin-picker-btn strong{font-size:17px}
+.refresh-1012 .chart-center-wrap{height:380px;min-height:380px}
+.refresh-1012 .chart-center{background:none;border:0;box-shadow:none;padding:0;pointer-events:none}
+.refresh-1012 .chart-center strong{font-size:32px;color:#365f55}
+.refresh-1012 .metrics-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.refresh-1012 .metrics-grid>div{padding:16px;background:#fff8ef;border:1px solid var(--line);border-radius:12px}
+.refresh-1012 .metrics-grid strong{font-size:26px!important;color:#4b8278}
+.refresh-1012 .health-action-card{margin-top:24px}
+.refresh-1012 .health-action-bot{display:none}
+.refresh-1012 .health-action-meta{display:none}
+.refresh-1012 #aiReport{background:#fff9f1;border-color:var(--line);font-size:17px;color:var(--ink)}
+
+/* Portfolio charts and holdings. */
+.refresh-1012 .sim-app{display:grid;grid-template-columns:1fr;gap:24px}
+.refresh-1012 .sim-app>section{grid-column:1/-1;margin:0}
+.refresh-1012 .sim-dashboard{order:0;background:#fff}
+.refresh-1012 .positions-panel{order:1}
+.refresh-1012 .order-panel{order:2}
+.refresh-1012 .trades-panel{order:3}
+.refresh-1012 .sim-scenario-card{order:4}
+.refresh-1012 .sim-account-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px}
+.refresh-1012 .sim-account-head h2{margin:0}
+.refresh-1012 .sim-kpi-grid>div{padding:22px;background:#fff8ef;border:1px solid var(--line);border-radius:14px}
+.refresh-1012 .sim-kpi-grid strong{font-size:30px!important;color:#342b25;overflow-wrap:anywhere}
+.refresh-1012 .sim-dashboard .chart-box{height:240px}
+.refresh-1012 .sim-scenario-desc{color:var(--muted)}
+.refresh-1012 .scenario-btn{background:#fff;border-color:var(--line);border-radius:14px;padding:18px}
+.refresh-1012 .scenario-btn.active{background:#f3eeea;border-color:#c96b2c;color:#5e4431}
+.refresh-1012 .scenario-btn strong{font-size:22px!important}
+.refresh-1012 .sim-mode-boundary{display:none}
+.refresh-1012 .position-card-top strong{font-size:22px!important}
+.refresh-1012 .position-change{font-size:22px!important;background:#edf5ef}
+.refresh-1012 .position-price-compare{gap:12px}
+.refresh-1012 .position-price-compare strong{font-size:18px;overflow-wrap:anywhere}
+.refresh-1012 .position-price-bars{display:flex;flex-direction:column;gap:5px;margin:14px 0}
+.refresh-1012 .position-price-bars span{display:block;height:7px;border-radius:999px}
+.refresh-1012 .position-price-bars .cost-bar{background:#dacdbb}
+.refresh-1012 .position-price-bars .current-bar{background:#4b8278}
+.refresh-1012 .position-performance-card.loss .current-bar{background:#c45447}
+.refresh-1012 .position-card-bottom strong{font-size:23px}
+.refresh-1012 .position-performance-card{padding:22px;box-shadow:none;background:#fff;border-color:var(--line)}
+.refresh-1012 .position-performance-empty{background:#fff9f1;min-height:150px}
+.refresh-1012 .coin-market-panel{background:#f6f2f0;border-color:#e3dbd5}
+.refresh-1012 .coin-market-grid strong{font-size:22px}
+.refresh-1012 .order-workspace{grid-template-columns:1fr 1fr;gap:28px}
+
+/* AI coach keeps chat, buy planning and sell actions. */
+.refresh-1012 .ai-coach-app{gap:24px;grid-template-columns:300px minmax(0,1fr)}
+.refresh-1012 .coach-chat{height:auto;min-height:720px;box-shadow:none}
+.refresh-1012 .coach-view-tab.active{background:#c96b2c;color:#fff;border-color:#c96b2c}
+.refresh-1012 .risk-card.active{background:#f5f0ed;color:#5e4431;border-color:#c96b2c}
+.refresh-1012 .bubble{background:#fff7ed;border-color:var(--line);font-size:17px}
+.refresh-1012 .coach-position-values{grid-template-columns:1fr;gap:8px}
+.refresh-1012 .coach-position-values span{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff8ef}
+.refresh-1012 .coach-position-values strong{font-size:18px}
+.refresh-1012 .coach-position-card{box-shadow:none;background:#fff}
+.refresh-1012 .coach-position-top em{font-size:20px!important}
+.refresh-1012 .coach-sell-summary strong{font-size:18px}
+.refresh-1012 .conversation-empty,.refresh-1012 .coach-tool-status{font-size:16px;color:var(--muted)}
+.refresh-1012 .conversation-item{border-radius:12px}
+
+/* Programme controls remain together, above immersive dialogue. */
+.refresh-1012 .podcast-player-section{padding:32px 0}
+.refresh-1012 .podcast-player-section .podcast-hero-card{width:100%;padding:26px;background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:none}
+.refresh-1012 .podcast-preview-main{display:grid;grid-template-columns:140px minmax(0,1fr);gap:26px;align-items:center;margin:0}
+.refresh-1012 .podcast-cover-art{position:relative;display:grid;place-items:center;width:140px;height:140px;overflow:hidden;border-radius:14px;background:url('../img/podcast-finance-editorial.png') 67% center/cover;color:#fff}
+.refresh-1012 .podcast-cover-art>i{display:grid;place-items:center;width:64px;height:64px;border:1px solid #ffffffc0;border-radius:50%;font-size:32px;background:#3b2c2460;backdrop-filter:blur(2px)}
+.refresh-1012 .podcast-cover-ring{display:none}
+.refresh-1012 .podcast-preview-copy>span{color:#aa6337}
+.refresh-1012 .podcast-preview-copy>strong{display:block;font-size:26px;margin-block:6px;color:var(--ink)}
+.refresh-1012 .podcast-preview-copy>small{display:block;color:var(--muted);margin-bottom:14px}
+.refresh-1012 .podcast-preview-copy>div:not(.podcast-hero-builder){display:none}
+.refresh-1012 .podcast-hero-builder-row{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:14px}
+.refresh-1012 .podcast-topic-bubble{display:flex;align-items:center;gap:18px;border:1px solid var(--line);border-radius:18px;background:#fff8ef;padding:12px 18px}
+.refresh-1012 .podcast-topic-bubble label{white-space:nowrap;color:#675647}
+.refresh-1012 .podcast-topic-bubble select{flex:1;min-width:0}
+.refresh-1012 .podcast-generate-bubble{display:flex;align-items:center;justify-content:center;gap:12px;border:0;border-radius:18px!important;padding:16px;cursor:pointer}
+.refresh-1012 .podcast-generate-bubble span{font-size:20px!important}
+.refresh-1012 .podcast-generate-bubble small{display:none}
+.refresh-1012 .podcast-hero-progress{height:6px;overflow:hidden;border-radius:999px;background:#ebdfd3;margin:24px 0 18px}
+.refresh-1012 .podcast-hero-progress>div{height:100%;width:0;background:#ef7d2d;transition:width .2s}
+.refresh-1012 .podcast-hero-controls{display:flex;align-items:center;gap:12px}
+.refresh-1012 .podcast-round-control{display:grid;place-items:center;width:48px;height:48px;padding:0;border:1px solid var(--line);border-radius:50%;background:#fff;color:#443326;cursor:pointer}
+.refresh-1012 .podcast-round-control:first-child{background:#c96b2c;color:#fff;border-color:#c96b2c}
+.refresh-1012 .podcast-speed{margin-left:auto;padding:8px 12px;background:#fff8ef;border-radius:8px}
+.refresh-1012 .audio-status{margin-top:12px;color:var(--muted);font-size:16px}
+.refresh-1012 .podcast-workspace-section{padding:0 0 48px}
+.refresh-1012 .podcast-immersive-shell{width:min(1440px,calc(100% - 48px));margin:auto}
+.refresh-1012 .podcast-dashboard{padding:0!important}
+.refresh-1012 .podcast-dialogue-fullscreen{padding:30px;min-height:calc(100vh - 96px);border-radius:18px}
+.refresh-1012 .podcast-dialogue-head{display:flex;justify-content:space-between;align-items:center;gap:22px;margin-bottom:24px}
+.refresh-1012 .podcast-dialogue-head h3{margin:8px 0}
+.refresh-1012 .podcast-dialogue-head span{color:#8b6b50}
+.refresh-1012 .podcast-dialogue-actions{display:flex;align-items:center;gap:18px}
+.refresh-1012 .podcast-dialogue-actions em{color:var(--muted);font-style:normal}
+.refresh-1012 .chat-scene{display:grid;grid-template-columns:100px minmax(0,1fr) 100px;gap:20px;padding:24px;background:#fff8f0;border:1px solid var(--line);border-radius:16px;min-height:650px}
+.refresh-1012 .chat-window{height:calc(100vh - 280px);min-height:550px;max-height:none;padding:18px;overflow-y:auto;background:transparent}
+.refresh-1012 .chat-person{align-self:end;justify-self:center;padding-bottom:14px;text-align:center}
+.refresh-1012.podcast-page .chat-head{width:90px;height:90px;border:3px solid #fff;border-radius:50%;overflow:hidden;box-shadow:none}
+.refresh-1012.podcast-page .chat-head img{width:100%;height:100%;object-fit:cover}
+.refresh-1012 .chat-person small{display:block;color:var(--muted)}
+.refresh-1012 .chatRow{display:flex;margin-bottom:24px;gap:12px;animation:bubbleAppear .4s ease both}
+.refresh-1012 .chatRow.analyst{justify-content:flex-end}
+.refresh-1012 .chatBubble{max-width:85%;padding:20px;border:1px solid var(--line);border-radius:18px;background:#fff;box-shadow:none}
+.refresh-1012 .chatRow.analyst .chatBubble{background:#eaf3ec;border-color:#cfe0d5;color:#315e54}
+.refresh-1012 .chatText{font-size:19px;line-height:1.85}
+.refresh-1012 .cast-card.is-speaking .chat-head{outline:4px solid #ef7d2d44}
+.refresh-1012 #podcastDialogueSection{scroll-margin-top:90px}
+@keyframes bubbleAppear{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.refresh-1012 .chatRow{animation:none}}
+
+/* Member/account pages share the same full-width title strip. */
+.refresh-1012 .member-page{padding-top:32px!important}
+.refresh-1012 .member-account-tools{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-bottom:28px;align-items:stretch}
+.refresh-1012 .member-account-tools .member-hero-actions{display:contents}
+.refresh-1012 .member-account-tools .member-subscribe-button{height:100%;padding:20px;min-height:100px}
+.refresh-1012 .member-account-tools .member-profile-mini{margin:0;border-radius:16px;padding:20px;min-height:100px}
+.refresh-1012 .member-profile-mini span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;overflow-wrap:normal}
+.refresh-1012 .member-hero-actions{flex:none;max-width:420px}
+.refresh-1012 .member-profile-mini{background:#fff;border-color:var(--line)}
+.refresh-1012 .member-subscribe-button,.refresh-1012 .member-plan-action,.refresh-1012 .membership-plan-button{background:#c96b2c;color:#fff;border-color:#c96b2c;border-radius:12px}
+.refresh-1012 .member-subscribe-button{background:#4b8278;border-color:#4b8278}
+.refresh-1012 .member-subscribe-button small{color:#fff}
+.refresh-1012 .member-plan-action-secondary,.refresh-1012 .membership-plan-button-secondary{background:#fff;color:#c96b2c}
+.refresh-1012 .member-kpi{padding:24px;min-height:150px}
+.refresh-1012 .member-kpi>strong{font-size:32px;color:#4b8278}
+.refresh-1012:not(.home-page) main .member-plan-price,.refresh-1012:not(.home-page) main .membership-price{font-size:40px!important;color:var(--ink)}
+.refresh-1012 .member-plan-grid,.refresh-1012 .membership-plan-grid{gap:24px}
+.refresh-1012 .member-plan,.refresh-1012 .membership-plan{background:#fff;border-color:var(--line);border-radius:16px}
+.refresh-1012 .member-plan-premium,.refresh-1012 .membership-plan-premium{background:#f2f7ef;border-color:#c9dccb}
+.refresh-1012 .member-plan-head{gap:24px}
+.refresh-1012 .member-current-tier{font-size:16px;background:#eef5ed;color:#3b7568;border-color:#c9dccb}
+.refresh-1012 .subscription-fx-note{font-size:16px;color:var(--muted);margin:0 0 14px}
+.refresh-1012 .membership-overview h1{margin:6px 0}
+.refresh-1012 .membership-overview>.container{position:relative;display:flex;flex-direction:column;justify-content:center;min-height:142px}
+.refresh-1012 .membership-overview :is(h1,p){margin:0;max-width:900px}
+.refresh-1012 .membership-overview .membership-account-status{position:absolute;right:0;top:50%;transform:translateY(-50%);padding:10px 14px;background:#f5f0ed;color:#5e4431;border:1px solid #e0d6cf;border-radius:12px}
+.refresh-1012 .podcast-hero-controls .time{color:#675647}
+.refresh-1012 .podcast-preview-copy>small{min-height:0!important;margin:4px 0 16px!important;color:#796b60!important}
+.refresh-1012 .audio-status{background:#fff8ef;border:1px solid var(--line)}
+.refresh-1012 .coach-chat>.chat-head{width:auto;height:auto;min-height:0;border:0;border-radius:0;overflow:visible;padding:0 0 20px;background:transparent}
+.refresh-1012 .coach-chat>.chat-head strong{font-size:23px;display:block;color:var(--ink)}
+.refresh-1012 .coach-chat>.chat-head span{display:block;color:var(--muted);margin-top:6px}
+.refresh-1012 main :is(.market-info-strip,.ta-guide) strong,.refresh-1012 main .membership-steps strong{font-size:18px}
+.refresh-1012 .register-plan-link{display:none}
+.refresh-1012 .register-content .card{max-width:620px;margin:auto;padding:32px}
+
+/* Product copy aligns left; amounts and quantities align right. */
+.refresh-1012 main{text-align:left}
+.refresh-1012 main :is(h1,h2,h3,h4,p,li,label,summary,th,td,.section-copy,.empty,.status,.chat-person,.risk-card,.scenario-btn){text-align:left!important}
+.refresh-1012 main :is(input[type=number],.numeric,.hotPrice,.hotChange,.position-change,.coach-position-top>em,.position-price-compare strong,.position-card-bottom strong,.coach-position-values strong,.coach-sell-summary strong,.member-kpi>strong,.sim-kpi>strong,.summary-row strong,.metrics-grid strong,.analysis-stat strong,.coach-portfolio-metrics strong,.chart-center strong){text-align:right!important;font-variant-numeric:tabular-nums}
+.refresh-1012 main :is(.summary-row strong,.metrics-grid strong,.member-kpi>strong,.coach-position-values strong,.position-price-compare strong,.chart-center strong){display:block;width:100%}
+.refresh-1012 main .chart-center{text-align:left;max-width:180px}
+.refresh-1012 main .chart-center :is(span,small){text-align:left;display:block}
+.refresh-1012 main .chat-person{justify-self:start}
+.refresh-1012 main .chat-person.onyx{justify-self:end}
+.refresh-1012 main .table-wrap{max-width:100%;overflow-x:auto}
+.refresh-1012 main table{width:100%;border-collapse:collapse}
+.refresh-1012 main td.numeric,.refresh-1012 main th.numeric{white-space:nowrap;text-align:right!important}
+.refresh-1012 main .history-filter-row,.refresh-1012 main .record-actions,.refresh-1012 main .trade-filter-bar{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.refresh-1012 main .history-filter-row{margin:20px 0}
+.refresh-1012 main .history-filter-row select{min-width:180px}
+.refresh-1012 main .history-day-group{border:1px solid var(--line);border-radius:12px;margin-top:14px;overflow:hidden}
+.refresh-1012 main .history-day-group>summary{padding:16px 20px;cursor:pointer;background:#fff8f0;font-weight:700}
+.refresh-1012 main .history-day-group>summary span{float:right;color:var(--muted)}
+.refresh-1012 main .health-record-item{margin:0;border:0;border-radius:0;padding:18px 20px;border-top:1px solid var(--line);align-items:start}
+.refresh-1012 main .record-metrics{min-width:160px;display:grid;gap:12px}
+.refresh-1012 main .record-metrics>div{display:flex;justify-content:space-between;gap:16px}
+.refresh-1012 main .health-record-assets{margin-top:12px;max-width:100%;overflow-x:auto}
+.refresh-1012 main .health-record-item>div{min-width:0}
+.refresh-1012 main .health-record-assets summary{cursor:pointer;color:#c96b2c}
+.refresh-1012 main .health-record-assets table{margin-top:12px}
+.refresh-1012 main .trade-filter-bar{padding:20px 0}
+.refresh-1012 main .trade-filter-bar label{display:grid;gap:8px;min-width:155px}
+.refresh-1012 main .trade-side-filters{display:flex;gap:6px;align-self:end;padding-bottom:1px}
+.refresh-1012 main .trade-side-filters button,.refresh-1012 main #tradeFilterReset{border:1px solid var(--line);border-radius:10px;background:white;color:var(--ink);padding:10px 16px;cursor:pointer}
+.refresh-1012 main .trade-side-filters button[aria-pressed=true]{background:#c96b2c;border-color:#c96b2c;color:white}
+.refresh-1012 main #tradeFilterReset{align-self:end}
+.refresh-1012 main #tradeFilterCount{align-self:end;line-height:48px}
+.refresh-1012 main .trade-date-group td{background:#fff8ef;padding:12px 16px;font-weight:700;color:#85674f}
+.refresh-1012 main .coach-view-tabs{flex-wrap:wrap;gap:8px}
+.refresh-1012 main .coach-reply-content{line-height:1.8;overflow-wrap:anywhere}
+.refresh-1012 main .coach-reply-content :is(p,ul,ol,pre,.table-wrap){margin:12px 0}
+.refresh-1012 main .coach-reply-content h3{font-size:19px!important;margin:22px 0 8px;color:#c96b2c}
+.refresh-1012 main .coach-reply-content h3:first-child{margin-top:8px}
+.refresh-1012 main .coach-reply-content li{margin:8px 0}
+.refresh-1012 main .coach-reply-content :is(ul,ol){padding-left:24px}
+.refresh-1012 main .coach-reply-content pre{overflow-x:auto;white-space:pre-wrap;padding:14px;background:#fff8ef;border-radius:10px}
+.refresh-1012 main .coach-reply-content code{background:#f8ede0;padding:2px 6px;border-radius:4px}
+.refresh-1012 main .coach-reply-table td,.refresh-1012 main .coach-reply-table th{padding:12px;border-bottom:1px solid var(--line)}
+.refresh-1012 main .coach-performance-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:22px 0}
+.refresh-1012 main .coach-performance-metrics>div{padding:20px;background:#fff8ef;border:1px solid var(--line);border-radius:14px}
+.refresh-1012 main .coach-performance-metrics span{display:block;color:var(--muted)}
+.refresh-1012 main .coach-performance-metrics strong{display:block;font-size:26px;color:#4b8278;margin-top:10px}
+.refresh-1012 main .coach-performance-total{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:20px;background:#edf5ef;border-radius:14px}
+.refresh-1012 main .coach-performance-total strong{color:#4b8278;font-size:24px}
+.coach-success-dialog{width:min(440px,calc(100% - 40px));border:1px solid #eddccb;border-radius:20px;padding:32px;color:#3b3027;background:#fffcf8;box-sizing:border-box;box-shadow:0 20px 80px #38201328;font-family:var(--font);text-align:left}
+.coach-success-dialog::backdrop{background:#36251866;backdrop-filter:blur(3px)}
+.coach-success-dialog h2{font-size:26px;margin:18px 0 8px}
+.coach-success-dialog p{font-size:17px;line-height:1.7}
+.coach-success-icon{display:grid;place-items:center;width:52px;height:52px;background:#f0e7e1;color:#c96b2c;border-radius:50%;font-size:28px}
+.coach-success-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:24px}
+.coach-success-actions .button{padding:12px 18px;min-height:48px;font-size:17px}
+.refresh-1012 main .coach-tool-view{min-width:0}
+.refresh-1012 main .summary-row span{flex:0 0 auto;white-space:nowrap}
+.refresh-1012 main .summary-row strong{width:auto;min-width:0}
+.refresh-1012 main :is(.report-stat-strip strong,.portfolio-breakdown-list strong,#fomoChange){text-align:right!important;font-variant-numeric:tabular-nums}
+.refresh-1012 main .report-stat-strip>div{display:flex;flex-direction:column;gap:10px}
+.refresh-1012 main .report-stat-strip strong{display:block;width:100%;font-size:24px}
+.refresh-1012 main :is([class*="empty"],.chat-person strong,.chat-person small){text-align:left!important}
+@media(max-width:700px){
+  .refresh-1012 main .health-record-item{display:block}
+  .refresh-1012 main .record-metrics{margin-top:16px}
+  .refresh-1012 main .trade-filter-bar{gap:14px}
+  .refresh-1012 main .trade-filter-bar label{flex:1;min-width:140px}
+  .refresh-1012 main .trade-side-filters{width:100%}
+  .refresh-1012 main .coach-performance-metrics{grid-template-columns:1fr}
+  .refresh-1012 main .coach-performance-total{align-items:stretch;flex-direction:column}
+}
+
+@media(max-width:1000px){
+  .refresh-1012:not(.home-page) main .container,.refresh-1012:not(.home-page) main .wide-container{width:calc(100% - 48px)!important}
+  .refresh-1012 .health-workspace{grid-template-columns:1fr}
+  .refresh-1012 .ai-coach-app{grid-template-columns:1fr}
+  .refresh-1012 .member-hero-actions{max-width:320px}
+  .refresh-1012 .podcast-dialogue-head{align-items:flex-start;flex-direction:column}
+  .refresh-1012 .chat-scene{grid-template-columns:70px minmax(0,1fr) 70px;padding:18px}
+  .refresh-1012.podcast-page .chat-head{width:65px;height:65px}
+}
+@media(max-width:700px){
+  .refresh-1012:not(.home-page) main .container,.refresh-1012:not(.home-page) main .wide-container{width:calc(100% - 32px)!important}
+  .refresh-1012:not(.home-page) main .hero>.container{flex-direction:column;align-items:stretch;gap:22px}
+  .refresh-1012:not(.home-page) main .hero-grid>div:first-child{padding-left:64px!important}
+  .refresh-1012:not(.home-page) main h1{font-size:29px!important}
+  .refresh-1012:not(.home-page) main h2{font-size:24px!important}
+  .refresh-1012:not(.home-page) main .hero-grid>div:first-child::before{width:46px;height:46px}
+  .refresh-1012:not(.home-page) main .hero-grid>div:first-child::after{left:13px}
+  .refresh-1012:not(.home-page) main :is(.section,.health-section,.member-page,.membership-comparison,.membership-next){padding-block:26px}
+  .refresh-1012:not(.home-page) main :is(.card,.member-card,.membership-plan,.member-upgrade){padding:20px}
+  .refresh-1012 .market-header-action button{width:100%}
+  .refresh-1012 .precheck-grid,.refresh-1012 .order-workspace{grid-template-columns:1fr}
+  .refresh-1012 .precheck-card{padding:18px;grid-template-columns:1fr}
+  .refresh-1012 .precheck-icon{display:none}
+  .refresh-1012 .precheck-form{grid-template-columns:1fr}
+  .refresh-1012 .precheck-form .button{grid-column:1/-1}
+  .refresh-1012 .health-workspace,.refresh-1012 .setup-card,.refresh-1012 .preview-card{min-width:0;width:100%;box-sizing:border-box}
+  .refresh-1012 .metrics-grid{grid-template-columns:1fr 1fr}
+  .refresh-1012 .chart-center-wrap{height:300px;min-height:300px}
+  .refresh-1012 .sim-account-head,.refresh-1012 .position-performance-head{align-items:flex-start;flex-direction:column}
+  .refresh-1012 .sim-kpi-grid{grid-template-columns:1fr}
+  .refresh-1012 .sim-scenario-selector{grid-template-columns:1fr 1fr}
+  .refresh-1012 .scenario-btn small{display:none}
+  .refresh-1012 .currency-standard-badge{white-space:normal}
+  .refresh-1012 .podcast-preview-main{grid-template-columns:1fr;gap:18px}
+  .refresh-1012 .podcast-cover-art{width:100px;height:100px}
+  .refresh-1012 .podcast-hero-builder-row{grid-template-columns:1fr}
+  .refresh-1012 .podcast-topic-bubble{align-items:stretch;flex-direction:column;gap:8px}
+  .refresh-1012 .podcast-immersive-shell{width:calc(100% - 24px)}
+  .refresh-1012 .podcast-dialogue-fullscreen{padding:18px}
+  .refresh-1012 .podcast-dialogue-actions{align-items:flex-start;flex-direction:column;gap:10px}
+  .refresh-1012 .chat-scene{grid-template-columns:1fr 1fr;padding:12px;gap:12px}
+  .refresh-1012 .chat-person{align-self:start;display:flex;align-items:center;gap:8px;padding:0}
+  .refresh-1012 .chat-person.onyx{justify-self:end}
+  .refresh-1012.podcast-page .chat-head{width:40px;height:40px}
+  .refresh-1012 .chat-person small{display:none}
+  .refresh-1012 .chat-window{grid-column:1/-1;grid-row:2;min-height:540px;padding:8px 0}
+  .refresh-1012 .chatBubble{padding:16px;max-width:90%}
+  .refresh-1012 .chatText{font-size:18px}
+  .refresh-1012 .member-hero-actions{max-width:none}
+  .refresh-1012 .member-account-tools{grid-template-columns:1fr}
+  .refresh-1012 .membership-overview .membership-account-status{position:static;transform:none;margin-top:16px;align-self:flex-start}
+  .refresh-1012 .member-plan-head{flex-direction:column;align-items:flex-start}
+  .refresh-1012 .member-plan-tag{position:static;display:block;margin-bottom:10px}
+}
+
+/* Currency is a label; the amount remains the primary figure on every page. */
+.refresh-1012 main span:is(.money-currency,.money-amount){display:inline!important;width:auto!important;height:auto!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;background:none!important;box-shadow:none!important}
+.refresh-1012 main span.money-currency{font-family:Arial,sans-serif!important;font-size:max(13px,.52em)!important;font-weight:600!important;line-height:1.2!important;letter-spacing:.04em;color:#917760!important;vertical-align:baseline}
+.refresh-1012 main span.money-amount{font-family:Arial,sans-serif!important;font-size:1em!important;font-weight:inherit!important;color:inherit!important;font-variant-numeric:tabular-nums;letter-spacing:-.025em;line-height:inherit!important}
+.refresh-1012 main :is(.numeric,.position-change,.hotPrice,.hotChange,.position-price-compare strong,.position-card-bottom strong,.coach-position-values strong,.member-kpi>strong,.sim-kpi>strong,.summary-row strong,.metrics-grid strong,.analysis-stat strong,.chart-center strong,.membership-price,.member-plan-price){font-family:Arial,"Microsoft JhengHei",sans-serif!important;font-variant-numeric:tabular-nums}
+.refresh-1012 main td.numeric:has(.money-amount){font-size:19px}

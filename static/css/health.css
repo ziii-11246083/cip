@@ -62,7 +62,7 @@
   display:grid;
   place-items:center;
   color:#fff;
-  background:linear-gradient(135deg,var(--brand),var(--brand-3));
+  background:var(--action-gradient);
   font-weight:950;
 }
 
@@ -151,7 +151,7 @@
 }
 
 .precheck-icon.success{
-  background:linear-gradient(135deg,#16845C,#FDBA74);
+  background:linear-gradient(135deg,#844416,#FDBA74);
 }
 
 .precheck-content{
@@ -180,7 +180,7 @@
 }
 
 .success-eyebrow{
-  color:#16845C;
+  color:#844416;
 }
 
 .precheck-form{
@@ -209,7 +209,7 @@
 
 .success-btn{
   border:none;
-  background:linear-gradient(135deg,#16845C,#FDBA74);
+  background:linear-gradient(135deg,#844416,#FDBA74);
   color:#fff;
   white-space:nowrap;
 }
@@ -228,9 +228,9 @@
 }
 
 .fomo-result.low{
-  background:rgba(22,132,92,.10);
-  color:#047857;
-  border:1px solid rgba(22,132,92,.18);
+  background:rgba(132,68,22,.10);
+  color:#783404;
+  border:1px solid rgba(132,68,22,.18);
 }
 
 .fomo-result.medium{
@@ -458,7 +458,7 @@
 .report-status{
   min-height:120px;
   border-radius:20px;
-  background:linear-gradient(135deg,var(--brand),var(--brand-3));
+  background:var(--action-gradient);
   color:#fff;
   display:flex;
   flex-direction:column;

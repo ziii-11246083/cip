@@ -7,44 +7,35 @@
     const status = $("membershipAccountStatus");
     if (status) {
       status.textContent = !loggedIn
-        ? "尚未登入。你可以先比較方案，加入進階會員前需登入。"
+        ? "公開功能免登入；加入進階會員需建立帳號並完成付款。"
         : premium
           ? "目前方案：進階會員"
-          : "目前方案：免費會員";
+          : "帳號已建立，尚未開通進階會員。";
     }
-    $("membershipFreePlan")?.classList.toggle("is-current", loggedIn && !premium);
+    $("membershipFreePlan")?.classList.remove("is-current");
     $("membershipPremiumPlan")?.classList.toggle("is-current", premium);
     const freeAction = $("membershipFreeAction");
     if (freeAction) {
-      freeAction.href = loggedIn ? "/member" : "/register";
-      freeAction.innerHTML = loggedIn
-        ? '前往會員中心 <i class="fas fa-arrow-right" aria-hidden="true"></i>'
-        : '建立免費帳號 <i class="fas fa-arrow-right" aria-hidden="true"></i>';
+      freeAction.href = "/market";
+      freeAction.innerHTML = '開始看市場 <i class="fas fa-arrow-right" aria-hidden="true"></i>';
     }
     const joinButton = $("joinPremiumBtn");
     if (joinButton) {
       joinButton.innerHTML = premium
         ? '前往會員中心 <i class="fas fa-arrow-right" aria-hidden="true"></i>'
         : loggedIn
-          ? '加入進階會員 <i class="fas fa-arrow-right" aria-hidden="true"></i>'
-          : '登入後加入進階會員 <i class="fas fa-arrow-right" aria-hidden="true"></i>';
+          ? '繼續付款開通 <i class="fas fa-arrow-right" aria-hidden="true"></i>'
+          : '建立帳號並加入進階會員 <i class="fas fa-arrow-right" aria-hidden="true"></i>';
     }
   }
 
   async function joinPremium() {
     await window.authManager?.ensureReady?.();
-    if (!window.authManager?.isLoggedIn?.()) {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      window.authManager?.openLogin?.();
-      return;
-    }
     if (window.authManager?.getMembershipTier?.() === "premium") {
       window.location.assign("/member");
       return;
     }
-    const dialog = $("membershipDialog");
-    if (typeof dialog?.showModal === "function") dialog.showModal();
-    else dialog?.setAttribute("open", "");
+    window.location.assign(window.authManager?.isLoggedIn?.() ? "/register?step=payment" : "/register");
   }
 
   document.addEventListener("DOMContentLoaded", () => {

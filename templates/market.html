@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-Hant">
 <head>
   <style>
@@ -8,69 +8,38 @@
   <script>document.documentElement.classList.add('js-enabled');</script>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>市場總覽 | Smart Invest Crypto</title>
+  <title>市場總覽 | Smart Invest Crypto｜智慧虛擬貨幣平台</title>
 
   <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo.jpg') }}">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=shared-site-density">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/market.css') }}?v=20261001-kline">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=brand-width-20261013">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/visual-refresh-1012.css') }}?v=orange-white-20261013">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/market.css') }}?v=orange-white-20261013">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/site-theme.css') }}?v=money-type-20261013">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/market-visual.css') }}?v=market-indicators-20261013">
 </head>
 
-<body class="market-page">
+<body class="market-page refresh-1012 market-editorial-1013">
   
 {% include "partials/header.html" %}
 
-<main>
-  <section class="hero">
-    <div class="container hero-grid">
-      <div class="reveal is-visible">
-        <div class="eyebrow"><i class="fas fa-chart-line"></i> Market Overview</div>
-        <h1 class="hero-title">市場總覽</h1>
-        <p class="hero-lead">整理主流加密貨幣價格、熱門幣種、價格走勢比較、技術指標與 BTC K 線圖，方便快速掌握市場目前的節奏與風險感受。</p>
-      </div>
+<main aria-label="市場總覽">
+  
 
-      <div class="hero-card reveal is-visible">
-        <div class="hero-card-title">
-          <div class="hero-card-icon"><i class="fas fa-bolt"></i></div>
-          <div>
-            <small>LIVE MARKET DATA</small>
-            <strong>即時市場資料</strong>
-          </div>
-        </div>
-
-        <div class="hero-mini-grid">
-          <div class="hero-mini">
-            <span>資料來源</span>
-            <strong>CoinGecko</strong>
-          </div>
-          <div class="hero-mini">
-            <span>圖表</span>
-            <strong>Chart.js</strong>
-          </div>
-          <div class="hero-mini">
-            <span>技術圖</span>
-            <strong>BTC K 線</strong>
-          </div>
-        </div>
-
-        <button class="button primary" id="btnQuickDemo" type="button" style="width:100%;margin-top:18px;">
-          <i class="fas fa-rotate-right"></i> 重新整理市場資料
-        </button>
-      </div>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="container">
+  <section class="section market-snapshot-section">
+    <div class="container market-editorial-container">
       <div class="section-head reveal">
         <div>
           <h2 class="section-title">主流幣種快照</h2>
           <p class="section-copy">追蹤 BTC、ETH、SOL、XRP 的即時價格與 24 小時變化。</p>
         </div>
-        <div class="market-badge" id="snapTime">資料時間：載入中</div>
+        <div class="market-snapshot-tools"><div class="market-badge" id="snapTime">資料時間：載入中</div>
+<button class="button primary market-refresh-button" id="btnQuickDemo" type="button">
+          <i class="fas fa-rotate-right"></i> 重新整理市場資料
+        </button></div>
       </div>
 
       <div class="coin-stats">
@@ -98,40 +67,13 @@
     </div>
   </section>
 
-  <section class="section">
-    <div class="container">
-      <a class="radar-feature reveal" href="/narrative-radar">
-        <div class="radar-feature-copy">
-          <div class="eyebrow"><i class="fas fa-brain"></i> Featured Insight</div>
-          <h2>AI 敘事雷達</h2>
-          <p>把熱門敘事、SFI 風險排名與單幣深度分析入口拉到市場頁第一層，先看市場現在在講什麼，再決定往哪個幣種繼續研究。</p>
-          <div class="radar-feature-points">
-            <span><i class="fas fa-signal"></i> 熱門敘事熱度</span>
-            <span><i class="fas fa-shield-heart"></i> SFI 風險觀察</span>
-            <span><i class="fas fa-arrow-right"></i> 直通深度分析</span>
-          </div>
-        </div>
-        <div class="radar-feature-side">
-          <div class="radar-chip">
-            <small>重點用途</small>
-            <strong>先抓市場主線</strong>
-          </div>
-          <div class="radar-chip">
-            <small>適合搭配</small>
-            <strong>熱門市場 + 價格比較</strong>
-          </div>
-          <div class="radar-feature-cta">
-            <span>前往 AI 敘事雷達</span>
-            <i class="fas fa-arrow-right"></i>
-          </div>
-        </div>
-      </a>
-
+  <section class="section market-content-section">
+    <div class="container market-editorial-container">
       <div class="market-tools reveal">
         <a class="tool-link-card" href="/social-sentiment">
           <span><i class="fas fa-satellite-dish"></i></span>
           <div>
-            <strong>社群訊噪分離</strong>
+            <strong>社群分析</strong>
             <small>整理市場情緒與熱門話題，幫你快速區分噪音與真正有用的市場訊號。</small>
           </div>
         </a>
@@ -142,21 +84,20 @@
             <small>針對單一幣種進一步看價格結構、風險位置與技術觀察重點。</small>
           </div>
         </a>
-        <a class="tool-link-card" href="/sim-trade">
-          <span><i class="fas fa-chart-column"></i></span>
+        <a class="tool-link-card" href="/narrative-radar">
+          <span><i class="fas fa-brain"></i></span>
           <div>
-            <strong>模擬交易</strong>
-            <small>會員可在 Paper Trading 中測試持倉比例、進出場節奏與交易想法。</small>
-            <em class="tool-badge"><i class="fas fa-lock"></i> 會員限定</em>
+            <strong>敘事雷達</strong>
+            <small>追蹤熱門題材，搭配風險排名掌握市場主線。</small>
           </div>
         </a>
       </div>
 
-      <div class="card reveal">
+      <div class="card reveal" id="marketSfiSection">
         <div class="section-head">
           <div>
             <h2 class="section-title">SFI 風險排名</h2>
-            <p class="section-copy">先看市場主要幣種的風險分數，再決定要不要往下做深度分析或追蹤敘事熱度。</p>
+            <p class="section-copy">SFI（系統性脆弱指數）衡量幣種在 BTC 下跌時的連動與脆弱程度，分數越高，越需要留意市場下跌風險。</p>
           </div>
           <a class="market-badge" href="/narrative-radar"><i class="fas fa-arrow-up-right-from-square"></i> 看完整排名</a>
         </div>
@@ -168,7 +109,7 @@
                 <th>排名</th>
                 <th>幣種</th>
                 <th>價格</th>
-                <th>24H</th>
+                <th>24 小時漲跌</th>
                 <th>SFI 分數</th>
               </tr>
             </thead>
@@ -181,19 +122,20 @@
         </div>
       </div>
 
-      <div class="card reveal">
+      <div class="card reveal" id="popularMarketSection">
         <div class="section-head">
           <div>
             <h2 class="section-title">熱門市場</h2>
-            <p class="section-copy">依市值排序顯示近期主要加密資產，方便快速查看市場活躍度與價格變化。</p>
+            <p class="section-copy">依市值選出主要幣種。綠色是上漲、紅色是下跌；對比條越長，代表 24 小時變化越大。</p>
           </div>
           <div class="market-badge" id="popularMeta">市場熱度：載入中</div>
         </div>
         <div class="divider"></div>
+        <div class="market-breadth" id="marketBreadth" hidden></div>
         <div class="hot-grid" id="popularCoinList"></div>
       </div>
 
-      <div class="card reveal">
+      <div class="card reveal" id="marketComparisonSection">
         <div class="section-head">
           <div>
             <h2 class="section-title">價格走勢比較</h2>
@@ -227,62 +169,73 @@
         <div class="overlay-list" id="overlayList"></div>
         <div class="chart-summary" id="chartSummary">
           <div class="summary-tile">
-            <span>最新價格</span>
+            <span><i class="fas fa-coins" aria-hidden="true"></i> 最新價格</span>
             <strong id="chartLatest">--</strong>
             <small>主幣最新收盤值</small>
+            <div class="summary-spark" id="chartPriceSpark"></div>
           </div>
           <div class="summary-tile">
-            <span>區間漲跌</span>
+            <span><i class="fas fa-arrow-trend-up" aria-hidden="true"></i> 區間漲跌</span>
             <strong id="chartRangeChange">--</strong>
             <small>從起點到現在</small>
+            <div class="summary-direction" id="chartDirection"></div>
           </div>
           <div class="summary-tile">
-            <span>區間高低</span>
+            <span><i class="fas fa-arrows-left-right" aria-hidden="true"></i> 區間位置</span>
             <strong id="chartHighLow">--</strong>
-            <small>判斷目前接近高點或低點</small>
+            <div class="price-position-track" id="chartPricePosition" hidden><i></i></div>
+            <small id="chartPositionLabel">判斷目前接近高點或低點</small>
           </div>
           <div class="summary-tile">
-            <span>波動提醒</span>
+            <span><i class="fas fa-wave-square" aria-hidden="true"></i> 波動幅度</span>
             <strong id="chartVolatility">--</strong>
-            <small>越高代表短線震盪越大</small>
+            <small>歷史每期漲跌的標準差</small>
+            <div class="summary-volatility" id="chartVolatilityBars"></div>
           </div>
         </div>
         <div class="chart-insight" id="chartInsight">載入後，這裡會自動整理目前走勢的重點觀察。</div>
+        <div class="chart-mode-row"><div class="chart-mode-switch" role="group" aria-label="走勢比較方式"><button type="button" data-chart-mode="price" aria-pressed="true">價格 · USD</button><button type="button" data-chart-mode="return" aria-pressed="false">漲跌幅 · %</button></div><p id="chartModeNote">查看各幣種的實際價格；比較強弱時可切換漲跌幅。</p></div>
         <div class="chart-box">
           <div class="chart-empty" id="chartEmpty">正在準備價格走勢資料...</div>
           <canvas id="marketChart"></canvas>
         </div>
       </div>
 
-      <div class="card reveal">
+      <div class="card reveal technical-visual-panel" id="marketTechnicalSection">
         <div class="section-head">
           <div>
             <h2 class="section-title">技術指標</h2>
-            <p class="section-copy">以 BTC 近期價格估算 RSI、SMA、EMA 與綜合訊號，作為技術面觀察參考。</p>
+            <p class="section-copy">BTC 的動能、均價與趨勢，一眼看懂。</p>
           </div>
           <div class="market-badge" id="taStatus">技術分析載入中</div>
         </div>
         <div class="divider"></div>
 
         <div class="ta-grid">
-          <div class="ta-card">
-            <span>RSI (14)</span>
+          <div class="ta-card ta-rsi-card">
+            <span class="ta-label"><i class="fas fa-gauge-high" aria-hidden="true"></i> 動能溫度 <small>RSI (14)</small></span>
             <strong id="taRsi">--</strong>
-            <p>觀察短期動能是否過熱或過冷。</p>
+            <div id="taRsiVisual" class="ta-rsi-visual"></div>
+            <p>低於 30 偏冷，高於 70 偏熱。</p>
           </div>
           <div class="ta-card">
-            <span>SMA (50)</span>
+            <span class="ta-label"><i class="fas fa-chart-line" aria-hidden="true"></i> 中期均價 <small>SMA (50)</small></span>
             <strong id="taSma">--</strong>
-            <p>中期平均價格參考。</p>
+            <div id="taSmaVisual" class="ta-price-visual"></div>
+            <div class="ta-distance" id="taSmaDistance">等待資料</div>
+            <p>實線：近期價格 · 虛線：均價</p>
           </div>
           <div class="ta-card">
-            <span>EMA (20)</span>
+            <span class="ta-label"><i class="fas fa-bolt" aria-hidden="true"></i> 短期均價 <small>EMA (20)</small></span>
             <strong id="taEma">--</strong>
+            <div id="taEmaVisual" class="ta-price-visual"></div>
+            <div class="ta-distance" id="taEmaDistance">等待資料</div>
             <p>更重視近期價格變化。</p>
           </div>
-          <div class="ta-card">
-            <span>綜合訊號</span>
+          <div class="ta-card ta-signal-card">
+            <span class="ta-label"><i class="fas fa-compass" aria-hidden="true"></i> 趨勢訊號 <small>綜合判斷</small></span>
             <strong id="taSignal">--</strong>
+            <div class="ta-signal-visual" id="taSignalVisual"></div>
             <p id="taSignalText">技術面資料載入後會顯示整體訊號。</p>
           </div>
         </div>
@@ -292,15 +245,19 @@
         </div>
       </div>
 
-      <div class="card reveal">
+      <div class="card reveal candle-visual-panel" id="marketCandleSection">
         <div class="section-head">
           <div>
             <h2 class="section-title">BTC K 線圖</h2>
-            <p class="section-copy">以實際開盤、最高、最低與收盤價繪製蠟燭圖，切換區間觀察漲跌；更多畫線工具與技術指標可在 TradingView 開啟。</p>
+            <p class="section-copy">綠色上漲、紅色下跌。移到 K 線上查看該期價格。</p>
           </div>
           <a class="tv-open-link" href="https://www.tradingview.com/chart/?symbol=BINANCE%3ABTCUSDT" target="_blank" rel="noopener noreferrer"><i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i> 開啟 TradingView 完整圖表</a>
         </div>
         <div class="divider"></div>
+        <div class="tv-market-summary">
+          <div class="tv-market-identity"><span class="tv-coin-mark" aria-hidden="true">₿</span><div><strong>Bitcoin</strong><span>BTC / USD</span></div></div>
+          <div class="tv-last-price"><span>最新收盤</span><strong id="tvLatestPrice">--</strong><em id="tvCandleMove">等待資料</em></div>
+        </div>
         <div class="tv-chart-toolbar">
           <span id="tvChartStatus" role="status">正在載入 BTC K 線…</span>
           <div class="tv-range" role="group" aria-label="BTC 圖表區間">
@@ -314,7 +271,7 @@
           <canvas id="tvFallbackChart" role="img" aria-label="BTC 近 30 天 K 線圖" hidden></canvas>
           <div id="tvChartEmpty" class="chart-empty">正在載入 K 線資料…</div>
         </div>
-        <p class="tv-ohlc-value" id="tvOhlcValue" aria-live="polite">開盤 --　最高 --　最低 --　收盤 --</p>
+        <div class="tv-ohlc-value" id="tvOhlcValue" aria-live="polite"><div><span>開盤</span><strong>--</strong></div><div><span>最高</span><strong>--</strong></div><div><span>最低</span><strong>--</strong></div><div><span>收盤</span><strong>--</strong></div></div>
         <p class="tv-source-note"><span id="tvSourceNote">K 線資料載入中。</span> 圖表函式庫由 <a href="https://www.tradingview.com/" target="_blank" rel="noopener noreferrer">TradingView Lightweight Charts™</a> 提供。</p>
       </div>
     </div>
@@ -340,9 +297,13 @@
   };
 </script>
 
-<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=auth-state-20260830"></script>
-<script src="{{ url_for('static', filename='js/common.js') }}?v=member-nav-lock-20260604"></script>
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=join-carousel-20261013"></script>
+<script src="{{ url_for('static', filename='js/common.js') }}?v=money-type-20261013"></script>
 <script src="{{ url_for('static', filename='vendor/lightweight-charts/lightweight-charts.standalone.production.js') }}?v=5.2.1"></script>
-<script src="{{ url_for('static', filename='js/market.js') }}?v=20261001-sfi-baseline"></script>
+<script src="{{ url_for('static', filename='js/market.js') }}?v=market-indicators-20261013"></script>
 </body>
 </html>
+
+
+
+

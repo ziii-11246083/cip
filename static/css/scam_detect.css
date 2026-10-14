@@ -39,7 +39,7 @@
 }
 
 #reportHeader.risk-low{
-  background:linear-gradient(135deg,var(--good),#047857);
+  background:linear-gradient(135deg,var(--good),#783404);
 }
 
 #reportHeader.risk-unknown{
@@ -60,8 +60,8 @@
 
 .report-head em.risk-low{
   color:var(--good);
-  background:rgba(16,185,129,.10);
-  border-color:rgba(16,185,129,.20);
+  background:rgba(185,86,16,.10);
+  border-color:rgba(185,86,16,.20);
 }
 
 .report-head em.risk-unknown{

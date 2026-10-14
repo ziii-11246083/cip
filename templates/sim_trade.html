@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-Hant">
 <head>
   <style>
@@ -8,184 +8,132 @@
   <script>document.documentElement.classList.add('js-enabled');</script>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>模擬交易 | Smart Invest Crypto</title>
+  <title>模擬交易 | Smart Invest Crypto｜智慧虛擬貨幣平台</title>
   <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo.jpg') }}">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=mobile-fit-20260830">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=brand-width-20261013">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/visual-refresh-1012.css') }}?v=orange-white-20261013">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/site-theme.css') }}?v=money-type-20261013">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/sim-workspace.css') }}?v=sim-workflow-20261015">
 </head>
-<body>
+<body class="sim-page refresh-1012">
 {% include "partials/header.html" %}
 
-<main>
-  <section class="hero sim-hero">
-    <div class="container hero-grid">
-      <div>
-        <div class="eyebrow"><i class="fas fa-chart-column"></i> Paper Trading</div>
-        <h1 class="hero-title">會員專屬模擬交易</h1>
-        <p class="hero-lead">使用虛擬資金練習買賣加密貨幣，觀察持倉、損益、配置比例與交易紀錄。</p>
-      </div>
-    </div>
-  </section>
+<main aria-label="模擬交易">
+  
 
   <section class="section">
     <div class="container wide-container sim-shell">
       <div class="member-gate" id="memberGate">
-        <h2>請先登入會員</h2>
-        <p>模擬交易會保存持倉與交易紀錄，因此需要會員帳號才能使用。</p>
+        <h2>開通進階會員，開始模擬交易</h2>
+        <p>練習虛擬買賣、保存持倉與交易紀錄，需登入進階會員帳號。</p>
         <div class="member-actions">
-          <a class="button primary" href="/register">註冊 / 登入會員</a>
+          <a class="button primary" href="/membership">查看會員方案</a>
+          <a class="button" href="/register">註冊 / 登入會員</a>
           <a class="button" href="/market">查看市場總覽</a>
         </div>
-        <div class="member-helper">登入後可使用 AI Agent 自動送單，也能手動建立買入與賣出紀錄。</div>
+        <div class="member-helper">進階會員可透過 AI 投資教練送單，或手動練習買入與賣出。</div>
       </div>
 
       <div id="simApp" class="sim-app">
-        <section class="card sim-dashboard" data-member-feature="模擬交易帳戶總覽">
-          <h2 class="sim-title">帳戶總覽</h2>
-          <div class="sim-kpi-grid">
-            <div><span>總資產</span><strong id="kpiTotal">--</strong></div>
-            <div><span>現金</span><strong id="kpiCash">--</strong></div>
-            <div><span>未實現損益</span><strong id="kpiPnl">--</strong><small id="kpiPnlPct" class="sub">--</small></div>
+        <div class="sim-page-heading">
+          <div><span class="sim-eyebrow"><i class="fas fa-layer-group" aria-hidden="true"></i> PAPER TRADING</span><h1>模擬交易</h1><p>先觀察，再試算，最後練習下單。</p></div>
+          <div class="sim-heading-actions"><span class="sim-account-badge"><i class="fas fa-flask" aria-hidden="true"></i> 虛擬帳戶 · USD</span><button class="sim-icon-button" id="btnReload" type="button"><i class="fas fa-rotate" aria-hidden="true"></i> 更新資料</button><small id="simUpdatedAt" role="status">資料載入中</small></div>
+        </div>
+        <nav class="sim-section-nav sim-workflow-nav" aria-label="交易練習流程">
+          <a href="#simMarket"><b>01</b><span>觀察行情<small>選幣種 · 看走勢</small></span><i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+          <a href="#simStress"><b>02</b><span>比較情境<small>試想漲跌 · 選填</small></span><i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+          <a href="#orderPanel"><b>03</b><span>模擬下單<small>試算金額 · 確認買賣</small></span><i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+          <a href="#simHistory"><b>04</b><span>交易回顧<small>核對紀錄 · 檢視結果</small></span><i class="fas fa-check" aria-hidden="true"></i></a>
+        </nav>
+        <div class="sim-member-handoff"><span><i class="fas fa-lightbulb" aria-hidden="true"></i> 在這裡練習決策，帳戶管理留給會員中心。</span><a href="/member">資產 · 持倉 · 資金管理 <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i></a></div>
+
+        <section class="card sim-market-card" id="simMarket" aria-labelledby="marketTitle" data-member-feature="模擬交易行情觀察">
+          <div class="sim-section-head"><div><span class="sim-eyebrow">01 / MARKET WATCH</span><h2 id="marketTitle">先看你想交易的幣種</h2></div><label class="sim-market-select" for="marketSymbol">觀察幣種<select id="marketSymbol"></select></label></div>
+          <div class="sim-market-workspace">
+            <div class="sim-market-quote">
+              <div class="coin-market-head"><span class="sim-coin-icon" id="quoteCoinIcon" aria-hidden="true">₿</span><div><strong id="quoteSymbol">--</strong><small id="quoteName">選擇幣種後顯示行情</small></div></div>
+              <small class="sim-muted">最新取得市價</small><strong id="quotePrice" class="sim-quote-price">--</strong>
+              <div class="sim-market-facts"><div><span>24H 漲跌</span><strong id="quoteChange">--</strong></div><div><span>總市值</span><strong id="quoteMarketCap">--</strong></div></div>
+              <a class="sim-next-step" href="#simStress">比較漲跌情境 <i class="fas fa-arrow-down" aria-hidden="true"></i></a>
+            </div>
+            <div class="sim-market-history"><div class="sim-chart-head sim-market-chart-head"><span class="sim-muted">歷史價格走勢</span><div class="sim-range-buttons" role="group" aria-label="幣種價格走勢期間"><button type="button" data-market-days="7" aria-pressed="true">7 天</button><button type="button" data-market-days="30" aria-pressed="false">30 天</button><button type="button" data-market-days="90" aria-pressed="false">90 天</button></div></div><div class="sim-market-chart-stage"><canvas id="marketChart" role="img" aria-label="所選幣種歷史價格走勢"></canvas><div class="sim-chart-empty" id="marketChartEmpty" role="status">價格資料載入中</div></div><small id="marketChartSource" class="sim-muted">歷史走勢與目前市價分開顯示</small></div>
           </div>
-          <div class="chart-box"><canvas id="equityChart"></canvas></div>
         </section>
 
-        <section class="card sim-scenario-card" data-member-feature="市場情境模擬">
-          <div class="sim-scenario-head">
-            <h2 class="sim-title">情境壓力測試（假設式）</h2>
-            <span class="sim-scenario-badge" id="scenarioBadge">一般市場</span>
+        <section class="card sim-scenario-card" id="simStress" data-member-feature="市場情境模擬">
+          <div class="sim-section-head"><div><span class="sim-eyebrow">02 / WHAT IF</span><h2 class="sim-title">下單前，先比較情境</h2></div><span class="sim-account-badge"><i class="fas fa-flask" aria-hidden="true"></i> 選填 · 假設試算</span></div>
+          <p class="sim-scenario-desc">用目前帳戶與所選策略，比較四種漲跌假設。<strong>這些假設不代表目前行情，也不會送出訂單。</strong></p>
+          <div class="sim-scenario-selector" role="group" aria-label="查看情境假設">
+            <button class="scenario-btn active" data-scenario="normal" type="button" aria-pressed="true"><i class="fas fa-balance-scale" aria-hidden="true"></i><strong>一般市場</strong><span>×1.0</span><small>風險資產期末目標</small></button>
+            <button class="scenario-btn" data-scenario="bull" type="button" aria-pressed="false"><i class="fas fa-chart-line" aria-hidden="true"></i><strong>牛市</strong><span>×1.3</span><small>風險資產期末目標</small></button>
+            <button class="scenario-btn" data-scenario="bear" type="button" aria-pressed="false"><i class="fas fa-arrow-trend-down" aria-hidden="true"></i><strong>熊市</strong><span>×0.7</span><small>風險資產期末目標</small></button>
+            <button class="scenario-btn" data-scenario="black_swan" type="button" aria-pressed="false"><i class="fas fa-bolt" aria-hidden="true"></i><strong>黑天鵝</strong><span>×0.4</span><small>風險資產期末目標</small></button>
           </div>
-          <p class="sim-scenario-desc">以相同起始資金與持倉快照，比較 normal / bull / bear / black swan。這是可重現的合成假設，<strong>不是歷史回測或價格預測</strong>，也不會改動即時模擬交易帳本。</p>
-          <div class="sim-mode-boundary">
-            <span><strong>即時模擬交易</strong>會記錄虛擬下單</span>
-            <span class="active"><strong>情境壓力測試</strong>只讀取一次快照</span>
-            <span><strong>歷史回測</strong>本頁未提供</span>
-          </div>
-          <div class="sim-scenario-selector">
-            <button class="scenario-btn active" data-scenario="normal" type="button">
-              <i class="fas fa-balance-scale"></i>
-              <strong>一般市場</strong>
-              <small>風險資產期末目標 ×1.0 · 日波動假設 ×1.0</small>
-            </button>
-            <button class="scenario-btn" data-scenario="bull" type="button">
-              <i class="fas fa-chart-line"></i>
-              <strong>牛市</strong>
-              <small>風險資產期末目標 ×1.3 · 日波動假設 ×0.8</small>
-            </button>
-            <button class="scenario-btn" data-scenario="bear" type="button">
-              <i class="fas fa-arrow-trend-down"></i>
-              <strong>熊市</strong>
-              <small>風險資產期末目標 ×0.7 · 日波動假設 ×1.5</small>
-            </button>
-            <button class="scenario-btn" data-scenario="black_swan" type="button">
-              <i class="fas fa-bolt"></i>
-              <strong>黑天鵝</strong>
-              <small>風險資產期末目標 ×0.4 · 日波動假設 ×3.0</small>
-            </button>
-          </div>
-          <div class="sim-scenario-info" id="scenarioInfo">
-            <div><span>風險資產期末目標</span><strong id="scPriceMult">1.0x</strong></div>
-            <div><span>日波動假設乘數</span><strong id="scVolMult">1.0x</strong></div>
-            <div><span>情境說明</span><strong id="scAdvice">基準假設</strong></div>
-          </div>
-          <div class="stress-controls">
-            <label for="stressStrategy">策略
-              <select id="stressStrategy">
-                <option value="conservative">保守型（風險資產 35%）</option>
-                <option value="balanced" selected>平衡型（風險資產 65%）</option>
-                <option value="aggressive">積極型（風險資產 90%）</option>
-              </select>
-            </label>
-            <label for="stressHorizon">假設期間（天）
-              <input id="stressHorizon" type="number" min="7" max="365" step="1" value="90">
-            </label>
-            <label for="stressSeed">Seed
-              <input id="stressSeed" type="number" min="0" max="2147483647" step="1" value="20260820">
-            </label>
-            <button type="button" id="runStressTest">比較四種情境</button>
-          </div>
-          <div class="status" id="stressStatus" role="status" aria-live="polite">等待執行；基準為目前模擬組合總值。</div>
+          <div class="sim-scenario-info" id="scenarioInfo"><span class="sim-scenario-badge" id="scenarioBadge">一般市場</span><span>期末目標 <b id="scPriceMult">1.0x</b></span><span>日波動乘數 <b id="scVolMult">1.0x</b></span><small id="scAdvice">基準假設</small></div>
+          <div class="stress-controls"><label for="stressStrategy">測試策略<select id="stressStrategy"><option value="conservative">保守型 · 風險資產 35%</option><option value="balanced" selected>穩健型 · 風險資產 65%</option><option value="aggressive">積極型 · 風險資產 90%</option></select></label><label for="stressHorizon">假設期間（天）<input id="stressHorizon" type="number" min="7" max="365" step="1" value="90"></label><label for="stressSeed">情境編號<input id="stressSeed" type="number" min="0" max="2147483647" step="1" value="20260820"></label><button type="button" id="runStressTest"><i class="fas fa-play" aria-hidden="true"></i> 比較四種情境</button></div>
+          <div class="status" id="stressStatus" role="status" aria-live="polite">有持倉後可比較策略；尚未持倉可先閱讀假設，再到下方練習下單。</div>
           <div class="stress-results" id="stressResults"></div>
+          <a class="sim-next-step" href="#orderPanel">接著規劃模擬買賣 <i class="fas fa-arrow-down" aria-hidden="true"></i></a>
+          <details class="compact-explain"><summary>計算方式與限制</summary><div>
           <p class="stress-limitations"><strong>合成年化波動</strong>是合成日報酬標準差年化後的風險指標，可能超過 100%；它不是虧損比例或發生機率。</p>
-          <p class="stress-limitations">計算方式：先依策略重新配置風險資產，保留各風險幣種之間的相對比例；不是直接測試原持倉比例。若沒有風險資產，則保留現金與穩定幣配置。黑天鵝假設風險資產期末下跌 60%、穩定幣期末下跌 3%、現金不變；第 5 日另有衝擊，已包含在期末目標中。最大回撤是路徑中從高點至低點的跌幅，可能大於期末虧損。Seed 改變中間路徑，不改變期末目標。</p>
+          <p class="stress-limitations">計算方式：先依策略重新配置風險資產，保留各風險幣種之間的相對比例；不是直接測試原持倉比例。若沒有風險資產，則保留現金與穩定幣配置。黑天鵝假設風險資產期末下跌 60%、穩定幣期末下跌 3%、現金不變；第 5 日另有衝擊，已包含在期末目標中。最大回撤是路徑中從高點至低點的跌幅，可能大於期末虧損。情境編號改變中間路徑，不改變期末目標。</p>
           <p class="stress-limitations">限制：未模擬手續費、稅負、流動性與成交滑價；期末目標是風險資產的情境假設，不是實際歷史價格。</p>
+          </div></details>
         </section>
+
 
         <section class="card order-panel" id="orderPanel" data-member-feature="建立模擬訂單">
+          <div class="sim-section-head"><div><span class="sim-eyebrow">03 / PRACTICE</span><h2 class="sim-title">把想法變成一筆模擬單</h2></div><a class="sim-muted" href="/ai-coach">和 AI 教練討論 <i class="fas fa-arrow-right" aria-hidden="true"></i></a></div>
           <div class="order-workspace">
-            <div class="order-form-area">
-              <h2 class="sim-title">建立模擬訂單</h2>
+            <div class="order-form-area"><div class="sim-cash-available"><span>可用模擬現金</span><strong id="kpiCash">--</strong></div>
+              <div class="sim-order-direction" role="group" aria-label="模擬交易方向"><button type="button" data-order-side="buy" aria-pressed="true"><i class="fas fa-plus" aria-hidden="true"></i> 買入</button><button type="button" data-order-side="sell" aria-pressed="false"><i class="fas fa-minus" aria-hidden="true"></i> 賣出</button></div>
+              <select id="orderSide" class="sim-sr-only" tabindex="-1" aria-hidden="true"><option value="buy">買入</option><option value="sell">賣出</option></select>
               <div class="order-grid">
-                <div>
+                <div class="order-symbol-field">
                   <label for="orderSymbol">幣種</label>
                   <select id="orderSymbol"></select>
                 </div>
                 <div>
-                  <label for="orderSide">方向</label>
-                  <select id="orderSide">
-                    <option value="buy">買入 BUY</option>
-                    <option value="sell">賣出 SELL</option>
-                  </select>
+                  <label for="orderAmt">金額（USD）</label>
+                  <input id="orderAmt" type="number" step="0.01" min="0.01" placeholder="例如 200" inputmode="decimal">
                 </div>
                 <div>
-                  <label for="orderQty">數量 quantity</label>
-                  <input id="orderQty" type="number" step="0.00000001" min="0" placeholder="例如 0.01">
-                </div>
-                <div>
-                  <label for="orderAmt">金額 amount_usd</label>
-                  <input id="orderAmt" type="number" step="0.01" min="0" placeholder="例如 200">
+                  <label for="orderQty">或輸入數量</label>
+                  <input id="orderQty" type="number" step="0.00000001" min="0.00000001" placeholder="例如 0.01" inputmode="decimal">
                 </div>
               </div>
-              <div class="order-actions">
-                <button class="btn-main" id="btnPlaceOrder">送出模擬單</button>
-                <button class="btn-ghost" id="btnLoadDemoPortfolio" type="button">載入示範投資組合（僅供展示）</button>
-                <button class="btn-ghost" id="btnReload">重新整理</button>
-                <button class="btn-danger" id="btnReset">重置帳戶</button>
-              </div>
-              <div class="status" id="orderStatus">尚未下單</div>
+              <div class="sim-sizing-head"><span id="orderAvailable">可用額度載入中</span><small>快速填入</small></div><div class="sim-quick-sizes" role="group" aria-label="使用可用現金或持倉的比例"><button type="button" data-order-fraction="0.25">25%</button><button type="button" data-order-fraction="0.5">50%</button><button type="button" data-order-fraction="0.75">75%</button><button type="button" data-order-fraction="1">100%</button></div>
+              <p class="sim-input-hint">金額與數量擇一填寫；試算不會自動送單。</p>
+              <div class="sim-account-tools"><button class="btn-ghost" id="btnLoadDemoPortfolio" type="button"><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i> 載入練習配置</button><button class="btn-danger" id="btnReset" type="button"><i class="fas fa-rotate-left" aria-hidden="true"></i> 重置帳戶</button></div>
             </div>
-
-            <aside class="coin-market-panel">
-              <h2 class="sim-title">幣種漲跌</h2>
-              <div class="coin-market-head">
-                <span id="quoteSymbol">--</span>
-                <small id="quoteName">選擇幣種後顯示行情</small>
+            <aside class="sim-order-preview" aria-label="本次模擬交易預覽">
+              <span class="sim-eyebrow">ORDER PREVIEW</span><div class="sim-preview-head"><h3>確認這筆交易</h3><strong id="orderPreviewSymbol">買入 BTC</strong></div>
+              <div class="sim-preview-numbers"><div><span>參考單價</span><strong id="orderPreviewPrice">--</strong></div><i class="fas fa-times" aria-hidden="true"></i><div><span>交易數量</span><strong id="orderPreviewQty">--</strong></div></div>
+              <div class="sim-order-ticket"><div><span>本次試算</span><strong id="quoteEstimate">請輸入金額或數量</strong></div><div><span id="orderAfterLabel">買入後可用現金</span><strong id="orderAfter">--</strong></div><div class="sim-order-capacity" aria-hidden="true"><span id="orderCapacityFill"></span></div><small id="orderCapacityLabel">等待交易內容</small></div>
+              <div class="coin-order-advice" id="quoteAdvice" role="status">等待幣種資料。</div>
+              <div class="order-actions">
+                <button class="btn-main" id="btnPlaceOrder" type="button" disabled><i class="fas fa-plus" aria-hidden="true"></i> 模擬買入</button>
               </div>
-              <div class="coin-market-grid">
-                <div><span>目前市價</span><strong id="quotePrice">--</strong></div>
-                <div><span>24h 漲跌</span><strong id="quoteChange">--</strong></div>
-                <div><span>總市值</span><strong id="quoteMarketCap">--</strong></div>
-                <div><span>買 1 顆</span><strong id="quoteOne">--</strong></div>
-                <div><span>買 0.1 顆</span><strong id="quotePointOne">--</strong></div>
-              </div>
-              <div class="coin-order-estimate">
-                <span>本次試算</span>
-                <strong id="quoteEstimate">請輸入數量或金額</strong>
-              </div>
-              <div class="coin-order-advice" id="quoteAdvice">等待幣種資料。</div>
+              <div class="status" id="orderStatus" role="status" aria-live="polite">尚未下單</div>
+              <a class="sim-next-step" id="simReviewLink" href="#simHistory" hidden>查看這次交易紀錄 <i class="fas fa-arrow-down" aria-hidden="true"></i></a>
             </aside>
           </div>
         </section>
 
-        <section class="card positions-panel" data-member-feature="持倉配置">
-          <h2 class="sim-title">持倉配置</h2>
-          <div class="chart-box small"><canvas id="allocChart"></canvas></div>
+        <section class="card trades-panel" id="simHistory" data-member-feature="交易紀錄">
+          <div class="sim-section-head"><div><span class="sim-eyebrow">04 / ACTIVITY</span><h2 class="sim-title">回顧你的交易</h2></div><span class="sim-muted">最近 100 筆 · 台北時間 UTC+8</span></div><div class="sim-review-summary">
+            <div><span>目前帳戶總值</span><strong id="kpiTotal">--</strong></div>
+            <div><span>尚未賣出的損益</span><strong id="kpiPnl">--</strong><small id="kpiPnlPct">--</small></div>
+            <a href="/member">完整資產與持倉 <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+          </div><div class="trade-filter-bar"><label for="tradeSymbolFilter">幣種<select id="tradeSymbolFilter"><option value="all">全部幣種</option></select></label><div class="trade-side-filters" role="group" aria-label="交易方向"><button type="button" data-trade-side="all" aria-pressed="true">全部</button><button type="button" data-trade-side="buy" aria-pressed="false">買入</button><button type="button" data-trade-side="sell" aria-pressed="false">賣出</button></div><label for="tradeTimeFilter">時間<select id="tradeTimeFilter"><option value="all">全部時間</option><option value="7">最近 7 天</option><option value="30">最近 30 天</option><option value="90">最近 90 天</option></select></label><button type="button" id="tradeFilterReset">重設篩選</button><span id="tradeFilterCount" role="status"></span></div>
+          <div class="sim-trade-totals"><span>篩選內買入總額 <strong id="tradeBuyTotal">--</strong></span><span>篩選內賣出總額 <strong id="tradeSellTotal">--</strong></span></div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>幣種</th><th>數量</th><th>均價</th><th>現價</th><th>市值</th><th>未實現損益</th></tr></thead>
-              <tbody id="positionsBody"></tbody>
-            </table>
-          </div>
-        </section>
-
-        <section class="card trades-panel" data-member-feature="交易紀錄">
-          <h2 class="sim-title">交易紀錄</h2>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>時間</th><th>方向</th><th>幣種</th><th>價格</th><th>數量</th><th>金額</th></tr></thead>
+              <thead><tr><th>時間</th><th>方向</th><th>幣種</th><th>價格（USD）</th><th>數量</th><th>金額（USD）</th></tr></thead>
               <tbody id="tradesBody"></tbody>
             </table>
           </div>
@@ -209,8 +157,12 @@
     anonKey: '{{ supabase_anon_key | default("dummy") }}'
   };
 </script>
-<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=auth-state-20260830"></script>
-<script src="{{ url_for('static', filename='js/common.js') }}?v=member-nav-lock-20260604"></script>
-<script src="{{ url_for('static', filename='js/sim_trade.js') }}?v=price-consistency-20260927"></script>
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=join-carousel-20261013"></script>
+<script src="{{ url_for('static', filename='js/common.js') }}?v=money-type-20261013"></script>
+<script src="{{ url_for('static', filename='js/sim_trade.js') }}?v=sim-workflow-20261015"></script>
 </body>
 </html>
+
+
+
+

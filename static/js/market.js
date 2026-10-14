@@ -3,13 +3,13 @@ const fmtUSD = function(n) {
   if (!Number.isFinite(n)) return "--";
 
   const abs = Math.abs(n);
-  if (abs >= 1e12) return "$" + (n / 1e12).toFixed(2) + "T";
-  if (abs >= 1e9) return "$" + (n / 1e9).toFixed(2) + "B";
-  if (abs >= 1e6) return "$" + (n / 1e6).toFixed(2) + "M";
-  if (abs >= 1e3) return "$" + (n / 1e3).toFixed(2) + "K";
-  if (abs < 1) return "$" + n.toFixed(4);
+  if (abs >= 1e12) return "USD " + (n / 1e12).toFixed(2) + "T";
+  if (abs >= 1e9) return "USD " + (n / 1e9).toFixed(2) + "B";
+  if (abs >= 1e6) return "USD " + (n / 1e6).toFixed(2) + "M";
+  if (abs >= 1e3) return "USD " + (n / 1e3).toFixed(2) + "K";
+  if (abs < 1) return "USD " + n.toFixed(4);
 
-  return "$" + n.toLocaleString(undefined, {
+  return "USD " + n.toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
@@ -44,6 +44,19 @@ let marketSfiCache = [];
 let professionalChart = null;
 let professionalChartRequest = 0;
 let professionalFallbackCandles = null;
+let marketChartMode = 'price';
+
+function escapeMarketText(value) {
+  return String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+}
+
+function marketSparkline(values, color = '#ef7d2d') {
+  const numbers = values.map(Number).filter(Number.isFinite);
+  if(numbers.length<2)return '';
+  const low=Math.min(...numbers),high=Math.max(...numbers),span=high-low||1;
+  const points=numbers.map((n,i)=>`${(i/(numbers.length-1)*240).toFixed(1)},${(48-(n-low)/span*40).toFixed(1)}`).join(' ');
+  return `<svg viewBox="0 0 240 56" preserveAspectRatio="none" role="img" aria-label="所選期間的實際價格走勢"><line x1="0" y1="49" x2="240" y2="49" stroke="#f0e2d6"/><polyline points="${points}" fill="none" stroke="${color}" stroke-width="2.5" vector-effect="non-scaling-stroke"/></svg>`;
+}
 
 function cacheBust() {
   return `_=${Date.now()}`;
@@ -244,8 +257,8 @@ function setStatus(id, value) {
 
 function riskTone(score) {
   score = Number(score);
-  if (score > 65) return "var(--bad)";
-  if (score > 40) return "var(--warn)";
+  if (score >= 65) return "var(--bad)";
+  if (score >= 40) return "var(--warn)";
   return "var(--good)";
 }
 
@@ -283,6 +296,10 @@ function updateChartSummary(symbol, values) {
     setText("chartRangeChange", "--");
     setText("chartHighLow", "--");
     setText("chartVolatility", "--");
+    ['chartPriceSpark','chartDirection','chartVolatilityBars'].forEach(id=>{const el=document.getElementById(id);if(el)el.replaceChildren();});
+    const location=document.getElementById('chartPricePosition');if(location)location.hidden=true;
+    const changeEl=document.getElementById('chartRangeChange');if(changeEl)changeEl.classList.remove('up','down');
+    setText('chartPositionLabel','目前沒有可計算的區間資料');
     setText("chartInsight", "目前沒有足夠資料，請稍後重試或換一個幣種。");
     return;
   }
@@ -297,8 +314,23 @@ function updateChartSummary(symbol, values) {
 
   setText("chartLatest", fmtUSD(latest));
   setText("chartRangeChange", fmtChange(rangeChange));
-  setText("chartHighLow", `${fmtUSD(low)} / ${fmtUSD(high)}`);
+  const highLow=document.getElementById('chartHighLow');
+  if(highLow)highLow.innerHTML=`<span class="range-value"><small>最低</small>${fmtUSD(low)}</span><span class="range-value"><small>最高</small>${fmtUSD(high)}</span>`;
   setText("chartVolatility", Number.isFinite(volatility) ? volatility.toFixed(2) + "%" : "--");
+  const changeEl=document.getElementById('chartRangeChange');
+  if(changeEl){changeEl.classList.toggle('up',rangeChange>=0);changeEl.classList.toggle('down',rangeChange<0);}
+  const spark=document.getElementById('chartPriceSpark');if(spark)spark.innerHTML=marketSparkline(values,rangeChange>=0?'#3b8a69':'#c64a44');
+  const directionEl=document.getElementById('chartDirection');
+  if(directionEl)directionEl.innerHTML=`<i class="fas fa-arrow-trend-${rangeChange>=0?'up':'down'}" aria-hidden="true"></i><span>${rangeChange>=0?'區間上漲':'區間下跌'}</span>`;
+  const positionEl=document.getElementById('chartPricePosition');
+  if(positionEl){positionEl.hidden=false;positionEl.querySelector('i').style.left=`${nearHigh}%`;}
+  setText('chartPositionLabel',`目前價格位於區間 ${nearHigh.toFixed(0)}% 位置`);
+  const bars=document.getElementById('chartVolatilityBars');
+  if(bars){
+    const changes=values.slice(1).map((n,i)=>pctChange(values[i],n)).filter(Number.isFinite).slice(-20);
+    const max=Math.max(...changes.map(Math.abs),.01);
+    bars.innerHTML=changes.map(n=>`<i class="${n>=0?'up':'down'}" style="--bar-height:${Math.max(5,Math.abs(n)/max*30)}px" title="${fmtChange(n)}"></i>`).join('');
+  }
 
   const direction = rangeChange >= 3 ? "偏多" : rangeChange <= -3 ? "偏弱" : "盤整";
   const location = nearHigh >= 75 ? "接近區間高位，追價要更保守" : nearHigh <= 25 ? "接近區間低位，可觀察是否止跌" : "位於區間中段，適合等待更明確訊號";
@@ -307,7 +339,7 @@ function updateChartSummary(symbol, values) {
   setText("chartInsight", `${symbol} 這段期間走勢${direction}，${location}。${risk}`);
 }
 
-function drawNativeLineChart(canvas, labels, datasets) {
+function drawNativeLineChart(canvas, labels, datasets, relative = false) {
   const ctx = canvas.getContext("2d");
   const rect = canvas.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
@@ -343,11 +375,11 @@ function drawNativeLineChart(canvas, labels, datasets) {
     ctx.moveTo(pad.left, y);
     ctx.lineTo(width - pad.right, y);
     ctx.stroke();
-    ctx.fillText(fmtUSD(value), 10, y + 4);
+    ctx.fillText(relative?fmtChange(value):fmtUSD(value), 10, y + 4);
   }
 
   datasets.forEach(function(ds) {
-    ctx.strokeStyle = ds.borderColor || "#F97316";
+    ctx.strokeStyle = ds.borderColor || "#ef7d2d";
     ctx.lineWidth = ds.borderWidth || 3;
     ctx.beginPath();
 
@@ -370,7 +402,7 @@ function drawNativeLineChart(canvas, labels, datasets) {
   datasets.forEach(function(ds, idx) {
     const x = pad.left + idx * 130;
     const y = 18;
-    ctx.fillStyle = ds.borderColor || "#F97316";
+    ctx.fillStyle = ds.borderColor || "#ef7d2d";
     ctx.fillRect(x, y - 9, 16, 4);
     ctx.fillStyle = "#2B1608";
     ctx.fillText(ds.label, x + 22, y);
@@ -422,17 +454,16 @@ function renderPopularCoinCards() {
     else downCount += 1;
 
     const div = document.createElement("div");
-    div.className = "hotChip";
+    div.className = `hotChip ${Math.abs(change)<.005?'flat':isUp?'rising':'falling'}`;
+    const maxChange=Math.max(...coins.map(c=>Math.abs(coinChange(c))),.01);
+    const moveWidth=Math.min(50,Math.abs(change)/maxChange*50);
     div.innerHTML = `
-      <div class="hotSymbol">
-        <span>${symbol}</span>
-        <span class="hotIcon">${isUp ? "↑" : "↓"}</span>
-      </div>
-      <div class="hotName">${coin.name || symbol}</div>
+      <div class="hot-card-header"><div class="hot-coin-mark" aria-hidden="true">${escapeMarketText(symbol.slice(0,3))}</div><div><div class="hotSymbol">${escapeMarketText(symbol)}</div><div class="hotName">${escapeMarketText(coin.name || symbol)}</div></div><span class="hot-move-label">${Math.abs(change)<.005?'持平':isUp?'↗ 上漲':'↘ 下跌'}</span></div>
       <div class="hotPrice">${fmtUSD(coinPrice(coin))}</div>
-      <div class="hotChange ${isUp ? "up" : "down"}">${fmtChange(change)} / 24h</div>
+      <div class="hot-change-row"><small>24 小時漲跌</small><div class="hotChange ${isUp ? "up" : "down"}">${fmtChange(change)}</div></div>
+      <div class="hot-change-track" role="img" aria-label="24 小時${isUp?'上漲':'下跌'} ${Math.abs(change).toFixed(2)}%，相對本列幣種的漲跌幅"><i class="hot-change-fill" style="left:${isUp?50:50-moveWidth}%;width:${moveWidth}%"></i><b></b></div>
       <div class="hotActions">
-        <button type="button" data-symbol="${symbol}">看走勢</button>
+        <button type="button" data-symbol="${escapeMarketText(symbol)}"><i class="fas fa-chart-line" aria-hidden="true"></i> 看走勢</button>
         <a href="/analysis/${encodeURIComponent(symbol)}">深度分析</a>
       </div>
     `;
@@ -443,6 +474,7 @@ function renderPopularCoinCards() {
       if (marketTicker) {
         marketTicker.value = symbol;
         await drawMarketChart();
+        document.getElementById('marketComparisonSection')?.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});
       }
     });
 
@@ -456,6 +488,14 @@ function renderPopularCoinCards() {
   if (meta) {
     const mood = upCount >= downCount ? "偏強" : "偏弱";
     meta.innerHTML = `<i class="fas fa-fire"></i> 熱門幣種：${mood}`;
+  }
+  const breadth=document.getElementById('marketBreadth');
+  if(breadth){
+    const rising=coins.filter(c=>coinChange(c)>=.005).length;
+    const falling=coins.filter(c=>coinChange(c)<=-.005).length;
+    const flat=coins.length-rising-falling;
+    breadth.hidden=!coins.length;
+    breadth.innerHTML=`<div class="breadth-title"><i class="fas fa-chart-simple" aria-hidden="true"></i><strong>這 ${coins.length} 種幣的漲跌分布</strong><small>24 小時 · 非全市場統計</small></div><div class="breadth-track" role="img" aria-label="${rising} 種上漲、${flat} 種持平、${falling} 種下跌"><i style="width:${rising/coins.length*100}%" class="breadth-up"></i><i style="width:${flat/coins.length*100}%" class="breadth-flat"></i><i style="width:${falling/coins.length*100}%" class="breadth-down"></i></div><div class="breadth-legend"><span class="up">↗ ${rising} 上漲</span><span>${flat} 持平</span><span class="down">↘ ${falling} 下跌</span></div>`;
   }
 }
 
@@ -563,8 +603,9 @@ async function drawMarketChart() {
         ? "目前使用 24 小時價格參考線，因完整走勢資料暫時無法取得。"
         : "";
 
-    const palette = ["#F97316", "#2563EB", "#10B981", "#8B5CF6", "#EF4444", "#0F766E"];
-    const datasets = [{
+    const palette = ["#ef7d2d", "#4b8278", "#10B981", "#c9a572", "#EF4444", "#0F766E"];
+    const rawSeries = [mainPts];
+    let datasets = [{
       label: `${mainTicker} 價格`,
       data: mainPts.map(function(p) { return p[1]; }),
       tension: 0.28,
@@ -581,6 +622,7 @@ async function drawMarketChart() {
       const pts = Array.isArray(series.prices) ? series.prices : [];
 
       if (pts.length) {
+        rawSeries.push(pts);
         const len = Math.min(mainPts.length, pts.length);
         labels = labels.slice(-len);
         datasets.push({
@@ -595,7 +637,23 @@ async function drawMarketChart() {
       }
     }
 
+    const compareLength=Math.min(labels.length,...datasets.map(ds=>ds.data.length));
+    labels=labels.slice(-compareLength);
+    datasets=datasets.map(ds=>({...ds,data:ds.data.slice(-compareLength)}));
+    const relative=marketChartMode==='return';
+    // Return comparisons share actual calendar dates, not just array positions.
+    let dailyComparison=false;
+    if(relative&&rawSeries.length>1){
+      const daily=rawSeries.map(points=>new Map(points.map(p=>[new Date(p[0]).toISOString().slice(0,10),Number(p[1])])));
+      const dates=Array.from(daily[0].keys()).filter(date=>daily.every(series=>series.has(date))).sort();
+      if(dates.length<2)throw new Error('比較幣種沒有足夠的共同日期資料');
+      labels=dates.map(date=>date.slice(5));
+      datasets=datasets.map((ds,i)=>({...ds,data:dates.map(date=>daily[i].get(date))}));
+      dailyComparison=true;
+    }
     updateChartSummary(mainTicker, datasets[0].data.map(Number).filter(Number.isFinite));
+    if(relative)datasets=datasets.map(ds=>({...ds,label:ds.label.replace('價格','區間漲跌'),data:ds.data.map(n=>pctChange(ds.data[0],n))}));
+    setText('chartModeNote',relative?(dailyComparison?'共同日期從 0% 起算，以每日最後一筆價格比較相對漲跌幅。':'從 0% 起算，查看所選期間的累積漲跌幅。'):'查看各幣種的實際價格；比較強弱時可切換漲跌幅。');
     if (sourceNote) {
       const insight = document.getElementById("chartInsight");
       if (insight) insight.textContent = `${insight.textContent} ${sourceNote}`;
@@ -604,7 +662,7 @@ async function drawMarketChart() {
     if (marketChart) marketChart.destroy();
 
     if (typeof Chart === "undefined") {
-      drawNativeLineChart(canvas, labels, datasets);
+      drawNativeLineChart(canvas, labels, datasets, relative);
       setStatus("chartStatus", `<i class="fas fa-check-circle"></i> 已載入`);
       showChartMessage("", false);
       renderOverlayList();
@@ -624,20 +682,20 @@ async function drawMarketChart() {
             tooltip: {
               callbacks: {
                 label: function(context) {
-                  return `${context.dataset.label}: ${fmtUSD(Number(context.raw))}`;
+                  return `${context.dataset.label}: ${relative?fmtChange(Number(context.raw)):fmtUSD(Number(context.raw))}`;
                 }
               }
             }
           },
           scales: {
             x: { grid: { display: false } },
-            y: { ticks: { callback: function(value) { return fmtUSD(Number(value)); } } }
+            y: { ticks: { callback: function(value) { return relative?fmtChange(Number(value)):fmtUSD(Number(value)); } } }
           }
         }
       });
     } catch (chartErr) {
       console.error(chartErr);
-      drawNativeLineChart(canvas, labels, datasets);
+      drawNativeLineChart(canvas, labels, datasets, relative);
     }
 
     setStatus("chartStatus", `<i class="fas fa-check-circle"></i> 已載入`);
@@ -672,6 +730,56 @@ function renderOverlayList() {
   });
 }
 
+function clearTechnicalVisuals() {
+  ["taRsiVisual", "taSmaVisual", "taEmaVisual", "taSignalVisual"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.replaceChildren();
+  });
+  ["taSmaDistance", "taEmaDistance"].forEach(id => setText(id, "等待資料"));
+}
+
+function renderTechnicalVisuals(prices, rsi, sma, ema, latest, className) {
+  const gauge = document.getElementById("taRsiVisual");
+  if (gauge && Number.isFinite(rsi)) {
+    const value = Math.max(0, Math.min(100, rsi));
+    const angle = value / 100 * Math.PI;
+    const x = 100 - 80 * Math.cos(angle), y = 100 - 80 * Math.sin(angle);
+    const label = value >= 70 ? "偏熱" : value <= 30 ? "偏冷" : "正常";
+    gauge.innerHTML = `<svg viewBox="0 0 200 118" role="img" aria-label="RSI ${rsi.toFixed(1)}，${label}，低於 30 偏冷，高於 70 偏熱">
+      <path d="M20 100 A80 80 0 0 1 53 35" fill="none" stroke="#82b297" stroke-width="13" stroke-linecap="round"/>
+      <path d="M53 35 A80 80 0 0 1 147 35" fill="none" stroke="#f4ba70" stroke-width="13"/>
+      <path d="M147 35 A80 80 0 0 1 180 100" fill="none" stroke="#d97664" stroke-width="13" stroke-linecap="round"/>
+      <circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="7" fill="#69452d" stroke="#fff" stroke-width="3"/>
+      <text x="100" y="92" text-anchor="middle" fill="#795a42" font-size="20">${label}</text>
+    </svg><div class="ta-gauge-labels"><span>偏冷</span><span>正常</span><span>偏熱</span></div>`;
+  }
+  [["taSmaVisual", "taSmaDistance", sma], ["taEmaVisual", "taEmaDistance", ema]].forEach(([id, distanceId, average]) => {
+    const host = document.getElementById(id), distance = document.getElementById(distanceId);
+    if (!host || !Number.isFinite(average) || average <= 0) return;
+    const points = prices.slice(-30);
+    const low = Math.min(...points, average), high = Math.max(...points, average);
+    const range = Math.max(high - low, high * .001);
+    const y = value => 94 - (value - low) / range * 74;
+    const coords = points.map((value, i) => [8 + i / Math.max(1, points.length - 1) * 224, y(value)]);
+    const path = coords.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(2)} ${y.toFixed(2)}`).join(" ");
+    const change = (latest / average - 1) * 100;
+    const above = latest >= average, color = above ? "#458b70" : "#c95d50";
+    host.innerHTML = `<svg viewBox="0 0 240 110" role="img" aria-label="近 ${points.length} 筆 BTC 價格，實線為價格，虛線為均價，目前${above ? "高於" : "低於"}均價 ${Math.abs(change).toFixed(2)}%">
+      <path d="${path} L232 104 L8 104 Z" fill="${color}" opacity=".08"/>
+      <path d="M8 ${y(average).toFixed(2)} H232" stroke="#c78c4f" stroke-width="2" stroke-dasharray="5 5"/>
+      <path d="${path}" fill="none" stroke="${color}" stroke-width="3" stroke-linejoin="round"/>
+      <circle cx="232" cy="${y(latest).toFixed(2)}" r="4" fill="${color}"/>
+    </svg>`;
+    if (distance) distance.innerHTML = `<span><i class="fas fa-arrow-trend-${above ? "up" : "down"}" aria-hidden="true"></i> ${above ? "高於" : "低於"}均價</span><b class="${above ? "up" : "down"}">${fmtChange(change)}</b>`;
+  });
+  const signal = document.getElementById("taSignalVisual");
+  if (signal) {
+    const icon = className === "signalBuy" ? "arrow-trend-up" : className === "signalSell" ? "arrow-trend-down" : "arrows-left-right";
+    const checks = [["RSI", rsi >= 70 ? "偏熱" : rsi <= 30 ? "偏冷" : "正常", rsi >= 70 ? "down" : "neutral"], ["SMA", latest >= sma ? "上方" : "下方", latest >= sma ? "up" : "down"], ["EMA", latest >= ema ? "上方" : "下方", latest >= ema ? "up" : "down"]];
+    signal.innerHTML = `<div class="ta-signal-icon ${className}"><i class="fas fa-${icon}" aria-hidden="true"></i></div><div class="ta-signal-checks">${checks.map(([name, label, tone]) => `<div class="${tone}"><span>${name}</span><b><i class="fas fa-circle" aria-hidden="true"></i> ${label}</b></div>`).join("")}</div>`;
+  }
+}
+
 async function loadTechnicalAnalysis() {
   const rsiEl = document.getElementById("taRsi");
   const smaEl = document.getElementById("taSma");
@@ -682,6 +790,7 @@ async function loadTechnicalAnalysis() {
 
   try {
     setStatus("taStatus", `<i class="fas fa-spinner fa-spin"></i> 計算中`);
+    clearTechnicalVisuals();
     const series = await fetchSeries("BTC", 90);
     const prices = (series.prices || []).map(function(p) {
       return Number(p[1]);
@@ -700,20 +809,20 @@ async function loadTechnicalAnalysis() {
 
     let signal = "觀望";
     let className = "signalNeutral";
-    let text = "市場仍需更多確認，適合保留彈性。";
+    let text = "均線與動能方向未一致，持續觀察。";
 
     if (latest > sma && latest > ema && rsi < 70) {
       signal = "偏多";
       className = "signalBuy";
-      text = "價格站上兩條均線，RSI 也沒有過熱，短線動能偏強；新手可等回檔或突破後再分批進場。";
+      text = "價格高於兩條均線，動能偏強。";
     } else if (rsi >= 70) {
       signal = "過熱";
       className = "signalSell";
-      text = "RSI 高於 70，代表買盤偏熱；不適合盲目追高，應先設定停利停損。";
+      text = "RSI 高於 70，短期買盤偏熱。";
     } else if (latest < sma && latest < ema) {
       signal = "偏弱";
       className = "signalSell";
-      text = "價格跌破 SMA 與 EMA，短中期動能偏弱；新手先觀望，等價格重新站回均線。";
+      text = "價格低於兩條均線，動能偏弱。";
     }
 
     if (signalEl) {
@@ -723,17 +832,19 @@ async function loadTechnicalAnalysis() {
     }
 
     if (signalTextEl) signalTextEl.textContent = text;
+    renderTechnicalVisuals(prices, rsi, sma, ema, latest, className);
     if (taGuide) {
       const rsiLabel = rsi >= 70 ? "偏熱" : rsi <= 30 ? "偏冷" : "正常";
-      taGuide.innerHTML = `<strong>新手解讀</strong><span>目前 BTC RSI 為 ${rsi.toFixed(1)}，屬於${rsiLabel}區間。價格 ${latest > sma ? "高於" : "低於"} SMA(50)，${latest > ema ? "高於" : "低於"} EMA(20)，綜合判斷為「${signal}」。</span>`;
+      taGuide.innerHTML = `<strong><i class="fas fa-circle-info" aria-hidden="true"></i> 觀察重點</strong><span>動能${rsiLabel} · 價格${latest > sma ? "高於" : "低於"}中期均價、${latest > ema ? "高於" : "低於"}短期均價。技術訊號僅供參考。</span>`;
     }
     setStatus("taStatus", `<i class="fas fa-check-circle"></i> 已更新`);
   } catch (err) {
     console.error(err);
+    clearTechnicalVisuals();
     if (rsiEl) rsiEl.textContent = "--";
     if (smaEl) smaEl.textContent = "--";
     if (emaEl) emaEl.textContent = "--";
-    if (signalEl) signalEl.textContent = "--";
+    if (signalEl) { signalEl.textContent = "--"; signalEl.classList.remove("signalBuy", "signalSell", "signalNeutral"); }
     if (signalTextEl) signalTextEl.textContent = "技術分析資料暫時無法取得。";
     if (taGuide) taGuide.innerHTML = `<strong>新手解讀</strong><span>目前無法取得足夠價格資料，請稍後重新整理。這不代表市場沒有風險，只是系統暫時不能計算指標。</span>`;
     setStatus("taStatus", `<i class="fas fa-circle-exclamation"></i> 無法計算`);
@@ -804,6 +915,14 @@ function disposeProfessionalChart() {
   professionalChart = null;
 }
 
+function renderCandlePrices(candle) {
+  const value = document.getElementById("tvOhlcValue");
+  if (!value) return;
+  const fields = [["開盤", "open"], ["最高", "high"], ["最低", "low"], ["收盤", "close"]];
+  setText("tvOhlcValue", fields.map(([label, key]) => `${label} ${candle ? fmtUSD(candle[key]) : "--"}`).join("　"));
+  value.innerHTML = fields.map(([label, key]) => `<div><span>${label}</span><strong>${candle ? fmtUSD(candle[key]) : "--"}</strong></div>`).join("");
+}
+
 function drawNativeCandlestickChart(canvas, candles) {
   const context = canvas.getContext && canvas.getContext("2d");
   if (!context) throw new Error("Canvas unavailable");
@@ -827,10 +946,10 @@ function drawNativeCandlestickChart(canvas, candles) {
   const upper = maxPrice + margin;
   const y = function(price) { return bottom - (price - lower) / (upper - lower) * (bottom - top); };
 
-  context.font = "12px system-ui, sans-serif";
+  context.font = "14px Arial, sans-serif";
   context.textAlign = "left";
-  context.strokeStyle = "#e2e8f0";
-  context.fillStyle = "#64748b";
+  context.strokeStyle = "#efe3d6";
+  context.fillStyle = "#8a735f";
   context.lineWidth = 1;
   for (let i = 0; i <= 4; i += 1) {
     const price = lower + (upper - lower) * i / 4;
@@ -846,7 +965,7 @@ function drawNativeCandlestickChart(canvas, candles) {
   const bodyWidth = Math.max(2, Math.min(16, step * .65));
   candles.forEach(function(candle, index) {
     const x = left + step * (index + .5);
-    const color = candle.close >= candle.open ? "#16a34a" : "#ef4444";
+    const color = candle.close >= candle.open ? "#409171" : "#cc5a50";
     context.strokeStyle = color;
     context.fillStyle = color;
     context.beginPath();
@@ -858,7 +977,7 @@ function drawNativeCandlestickChart(canvas, candles) {
     context.fillRect(x - bodyWidth / 2, bodyTop, bodyWidth, bodyHeight);
   });
 
-  context.fillStyle = "#64748b";
+  context.fillStyle = "#8a735f";
   const labelCount = Math.min(5, candles.length);
   for (let i = 0; i < labelCount; i += 1) {
     const index = Math.round((candles.length - 1) * i / Math.max(1, labelCount - 1));
@@ -880,26 +999,39 @@ function renderProfessionalCandles(host, canvas, candles) {
         height: host.clientHeight || 480,
         layout: {
           background: { type: "solid", color: "#ffffff" },
-          textColor: "#64748b",
+          textColor: "#8a735f",
+          fontSize: 14,
+          fontFamily: "Arial, sans-serif",
           attributionLogo: true
         },
         grid: {
-          vertLines: { color: "#f1f5f9" },
-          horzLines: { color: "#e2e8f0" }
+          vertLines: { visible: false },
+          horzLines: { color: "#f0e6dc", style: 2 }
         },
-        rightPriceScale: { borderColor: "#e2e8f0" },
-        timeScale: { borderColor: "#e2e8f0", timeVisible: true, secondsVisible: false }
+        crosshair: {
+          vertLine: { color: "#db955d", labelBackgroundColor: "#78573e", style: 2 },
+          horzLine: { color: "#db955d", labelBackgroundColor: "#78573e", style: 2 }
+        },
+        rightPriceScale: { borderColor: "#eadbc8", scaleMargins: { top: .12, bottom: .12 } },
+        timeScale: { borderColor: "#eadbc8", timeVisible: true, secondsVisible: false, rightOffset: 4 },
+        localization: { locale: "zh-TW", priceFormatter: price => fmtUSD(price) }
       });
       professionalChart = chart;
       const series = chart.addSeries(library.CandlestickSeries, {
-        upColor: "#16a34a",
-        downColor: "#ef4444",
-        wickUpColor: "#16a34a",
-        wickDownColor: "#ef4444",
+        upColor: "#409171",
+        downColor: "#cc5a50",
+        wickUpColor: "#409171",
+        wickDownColor: "#cc5a50",
         borderVisible: false,
         priceFormat: { type: "price", precision: 2, minMove: .01 }
       });
       series.setData(candles);
+      if (typeof chart.subscribeCrosshairMove === "function") {
+        chart.subscribeCrosshairMove(event => {
+          const selected = event.seriesData?.get(series);
+          renderCandlePrices(selected && [selected.open, selected.high, selected.low, selected.close].every(Number.isFinite) ? selected : candles[candles.length - 1]);
+        });
+      }
       chart.timeScale().fitContent();
       professionalFallbackCandles = null;
       return;
@@ -935,7 +1067,14 @@ async function drawProfessionalChart(days) {
     const latest = candles[candles.length - 1];
     setText("tvChartStatus", `BTC / USD · 近 ${days} 天 · ${interval}`);
     setText("tvSourceNote", `K 線資料來源：${source}。本站為 BTC/USD；外連 TradingView 為 BTC/USDT，兩者報價可能不同。`);
-    setText("tvOhlcValue", `最新 K 線：開盤 ${fmtUSD(latest.open)}　最高 ${fmtUSD(latest.high)}　最低 ${fmtUSD(latest.low)}　收盤 ${fmtUSD(latest.close)}`);
+    renderCandlePrices(latest);
+    setText("tvLatestPrice", fmtUSD(latest.close));
+    const movement = (latest.close / latest.open - 1) * 100;
+    const move = document.getElementById("tvCandleMove");
+    if (move) {
+      move.className = movement >= 0 ? "up" : "down";
+      move.textContent = `${movement >= 0 ? "↗" : "↘"} ${fmtChange(movement)} · 最新 K 線`;
+    }
     host.setAttribute("aria-label", `BTC 近 ${days} 天 ${interval} 圖`);
     canvas.setAttribute("aria-label", `BTC 近 ${days} 天 ${interval} 圖`);
     showProfessionalChartMessage("", false);
@@ -948,12 +1087,29 @@ async function drawProfessionalChart(days) {
     canvas.hidden = true;
     setText("tvChartStatus", "BTC K 線暫時無法取得");
     setText("tvSourceNote", "K 線資料暫時無法取得；仍可在 TradingView 開啟完整圖表。");
-    setText("tvOhlcValue", "開盤 --　最高 --　最低 --　收盤 --");
+    renderCandlePrices(null);
+    setText("tvLatestPrice", "--");
+    const move = document.getElementById("tvCandleMove");
+    if (move) { move.className = ""; move.textContent = "等待資料"; }
     showProfessionalChartMessage("K 線資料暫時無法取得，請稍後重試。", true);
   }
 }
 
 function initProfessionalChart() {
+  const fallbackCanvas = document.getElementById("tvFallbackChart");
+  if (fallbackCanvas) {
+    fallbackCanvas.addEventListener("pointermove", event => {
+      if (!professionalFallbackCandles || fallbackCanvas.hidden) return;
+      const rect = fallbackCanvas.getBoundingClientRect();
+      const width = Math.max(320, Math.floor(rect.width));
+      const x = (event.clientX - rect.left) / rect.width * width;
+      const index = Math.floor((x - 16) / (width - 102) * professionalFallbackCandles.length);
+      renderCandlePrices(professionalFallbackCandles[index] || professionalFallbackCandles[professionalFallbackCandles.length - 1]);
+    });
+    fallbackCanvas.addEventListener("pointerleave", () => {
+      if (professionalFallbackCandles) renderCandlePrices(professionalFallbackCandles[professionalFallbackCandles.length - 1]);
+    });
+  }
   const buttons = document.querySelectorAll("[data-tv-days]");
   buttons.forEach(function(button) {
     button.addEventListener("click", function() {
@@ -1012,6 +1168,11 @@ async function refreshAll() {
 }
 
 function initControls() {
+  document.querySelectorAll('[data-chart-mode]').forEach(button=>button.addEventListener('click',()=>{
+    marketChartMode=button.dataset.chartMode;
+    document.querySelectorAll('[data-chart-mode]').forEach(item=>item.setAttribute('aria-pressed',String(item===button)));
+    drawMarketChart();
+  }));
   const btnQuickDemo = document.getElementById("btnQuickDemo");
   const btnAddOverlay = document.getElementById("btnAddOverlay");
   const btnClearOverlay = document.getElementById("btnClearOverlay");

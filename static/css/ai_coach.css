@@ -105,7 +105,7 @@
   border:none;
   border-radius:15px;
   padding:0 18px;
-  background:linear-gradient(135deg,var(--brand),var(--brand-3));
+  background:var(--action-gradient);
   color:#fff;
   font-weight:950;
   cursor:pointer;
@@ -721,11 +721,11 @@
 }
 .next-step-box{
   margin-top:.65rem;
-  border:1px solid rgba(15,118,110,.18);
-  background:#f0fdfa;
+  border:1px solid rgba(118,58,15,.18);
+  background:#fdf5f0;
   border-radius:.65rem;
   padding:.62rem .72rem;
-  color:#115e59;
+  color:#5e3111;
 }
 .next-step-box strong{
   display:block;

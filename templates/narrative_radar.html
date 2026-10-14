@@ -1,107 +1,39 @@
-﻿<!doctype html>
-<html lang="zh-Hant">
-<head>
-  <style>
-    html.js-enabled body{opacity:0;transition:opacity .5s ease;}
-    html.js-enabled body.page-ready{opacity:1;}
-  </style>
+<!doctype html>
+<html lang="zh-Hant"><head>
+  <style>html.js-enabled body{opacity:0;transition:opacity .5s ease;}html.js-enabled body.page-ready{opacity:1;}</style>
   <script>document.documentElement.classList.add('js-enabled');</script>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AI 敘事雷達 | Smart Invest Crypto</title>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>敘事雷達 | Smart Invest Crypto｜智慧虛擬貨幣平台</title>
   <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo.jpg') }}">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-  <link rel="preconnect" href="https://cdn.jsdelivr.net">
   
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=radar">
-  <style>
-    .radar-grid{display:grid;grid-template-columns:minmax(0,.95fr) minmax(360px,.55fr);gap:22px;align-items:start}
-    .radar-list{display:grid;gap:12px}
-    .radar-item{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;padding:18px;border:1px solid var(--line);border-radius:18px;background:#fff}
-    .radar-item strong{display:block;color:var(--dark);font-size:18px}
-    .radar-item span{display:block;margin-top:4px;color:var(--muted);font-weight:800}
-    .radar-score{font-size:24px;font-weight:950;color:var(--brand)}
-    .quick-actions{display:grid;gap:12px}
-    .quick-actions .button{justify-content:flex-start}
-    .risk-table{width:100%;border-collapse:collapse;background:#fff}
-    .risk-table th,.risk-table td{padding:14px 16px;border-bottom:1px solid var(--line);text-align:left}
-    .risk-table th{color:var(--muted);font-size:13px}
-    .risk-table td{font-weight:850;color:var(--dark)}
-    @media(max-width:980px){.radar-grid{grid-template-columns:1fr}}
-  </style>
-</head>
-<body>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=brand-width-20261013">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/visual-refresh-1012.css') }}?v=orange-white-20261013">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/site-theme.css') }}?v=money-type-20261013">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/research-workspace.css') }}?v=research-20261015">
+</head><body class="narrative-page tools-page refresh-1012">
 {% include "partials/header.html" %}
-<main>
-  <section class="hero">
-    <div class="container hero-grid">
-      <div class="reveal is-visible">
-        <div class="eyebrow"><i class="fas fa-brain"></i> Narrative Radar</div>
-        <h1 class="hero-title">AI 敘事雷達</h1>
-        <p class="hero-lead">先看市場正在討論什麼，再搭配 SFI 風險排名決定要研究哪個幣種。</p>
-      </div>
-      <div class="hero-card reveal is-visible">
-        <div class="hero-card-title">
-          <div class="hero-card-icon"><i class="fas fa-signal"></i></div>
-          <div><small>TOP NARRATIVE</small><strong id="topNarrative">掃描中</strong></div>
-        </div>
-        <div class="hero-mini-grid">
-          <div class="hero-mini"><span>熱度</span><strong id="topScore">--</strong></div>
-          <div class="hero-mini"><span>市場</span><strong>Crypto</strong></div>
-          <div class="hero-mini"><span>用途</span><strong>選題</strong></div>
-        </div>
-      </div>
-    </div>
-  </section>
+<main aria-label="敘事雷達"><section class="section"><div class="container wide-container tools-stack">
+  <div class="tools-page-heading"><div><span class="tools-eyebrow">NARRATIVE RADAR</span><h1>敘事雷達</h1><p>抓住討論主線，再拆開題材熱度與風險。</p></div><div class="tools-heading-actions"><span class="tools-status" id="toolsStatus" role="status">載入中</span><button class="tools-refresh" id="toolsReload" type="button"><i class="fas fa-rotate" aria-hidden="true"></i> 更新資料</button><small id="toolsUpdatedAt">正在取得資料</small></div></div>
+  <nav class="tools-tabs" aria-label="研究工具"><a href="/social-sentiment"><span><i class="fas fa-satellite-dish" aria-hidden="true"></i></span><div><strong>社群分析</strong><small>看討論</small></div><i class="fas fa-arrow-right" aria-hidden="true"></i></a><a href="/narrative-radar" aria-current="page"><span><i class="fas fa-brain" aria-hidden="true"></i></span><div><strong>敘事雷達</strong><small>找題材</small></div><i class="fas fa-arrow-right" aria-hidden="true"></i></a><a href="/analysis/BTC"><span><i class="fas fa-microscope" aria-hidden="true"></i></span><div><strong>幣種分析</strong><small>查風險</small></div><i class="fas fa-arrow-right" aria-hidden="true"></i></a></nav>
 
-  <section class="section">
-    <div class="container radar-grid">
-      <section class="card">
-        <div class="section-head">
-          <div>
-            <h2 class="section-title">熱門敘事</h2>
-            <p class="section-copy">分數越高，代表近期訊號越集中。</p>
-          </div>
-        </div>
-        <div class="radar-list" id="narrativeList"><div class="member-record-empty">資料載入中...</div></div>
-      </section>
-
-      <aside class="card">
-        <h2 class="section-title">下一步</h2>
-        <div class="quick-actions" style="margin-top:18px">
-          <a class="button primary" href="/market"><i class="fas fa-chart-line"></i> 看市場</a>
-          <a class="button" href="/analysis/BTC"><i class="fas fa-microscope"></i> 分析 BTC</a>
-          <a class="button" href="/social-sentiment"><i class="fas fa-satellite-dish"></i> 看社群</a>
-        </div>
-      </aside>
-    </div>
+  <div class="tools-radar-grid">
+    <section class="card"><div class="tools-section-head"><div><span class="tools-eyebrow">01 / NARRATIVE HEAT</span><h2>題材熱度排行</h2></div><span class="tools-tag">關鍵字命中次數</span></div><div id="narrativeList" class="tools-heat-list"><div class="tools-empty">正在掃描題材…</div></div><p class="tools-footnote">條形依本次最高次數比較；次數可能包含重複報導。</p></section>
+    <aside class="card tools-focus-card"><span class="tools-eyebrow">CURRENT FOCUS</span><div class="tools-radar-orbit" aria-hidden="true"><i class="fas fa-satellite-dish"></i><span></span></div><span class="tools-muted">本次最常提到的題材</span><h2 id="topNarrative">掃描中</h2><div class="tools-focus-value"><strong id="topScore">--</strong><span>次關鍵字命中</span></div><div class="tools-focus-stats"><div><strong id="narrativeCount">--</strong><small>觀察題材</small></div><div><strong id="narrativeHits">--</strong><small>合計命中次數</small></div></div><a href="/social-sentiment" class="tools-inline-link">回看新聞與討論 <i class="fas fa-arrow-right" aria-hidden="true"></i></a></aside>
+  </div>
+  <section class="card" id="radarRisk"><div class="tools-section-head"><div><span class="tools-eyebrow">02 / RISK CHECK</span><h2>熱度之外，再看風險</h2></div><span class="tools-muted" id="radarVisible">載入中…</span></div>
+    <div class="tools-feed-controls"><label class="tools-search"><i class="fas fa-magnifying-glass" aria-hidden="true"></i><input id="radarCoinSearch" type="search" aria-label="搜尋風險幣種" placeholder="搜尋幣種或名稱"></label><select id="radarSort" aria-label="風險表排序"><option value="rank">依市值排名</option><option value="high">SFI 由高到低</option><option value="low">SFI 由低到高</option></select><span class="tools-table-key"><i></i> SFI 衡量歷史下跌連動</span></div>
+    <div class="table-wrap"><table class="tools-risk-table"><thead><tr><th>市值排名</th><th>幣種</th><th>24H 漲跌</th><th>SFI 分數</th><th>深入研究</th></tr></thead><tbody id="riskRows"><tr><td colspan="5">正在取得資料…</td></tr></tbody></table></div>
+    <p class="tools-footnote">BTC 是比較基準；低分不代表安全，分數也不是預測跌幅。</p>
   </section>
-
-  <section class="section">
-    <div class="container">
-      <div class="card">
-        <div class="section-head">
-          <div>
-            <h2 class="section-title">SFI 風險快排</h2>
-            <p class="section-copy">用風險分數幫你避開過熱或波動過大的標的。</p>
-          </div>
-        </div>
-        <div class="table-wrap">
-          <table class="risk-table">
-            <thead><tr><th>排名</th><th>幣種</th><th>24H</th><th>SFI</th><th></th></tr></thead>
-            <tbody id="riskRows"><tr><td colspan="5">資料載入中...</td></tr></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </section>
-</main>
+  <a class="tools-next-card" href="/analysis/BTC"><span class="tools-next-icon"><i class="fas fa-microscope" aria-hidden="true"></i></span><div><strong>接著拆解 BTC 與幣種風險</strong><span>用歷史連動、散點與模型路徑看懂指標。</span></div><i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+</div></section></main>
 <div class="float-actions"><a href="/" class="float-btn" title="回首頁"><i class="fas fa-house"></i></a><button class="float-btn" id="backToTopBtn" type="button" title="回到頂部"><i class="fas fa-arrow-up"></i></button></div>
 {% include "partials/footer.html" %}
-<div class="toast" id="toast"><div class="t">提示</div><div class="m">--</div></div>
-<script>window.__SUPABASE_CONFIG__ = { url: '{{ supabase_url | default("https://dummy.supabase.co") }}', anonKey: '{{ supabase_anon_key | default("dummy") }}' };</script>
-<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=auth-state-20260830"></script>
-<script src="{{ url_for('static', filename='js/common.js') }}?v=member-nav-lock-20260604"></script>
-<script src="{{ url_for('static', filename='js/narrative_radar.js') }}?v=radar"></script>
-</body>
-</html>
+<div class="toast" id="toast"><div class="t" id="toastT">提示</div><div class="m" id="toastM">--</div></div>
+<script>window.__SUPABASE_CONFIG__ = {url:'{{ supabase_url | default("https://dummy.supabase.co") }}',anonKey:'{{ supabase_anon_key | default("dummy") }}'};</script>
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=join-carousel-20261013"></script>
+<script src="{{ url_for('static', filename='js/common.js') }}?v=money-type-20261013"></script>
+<script src="{{ url_for('static', filename='js/research_tools.js') }}?v=research-20261015"></script>
+<script src="{{ url_for('static', filename='js/narrative_radar.js') }}?v=research-20261015"></script>
+</body></html>

@@ -47,6 +47,7 @@ function setStudioGenerating(isGenerating) {
     const market = $("podMarket");
     if (card) card.classList.toggle("is-generating", Boolean(isGenerating));
     if (market) market.disabled = Boolean(isGenerating);
+    document.querySelectorAll("[data-podcast-topic]").forEach(button => { button.disabled = Boolean(isGenerating); });
 }
 
 let popularCoinsCache = [];
@@ -67,8 +68,35 @@ let hasAudioSync = false;
 let latestScript = "";
 let latestAudioUrl = "";
 let browserVoiceActive = false;
+let browserVoicePaused = false;
+let browserVoiceRun = 0;
+let browserVoiceContinuation = null;
+let browserVoiceStatus = "正在使用瀏覽器朗讀。";
+let podcastState = "idle";
 
 const player = $("player");
+
+function setPodcastState(state) {
+    podcastState = state;
+    document.body.dataset.podcastState = state;
+    const labels = {idle:"等待生成",generating:"正在製作",ready:"可以播放",playing:"播放中",paused:"已暫停",ended:"播放完畢",error:"請重新生成"};
+    if ($("podcastState")) $("podcastState").textContent = labels[state] || labels.idle;
+    if ($("podcastDialogueStatus")) $("podcastDialogueStatus").textContent = state === "idle" ? "等待你的第一集" : labels[state];
+    const ready = Boolean(podcastLines.length || latestScript);
+    const playing = state === "playing";
+    const generating = state === "generating";
+    if ($("btnPodcastPlay")) $("btnPodcastPlay").disabled = !ready || generating || playing;
+    if ($("btnPodcastPause")) $("btnPodcastPause").disabled = !playing;
+    if ($("btnCopyScript")) $("btnCopyScript").disabled = !ready || generating;
+    const dock = $("btnPodcastDockPlay");
+    if (dock) {
+        dock.disabled = !ready || generating;
+        dock.setAttribute("aria-label", playing ? "暫停節目" : "播放節目");
+        dock.innerHTML = `<i class="fas fa-${playing ? "pause" : "play"}" aria-hidden="true"></i>`;
+    }
+    const seekable = !generating && Number.isFinite(player?.duration) && player.duration > 0 && Boolean(player?.getAttribute("src"));
+    ["podcastSeek", "btnPodcastBack", "btnPodcastForward"].forEach(id => { if ($(id)) $(id).disabled = !seekable; });
+}
 
 async function fetchPersonalPortfolioSummary() {
     const token = await window.authManager?.getToken?.().catch(() => null);
@@ -204,9 +232,9 @@ function escapeHTML(value) {
 }
 
 function normalizeSpeaker(speaker, index = 0) {
-    const s = String(speaker || "").trim();
-    if (["主持人", "Host", "host", "nova", "Nova"].includes(s)) return "主持人";
-    if (["分析師", "Analyst", "analyst", "onyx", "Onyx"].includes(s)) return "分析師";
+    const s = String(speaker || "").trim().toLowerCase();
+    if (["主持人", "主持", "host", "nova"].includes(s)) return "主持人";
+    if (["分析師", "分析", "analyst", "onyx"].includes(s)) return "分析師";
     return index % 2 === 0 ? "主持人" : "分析師";
 }
 
@@ -220,9 +248,9 @@ function normalizeLines(data) {
     }
 
     const script = data.script || "";
-    return script.split("\n").map((line, index) => {
+    return script.split("\n").filter(line => line.trim()).map((line, index) => {
         const clean = line.trim();
-        const match = clean.match(/^(主持人|分析師|Host|Analyst)[:：]\s*(.+)$/i);
+        const match = clean.match(/^(主持人|分析師|Host|Analyst|Nova|Onyx)[:：]\s*(.+)$/i);
         return {
             speaker: match ? normalizeSpeaker(match[1], index) : normalizeSpeaker("", index),
             text: match ? match[2] : clean
@@ -253,12 +281,42 @@ function appendChatBubble(speaker, text) {
         </div>
     `;
     stream.appendChild(row);
-    stream.scrollTo({ top: stream.scrollHeight, behavior: "smooth" });
+    row.dataset.lineIndex = stream.querySelectorAll(".chatRow").length - 1;
+    stream.querySelectorAll(".chatRow.is-current").forEach(item => item.classList.remove("is-current"));
+    row.classList.add("is-current");
+    stream.scrollTo({ top: stream.scrollHeight, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
 }
 
 function syncWatchlistFromTopic() {
     const topic = $("podMarket")?.value || "CRYPTO";
     selectedSymbols = (TOPIC_WATCHLISTS[topic] || TOPIC_WATCHLISTS.CRYPTO).slice();
+    const hints = {PERSONAL:"結合市場重點與已登入帳戶的配置。",CRYPTO:"一起掌握主流幣與整體市場動向。",ALT:"追蹤新興幣種與熱門話題。",BTC:"專注比特幣的價格走勢與市場訊號。",RISK:"聚焦市場波動、集中度與風險提醒。"};
+    if ($("podTopicHint")) $("podTopicHint").textContent = hints[topic] || hints.CRYPTO;
+    document.querySelectorAll("[data-podcast-topic]").forEach(button => {
+        const selected = button.dataset.podcastTopic === topic;
+        button.setAttribute("aria-checked", String(selected));
+        button.tabIndex = selected ? 0 : -1;
+    });
+}
+
+function initPodcastTopics() {
+    const select = $("podMarket");
+    if (!select) return;
+    const buttons = Array.from(document.querySelectorAll("[data-podcast-topic]"));
+    const choose = button => {
+        if (button.disabled || select.disabled) return;
+        select.value = button.dataset.podcastTopic;
+        select.dispatchEvent(new Event("change", {bubbles:true}));
+    };
+    buttons.forEach((button, index) => {
+        button.addEventListener("click", () => choose(button));
+        button.addEventListener("keydown", event => {
+            if (!["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp", "Home", "End"].includes(event.key)) return;
+            event.preventDefault();
+            const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : (index + (["ArrowRight", "ArrowDown"].includes(event.key) ? 1 : -1) + buttons.length) % buttons.length;
+            if (!buttons[next].disabled) { buttons[next].focus(); choose(buttons[next]); }
+        });
+    });
 }
 
 function resetChatStream(message = "按下播放後，對話泡泡會跟著語音同步出現。") {
@@ -287,6 +345,8 @@ function updateSpeakingState(speaker) {
         stage.classList.toggle("host-speaking", speaker === "主持人");
         stage.classList.toggle("analyst-speaking", speaker === "分析師");
     }
+    const status = $("podcastDialogueStatus");
+    if (status && speaker && podcastState === "playing") status.textContent = `${speaker === "主持人" ? "Nova" : "Onyx"} 正在說話`;
 }
 
 function estimateLineWeight(line) {
@@ -352,6 +412,7 @@ function renderBubblesUntil(lineCount) {
 
 function syncBubblesToAudioTime() {
     if (!player || !podcastLines.length || !hasAudioSync) return;
+    if (player.paused && player.currentTime === 0 && renderedLineCount === 0) return;
     if (!bubbleTimeline.length) buildBubbleTimeline(player.duration || 0);
 
     const current = player.currentTime || 0;
@@ -360,6 +421,7 @@ function syncBubblesToAudioTime() {
 
     const active = [...bubbleTimeline].reverse().find(segment => current >= segment.start && current < segment.end);
     updateSpeakingState(active ? active.speaker : "");
+    $("chatStream")?.querySelectorAll(".chatRow").forEach(row => row.classList.toggle("is-current", Number(row.dataset.lineIndex) === active?.index));
 }
 
 function startIntervalBubblePlayback(interval = 2600) {
@@ -389,11 +451,17 @@ function updateProgress() {
     const fill = $("progressFill");
     const timeText = $("timeText");
     if (!player || !fill || !timeText) return;
-    const duration = player.duration || 0;
-    const current = player.currentTime || 0;
+    const duration = Number.isFinite(player.duration) ? Math.max(0, player.duration) : 0;
+    const current = Math.max(0, Math.min(player.currentTime || 0, duration));
     const pct = duration ? (current / duration) * 100 : 0;
     fill.style.width = pct + "%";
     timeText.textContent = `${formatTime(current)} / ${formatTime(duration)}`;
+    if ($("podcastDockTime")) $("podcastDockTime").textContent = timeText.textContent;
+    const seek = $("podcastSeek");
+    if (seek) {
+        seek.value = Math.round(pct * 10);
+        seek.setAttribute("aria-valuetext", duration ? `${formatTime(current)}，共 ${formatTime(duration)}` : "尚未取得音訊時長");
+    }
 }
 
 function formatTime(seconds) {
@@ -409,48 +477,70 @@ function setAudioStatus(text) {
 }
 
 function formatAudioError(error) {
-    const message = error?.message || "";
-    const lower = message.toLowerCase();
-    if (
-        lower.includes("openai_api_key not set") ||
-        lower.includes("尚未設定 openai_api_key") ||
-        lower.includes("尚未設定")
-    ) {
-        return "尚未設定 OPENAI_API_KEY，無法生成雲端語音。已保留文字稿，可用播放按鈕啟動瀏覽器朗讀備援。";
-    }
-    if (
-        lower.includes("authenticationerror") ||
-        lower.includes("incorrect api key") ||
-        lower.includes("invalid api key") ||
-        lower.includes("401")
-    ) {
-        return "OpenAI API Key 驗證失敗。請重新產生新的 API key，貼到 .env 的 OPENAI_API_KEY，然後重啟 Flask。";
-    }
-    if (lower.includes("quota") || lower.includes("billing")) {
-        return "OpenAI 額度或付款設定有問題。請到 OpenAI Billing / Usage 確認帳戶可用額度。";
-    }
-    return message || "請確認 OpenAI API Key、額度與 TTS 模型。";
+    return "語音服務暫時無法使用，文字稿已保留。按下播放，可使用瀏覽器朗讀。";
 }
 
 function stopBrowserVoice() {
+    browserVoiceRun += 1;
+    browserVoiceContinuation = null;
     if ("speechSynthesis" in window) {
         window.speechSynthesis.cancel();
     }
     browserVoiceActive = false;
+    browserVoicePaused = false;
 }
 
-function speakPodcastWithBrowser() {
+function selectBrowserDialogueVoices(voices = []) {
+    const chinese = voices.filter(voice => /^(zh|cmn)(-|_|$)/i.test(voice.lang || ""));
+    const localePriority = voice => /TW|Hant/i.test(voice.lang) ? 0 : /CN|Hans/i.test(voice.lang) ? 1 : 2;
+    chinese.sort((a, b) => localePriority(a) - localePriority(b));
+    const female = /hsiao.?chen|hsiao.?yu|xiaoxiao|xiaoyi|huihui|yaoyao|hanhan|ting.?ting|mei.?jia|female|曉|慧慧/i;
+    const male = /yun.?jhe|yun.?jian|yun.?xi|yun.?yang|kang.?kang|zhi.?wei|\bmale\b|雲哲|云健|康康/i;
+    const host = chinese.find(voice => female.test(voice.name)) || chinese.find(voice => !male.test(voice.name)) || chinese[0] || null;
+    const different = chinese.filter(voice => voice !== host && (voice.voiceURI || voice.name) !== (host?.voiceURI || host?.name));
+    const analyst = different.find(voice => male.test(voice.name)) || different[0] || host;
+    return { host, analyst, distinct: Boolean(host && analyst && host !== analyst) };
+}
+
+function loadBrowserVoices() {
+    const synth = window.speechSynthesis;
+    if (typeof synth.getVoices !== "function") return Promise.resolve([]);
+    const initial = synth.getVoices();
+    if (initial.length) return Promise.resolve(initial);
+    return new Promise(resolve => {
+        let timeout;
+        const finish = () => {
+            const voices = synth.getVoices();
+            synth.removeEventListener?.("voiceschanged", onVoices);
+            clearTimeout(timeout);
+            resolve(voices);
+        };
+        const onVoices = () => { if (synth.getVoices().length) finish(); };
+        synth.addEventListener?.("voiceschanged", onVoices);
+        timeout = setTimeout(finish, 1200);
+        onVoices();
+    });
+}
+
+function resumeBrowserVoice() {
+    window.speechSynthesis.resume();
+    browserVoicePaused = false;
+    setPodcastState("playing");
+    setAudioStatus(browserVoiceStatus);
+    const continuation = browserVoiceContinuation;
+    browserVoiceContinuation = null;
+    continuation?.();
+}
+
+async function speakPodcastWithBrowser() {
     if (!("speechSynthesis" in window)) {
-        showPodcastToast("沒有可用語音", "這個瀏覽器不支援內建朗讀，請設定 OPENAI_API_KEY 產生雲端語音。");
+        showPodcastToast("沒有可用語音", "這個瀏覽器不支援內建朗讀。文字稿仍可閱讀或複製。");
         return;
     }
 
     const lines = podcastLines.length
         ? podcastLines
-        : latestScript.split(/\n+/).filter(Boolean).map((text, index) => ({
-            speaker: normalizeSpeaker("", index),
-            text: text.replace(/^(主持人|分析師)[:：]\s*/, "")
-        }));
+        : normalizeLines({ script: latestScript });
 
     if (!lines.length) {
         showPodcastToast("尚未有文字稿", "請先生成 Podcast。");
@@ -458,30 +548,48 @@ function speakPodcastWithBrowser() {
     }
 
     stopBrowserVoice();
+    const run = browserVoiceRun;
     resetChatStream("正在使用瀏覽器朗讀備援，泡泡會依序出現。");
     browserVoiceActive = true;
-    setAudioStatus("正在使用瀏覽器朗讀備援。若要生成正式音檔，請設定 OPENAI_API_KEY。");
+    setPodcastState("playing");
+    setAudioStatus("正在準備瀏覽器語音...");
+    const voices = selectBrowserDialogueVoices(await loadBrowserVoices());
+    if (run !== browserVoiceRun) return;
+    browserVoiceStatus = voices.distinct
+        ? "瀏覽器雙人朗讀：Nova 主持 · Onyx 分析。"
+        : "瀏覽器沒有兩種可用的中文音色；請使用雲端語音聆聽雙人聲音。";
+    if (!browserVoicePaused) setAudioStatus(browserVoiceStatus);
 
     let index = 0;
     const speakNext = () => {
+        if (run !== browserVoiceRun) return;
+        if (browserVoicePaused) { browserVoiceContinuation = speakNext; return; }
         if (!browserVoiceActive || index >= lines.length) {
             browserVoiceActive = false;
             updateSpeakingState("");
             setAudioStatus(index >= lines.length ? "瀏覽器朗讀完畢" : "瀏覽器朗讀已停止");
+            setPodcastState(index >= lines.length ? "ended" : "ready");
             return;
         }
 
         const line = lines[index];
         appendChatBubble(line.speaker, line.text);
+        if ($("timeText")) $("timeText").textContent = "瀏覽器朗讀";
+        if ($("podcastDockTime")) $("podcastDockTime").textContent = `${index + 1} / ${lines.length} 段`;
         const utterance = new SpeechSynthesisUtterance(line.text);
         utterance.lang = "zh-TW";
         utterance.rate = 1;
-        utterance.pitch = normalizeSpeaker(line.speaker, index) === "主持人" ? 1.04 : .92;
+        const isHost = normalizeSpeaker(line.speaker, index) === "主持人";
+        const voice = isHost ? voices.host : voices.analyst;
+        if (voice) utterance.voice = voice;
+        utterance.pitch = voices.distinct ? 1 : (isHost ? 1.04 : .92);
         utterance.onend = () => {
+            if (run !== browserVoiceRun) return;
             index += 1;
             speakNext();
         };
         utterance.onerror = () => {
+            if (run !== browserVoiceRun) return;
             index += 1;
             speakNext();
         };
@@ -492,6 +600,7 @@ function speakPodcastWithBrowser() {
 }
 
 function setPlayerSource(url) {
+    if (latestAudioUrl.startsWith("blob:") && latestAudioUrl !== url) URL.revokeObjectURL(latestAudioUrl);
     latestAudioUrl = url || "";
     if (!player) return;
 
@@ -510,7 +619,7 @@ function setPlayerSource(url) {
     hasAudioSync = true;
     bubbleTimeline = [];
     resetChatStream("語音已生成。按下播放後，泡泡會依照音訊時間同步出現。");
-    setAudioStatus("語音已生成，可以播放。");
+    setAudioStatus("AI 雙人語音已生成，可以播放。");
 }
 
 async function buildDialogueAudio(lines, speed) {
@@ -551,8 +660,18 @@ async function generatePodcast(btn) {
     const stream = $("chatStream");
 
     try {
+        if (player) player.pause();
+        stopBrowserVoice();
+        clearInterval(bubbleTimer);
+        bubbleTimer = null;
+        podcastLines = [];
+        latestScript = "";
+        bubbleTimeline = [];
+        if (scriptBox) scriptBox.textContent = "";
+        setPlayerSource("");
         setButtonLoading(btn, '<i class="fas fa-wand-magic-sparkles fa-spin"></i> 生成中...');
         setStudioGenerating(true);
+        setPodcastState("generating");
         clearInterval(bubbleTimer);
         if (stream) stream.innerHTML = '<div class="chat-empty">正在生成對話內容...</div>';
         setAudioStatus("正在生成 Podcast...");
@@ -592,11 +711,15 @@ async function generatePodcast(btn) {
         }
 
         podcastLines = normalizeLines(data);
+        if (new Set(podcastLines.map(line => line.speaker)).size !== 2) {
+            throw new Error("Podcast requires two speakers");
+        }
         latestScript = podcastLines.length
             ? podcastLines.map(line => `${line.speaker}：${line.text}`).join("\n")
             : (data.script || "");
+        if (!latestScript.trim()) throw new Error("Empty podcast content");
 
-        if (titleEl) titleEl.textContent = data.title || "Smart Invest 雙人市場快報";
+        if (titleEl) titleEl.textContent = data.title || "Smart Invest Crypto 雙人市場快報";
         if (bulletEl) {
             const bullets = Array.isArray(data.bullets) ? data.bullets : [];
             bulletEl.textContent = bullets.length ? bullets.join(" · ") : "已生成本集摘要與聊天內容。";
@@ -618,15 +741,21 @@ async function generatePodcast(btn) {
             }
         }
         if (!latestAudioUrl) {
-            startIntervalBubblePlayback();
+            resetChatStream("文字稿已備妥，按播放即可使用瀏覽器朗讀。");
         }
+        setPodcastState("ready");
 
         showPodcastToast("生成成功", latestAudioUrl ? "雙人語音與聊天內容已完成" : "聊天內容已完成，語音暫時無法產生");
     } catch (err) {
         console.error(err);
-        if (stream) stream.innerHTML = '<div class="chat-empty">生成失敗，請確認後端 API 是否正常。</div>';
-        setAudioStatus("生成失敗，請檢查 /podcast/generate 後端回傳格式。");
-        showPodcastToast("錯誤", err.message || "生成失敗，請稍後再試");
+        const hint = err.message === "Podcast requires two speakers" ? "這次未形成雙人對話，請重新生成。" : "請稍後重新生成。";
+        if (stream) stream.innerHTML = `<div class="chat-empty"><i class="fas fa-rotate-right" aria-hidden="true"></i><strong>這次未能完成節目</strong><span>${hint}</span></div>`;
+        podcastLines = []; latestScript = "";
+        if (scriptBox) scriptBox.textContent = "";
+        setPlayerSource("");
+        setAudioStatus("節目生成失敗，請稍後再試。");
+        setPodcastState("error");
+        showPodcastToast("生成失敗", "請稍後再試，或換個主題重新生成。");
     } finally {
         setStudioGenerating(false);
         resetButtonLoading(btn);
@@ -696,15 +825,31 @@ function initSpeedControl() {
     syncSpeed();
 }
 
+function scrollToPodcastDialogue() {
+    const dialogue = $("podcastDialogueSection") || document.querySelector(".podcast-dialogue-fullscreen");
+    if (!dialogue) return;
+    window.setTimeout(() => {
+        const header = document.querySelector(".site-header");
+        dialogue.style.scrollMarginTop = `${(header?.getBoundingClientRect().height || 0) + 16}px`;
+        dialogue.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" });
+    }, 120);
+}
+
 function initPlayerButtons() {
     bindClick("btnPodcastPlay", async () => {
+        if (browserVoicePaused) {
+            resumeBrowserVoice();
+            scrollToPodcastDialogue();
+            return;
+        }
         if (!player || !player.src) {
             if (latestScript || podcastLines.length) {
                 speakPodcastWithBrowser();
+                scrollToPodcastDialogue();
                 showPodcastToast("使用瀏覽器朗讀", "未取得雲端音檔，已改用瀏覽器內建語音。");
                 return;
             }
-            showPodcastToast("尚未有語音", "請先生成 Podcast。若要正式音檔，請設定 OPENAI_API_KEY。");
+            showPodcastToast("尚未有語音", "選擇主題並生成節目，即可開始聆聽。");
             return;
         }
 
@@ -713,17 +858,27 @@ function initPlayerButtons() {
             if (!bubbleTimeline.length) buildBubbleTimeline(player.duration || 0);
             syncBubblesToAudioTime();
             await player.play();
+            scrollToPodcastDialogue();
         } catch (e) {
-            showPodcastToast("播放失敗", "瀏覽器阻擋播放，請直接點播放器播放");
+            showPodcastToast("播放未開始", "請再按一次播放，或稍後重新生成節目。");
         }
     });
 
     bindClick("btnPodcastPause", () => {
+        if (browserVoiceActive) {
+            window.speechSynthesis.pause();
+            browserVoicePaused = true;
+            setPodcastState("paused");
+            setAudioStatus("已暫停瀏覽器朗讀。");
+            updateSpeakingState("");
+            return;
+        }
         if (player) player.pause();
         stopBrowserVoice();
         clearInterval(bubbleTimer);
         bubbleTimer = null;
         syncBubblesToAudioTime();
+        updateSpeakingState("");
     });
 
     bindClick("btnPodcastRestart", async () => {
@@ -736,9 +891,20 @@ function initPlayerButtons() {
                 await player.play();
             } catch (_) {}
         } else {
-            startIntervalBubblePlayback();
+            speakPodcastWithBrowser();
         }
     });
+
+    bindClick("btnPodcastDockPlay", () => $(podcastState === "playing" ? "btnPodcastPause" : "btnPodcastPlay")?.click());
+    const seek = seconds => {
+        if (!player || !Number.isFinite(player.duration) || player.duration <= 0) return;
+        player.currentTime = Math.max(0, Math.min(seconds, player.duration));
+        updateProgress();
+        syncBubblesToAudioTime();
+    };
+    $("podcastSeek")?.addEventListener("input", event => seek(Number(event.target.value) / 1000 * player.duration));
+    bindClick("btnPodcastBack", () => seek(player.currentTime - 15));
+    bindClick("btnPodcastForward", () => seek(player.currentTime + 15));
 
     if (player) {
         player.addEventListener("timeupdate", () => {
@@ -749,15 +915,24 @@ function initPlayerButtons() {
             updateProgress();
             buildBubbleTimeline(player.duration || 0);
             syncBubblesToAudioTime();
+            if (podcastState !== "generating" && latestScript) setPodcastState(player.paused ? "ready" : "playing");
         });
         player.addEventListener("seeked", syncBubblesToAudioTime);
         player.addEventListener("play", () => {
             hasAudioSync = true;
+            setPodcastState("playing");
             syncBubblesToAudioTime();
             setAudioStatus("播放中，對話泡泡已同步音訊時間。");
         });
-        player.addEventListener("pause", () => setAudioStatus("已暫停"));
+        player.addEventListener("pause", () => {
+            if (podcastState !== "generating" && latestScript) {
+                setPodcastState("paused");
+                setAudioStatus("已暫停");
+                updateSpeakingState("");
+            }
+        });
         player.addEventListener("ended", () => {
+            setPodcastState("ended");
             setAudioStatus("播放完畢");
             clearInterval(bubbleTimer);
             bubbleTimer = null;
@@ -765,12 +940,50 @@ function initPlayerButtons() {
             updateSpeakingState("");
         });
         player.addEventListener("error", () => {
-            setAudioStatus("音訊載入失敗，請檢查 audio_url 路徑是否正確。");
+            setPlayerSource("");
+            setPodcastState(latestScript ? "ready" : "error");
+            setAudioStatus("音訊暫時無法載入。文字稿已保留，按播放可使用瀏覽器朗讀。");
         });
     }
 }
 
+function initImmersiveReading() {
+    const dialogue = $("podcastDialogueSection"), button = $("btnPodcastFocus");
+    if (!dialogue || !button) return;
+    let background = [];
+    const toggle = active => {
+        document.body.classList.toggle("podcast-focus", active);
+        button.setAttribute("aria-pressed", String(active));
+        button.innerHTML = `<i class="fas fa-${active ? "compress" : "expand"}" aria-hidden="true"></i> ${active ? "離開沉浸" : "沉浸閱讀"}`;
+        if (active) {
+            background = Array.from(document.querySelectorAll(".site-header,.footer,.float-actions,.podcast-player-section,#toast")).map(el => ({el,inert:el.inert}));
+            background.forEach(({el}) => { el.inert = true; });
+            dialogue.setAttribute("role", "dialog");
+            dialogue.setAttribute("aria-modal", "true");
+            dialogue.setAttribute("aria-labelledby", "podcastDialogueTitle");
+        } else {
+            background.forEach(({el,inert}) => { el.inert = inert; });
+            background = [];
+            dialogue.removeAttribute("role");
+            dialogue.removeAttribute("aria-modal");
+            dialogue.removeAttribute("aria-labelledby");
+        }
+        button.focus({preventScroll:true});
+    };
+    button.addEventListener("click", () => toggle(!document.body.classList.contains("podcast-focus")));
+    dialogue.addEventListener("keydown", event => {
+        if (!document.body.classList.contains("podcast-focus")) return;
+        if (event.key === "Escape") { event.preventDefault(); toggle(false); return; }
+        if (event.key !== "Tab") return;
+        const focusable = Array.from(dialogue.querySelectorAll("button:not(:disabled),a[href],[tabindex='0']")).filter(el => el.offsetParent !== null);
+        const first = focusable[0], last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    });
+}
+
 function initPodcastPage() {
+    window.speechSynthesis?.getVoices?.();
     syncWatchlistFromTopic();
 
     bindClick("btnGenPodcast", function() {
@@ -781,12 +994,15 @@ function initPodcastPage() {
     if (marketSelect) {
         marketSelect.addEventListener("change", syncWatchlistFromTopic);
     }
+    initPodcastTopics();
 
     bindClick("btnCopyScript", copyScript);
 
     initSpeedControl();
     initPlayerButtons();
-    updateSpeakingState("主持人");
+    initImmersiveReading();
+    updateSpeakingState("");
+    setPodcastState("idle");
 }
 
 document.addEventListener("DOMContentLoaded", initPodcastPage);

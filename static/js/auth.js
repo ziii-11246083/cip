@@ -123,7 +123,7 @@ function isLoggedIn() {
 function getUserLabel(user) {
     const metadata = user?.user_metadata || {};
     const email = String(user?.email || "").trim();
-    return metadata.display_name || metadata.full_name || metadata.name || email.split("@")[0] || "Smart Invest 會員";
+    return metadata.display_name || metadata.full_name || metadata.name || email.split("@")[0] || "Smart Invest Crypto 會員";
 }
 
 function getProfile() {
@@ -253,28 +253,33 @@ async function applyAuthFromUrl() {
 
 function updateMembership(session) {
     const user = session?.user || null;
+    const premium = Boolean(user) && getMembershipTier() === "premium";
     if (user) {
         window.smartInvestMembership = {
             isMember: true,
+            isPremium: premium,
             email: user.email || "已登入"
         };
     } else {
         window.smartInvestMembership = {
             isMember: false,
+            isPremium: false,
             email: ""
         };
     }
 
     document.body?.classList.toggle("is-logged-in", Boolean(user));
     document.body?.classList.toggle("is-guest", !user);
-    document.body?.classList.toggle("is-member-locked", !Boolean(user));
+    document.body?.classList.toggle("is-member-locked", !premium);
     document.querySelectorAll(".member-nav i").forEach((icon) => {
-        icon.classList.toggle("fa-lock", !user);
-        icon.classList.toggle("fa-unlock", Boolean(user));
+        const allowed = icon.closest?.("[data-member-required]")?.dataset.memberRequired === "會員中心" ? Boolean(user) : premium;
+        icon.classList.toggle("fa-lock", !allowed);
+        icon.classList.toggle("fa-unlock", allowed);
     });
     window.dispatchEvent(new CustomEvent("smartinvest:auth-state", {
         detail: {
             isMember: Boolean(user),
+            isPremium: premium,
             isGuest: !user,
             email: user?.email || "",
             userId: user?.id || ""
@@ -379,7 +384,7 @@ window.authManager = {
             alert(`登入失敗: ${error.message}`);
         }
     },
-    signUpWithEmail: async (email, password, metadata = {}) => {
+    signUpWithEmail: async (email, password, metadata = {}, flow = {}) => {
         if (!requireSupabase()) return false;
         if (!email || !password) {
             alert("請輸入信箱與密碼");
@@ -394,8 +399,8 @@ window.authManager = {
             const { data, error } = await supabase.auth.signUp(payload);
             if (error) throw error;
             if (data?.session) applyAuthState(data.session);
-            alert("註冊成功，請檢查信箱完成驗證（若已關閉驗證則會直接登入）");
-            window.location.reload();
+            if (flow.notify !== false) alert("帳號已建立，請檢查信箱完成驗證。");
+            if (flow.reload !== false) window.location.reload();
             return true;
         } catch (error) {
             alert(`註冊失敗: ${error.message}`);
@@ -442,12 +447,16 @@ window.authManager = {
         return currentSession;
     },
     requireMember: (featureName) => {
-        if (isLoggedIn()) return true;
-        return notifyRequireLogin(featureName);
+        if (!isLoggedIn()) return notifyRequireLogin(featureName);
+        if (featureName === "會員中心" || getMembershipTier() === "premium") return true;
+        window.toast?.("進階會員限定", "完成付款開通後即可使用此功能。99 TWD／月。");
+        window.location.assign("/register?step=payment");
+        return false;
     },
     openLogin: () => openLoginPopup(),
     getProfile: () => getProfile(),
     getMembershipTier: () => getMembershipTier(),
+    hasPremiumAccess: () => getMembershipTier() === "premium",
     updateProfile: async ({ displayName, avatarKey }) => {
         if (!isLoggedIn()) throw new Error("請先登入會員。");
         const name = String(displayName || "").trim();
@@ -524,3 +533,4 @@ if (supabase) {
 } else {
     refreshSession().finally(markAuthReady);
 }
+

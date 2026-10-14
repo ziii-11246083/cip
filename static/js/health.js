@@ -4,6 +4,12 @@ let popularCoinsCache = [];
 let weightsChartInstance = null;
 const HEALTH_RECORD_KEY_PREFIX = "smartinvest_health_records";
 let activeHealthUserId = null;
+let activeHealthPremium = false;
+let analyzeBusy = false;
+let analysisController = null;
+let analysisRevision = 0;
+let fomoRequestId = 0;
+const ALLOCATION_COLORS = ["#ef7d2d", "#368575", "#a5bd86", "#e4b551", "#bb7758", "#7b695d"];
 
 const DEFAULT_COINS = [
   { symbol:"BTC", name:"Bitcoin" },
@@ -23,10 +29,10 @@ function $(id){
 }
 
 function isHealthMember(){
-  return Boolean(window.authManager?.isLoggedIn?.() || window.smartInvestMembership?.isMember);
+  return Boolean(window.authManager?.hasPremiumAccess?.() ?? (window.authManager?.getMembershipTier?.() === "premium"));
 }
 
-function requireHealthMember(featureName = "投資配置健康度檢查"){
+function requireHealthMember(featureName = "投資健康度"){
   if(isHealthMember()) return true;
 
   if(window.authManager?.requireMember){
@@ -38,7 +44,8 @@ function requireHealthMember(featureName = "投資配置健康度檢查"){
 }
 
 function formatMoney(value){
-  return Number(value || 0).toLocaleString("zh-TW", {
+  const cents = Math.round(Number(value || 0) * 100);
+  return "USD " + (cents === 0 ? 0 : cents / 100).toLocaleString("zh-TW", {
     maximumFractionDigits: 2
   });
 }
@@ -50,13 +57,11 @@ function formatPct(value){
 
 function getTotalCapital(){
   const total = Number($("totalCapital")?.value || 0);
-  return Math.max(0, total);
+  return Number.isFinite(total) ? Math.max(0, Math.round(total*100)/100) : 0;
 }
 
 function getAllocatedAmount(){
-  return Object.values(portfolioAssets).reduce((sum, item) => {
-    return sum + Number(item.amount || 0);
-  }, 0);
+  return Object.values(portfolioAssets).reduce((sum, item) => sum + Math.round(Number(item.amount || 0) * 100), 0) / 100;
 }
 
 function coinIcon(symbol){
@@ -78,6 +83,9 @@ function getHealthRecordKey(userId = getHealthUserId()){
 }
 
 function resetHealthWorkspace(){
+  analysisRevision++;
+  analysisController?.abort();
+  setAnalyzeLoading(false);
   portfolioAssets = {};
 
   if(weightsChartInstance){
@@ -86,11 +94,6 @@ function resetHealthWorkspace(){
   }
 
   if($("assetAmount")) $("assetAmount").value = "";
-  if($("coinSearchInput")) $("coinSearchInput").value = "";
-  if($("fomoChange")) {
-    $("fomoChange").value = "";
-    delete $("fomoChange").dataset.change;
-  }
 
   if($("assetBubbles")) $("assetBubbles").innerHTML = `<div class="empty">尚未加入配置。</div>`;
   if($("riskBadgeMini")) $("riskBadgeMini").textContent = "尚未計算";
@@ -100,10 +103,61 @@ function resetHealthWorkspace(){
   if($("kMdd")) $("kMdd").textContent = "--";
   if($("riskMeterText")) $("riskMeterText").textContent = "尚未分析";
   if($("riskBar")) $("riskBar").style.width = "0%";
-  if($("aiReport")) $("aiReport").textContent = "完成健康度檢查後，這裡會顯示配置摘要。";
+  renderEmptyHealthReport();
 
   updateBudgetSummary();
   drawChart();
+}
+
+function portfolioReadiness(){
+  const total = getTotalCapital(), allocated = getAllocatedAmount();
+  if(total <= 0) return {ready:false, message:"先輸入大於 0 的總預算。"};
+  if(!Object.keys(portfolioAssets).length) return {ready:false, message:"加入至少一個幣種，或使用一鍵配置。"};
+  if(!Number.isFinite(allocated) || Object.values(portfolioAssets).some(a => !Number.isFinite(a.amount) || a.amount <= 0)) return {ready:false, message:"配置金額必須為有效的正數。"};
+  if(Math.round(allocated * 100) > Math.round(total * 100)) return {ready:false, message:"配置超過總預算，請調整金額。"};
+  const draft = Number($("assetAmount")?.value || 0);
+  if(draft !== 0) return {ready:false, message:"有未加入的金額，請先加入配置或清空輸入。"};
+  return {ready:true, message:allocated < total ? `尚餘 ${formatMoney(total-allocated)} 未配置；分析以已配置部位為準。` : "預算已完成配置，可以開始檢查。"};
+}
+
+function updateAnalyzeReadiness(){
+  const state = portfolioReadiness();
+  if($("btnAnalyze")) $("btnAnalyze").disabled = analyzeBusy || !state.ready || !isHealthMember();
+  if($("allocationReadyTitle")) $("allocationReadyTitle").textContent = analyzeBusy ? "正在檢查配置" : state.ready ? "配置就緒" : "先完成配置";
+  if($("allocationReadyText")) $("allocationReadyText").textContent = analyzeBusy ? "讀取歷史行情，整理配置摘要…" : state.message;
+  if($("btnAutoAllocate")) $("btnAutoAllocate").disabled = analyzeBusy || getTotalCapital() <= 0;
+}
+
+function renderEmptyHealthReport(){
+  if($("aiReport")) $("aiReport").innerHTML = `<div class="health-report-empty"><i class="fas fa-chart-simple" aria-hidden="true"></i><strong>你的配置，會在這裡變成一份圖解</strong><div><span>配置比例</span><span>歷史波動</span><span>重點提醒</span></div><small>完成配置後，按「檢查配置」。</small></div>`;
+}
+
+function invalidateHealthReport(){
+  if(analyzeBusy) return;
+  if($("kVol")) $("kVol").textContent = "待檢查";
+  if($("kMdd")) $("kMdd").textContent = "待檢查";
+  renderEmptyHealthReport();
+}
+
+function renderAllocationLegend(){
+  const total = getTotalCapital(), allocated = getAllocatedAmount();
+  const entries = Object.values(portfolioAssets);
+  const base = Math.max(total, allocated);
+  const rows = entries.map((asset,index) => ({label:asset.symbol, amount:asset.amount, color:ALLOCATION_COLORS[index % ALLOCATION_COLORS.length]}));
+  if(total > allocated) rows.push({label:"未配置", amount:total-allocated, color:"#e9ddcc"});
+  if($("allocationLegend")) $("allocationLegend").innerHTML = rows.length ? rows.map(row => `<div class="allocation-legend-row"><div><span class="allocation-dot" style="background:${row.color}" aria-hidden="true"></span><strong>${escapeHTML(row.label)}</strong><b>${formatPct(base > 0 ? row.amount/base*100 : 0)}</b></div><div class="visual-track"><div style="width:${base > 0 ? row.amount/base*100 : 0}%;background:${row.color}"></div></div><small>${formatMoney(row.amount)}</small></div>`).join("") : `<div class="allocation-legend-empty"><i class="fas fa-chart-pie" aria-hidden="true"></i><strong>先加入你的第一個幣種</strong><small>每筆配置都會變成一段比例。</small></div>`;
+  const progress = total > 0 ? allocated/total*100 : 0;
+  if($("allocationProgressText")) $("allocationProgressText").textContent = allocated > 0 ? `${formatPct(progress)}${allocated > total ? " · 超出預算" : ""}` : "尚未加入配置";
+  if($("allocationProgressBar")) $("allocationProgressBar").style.width = Math.min(100,Math.max(0,progress)) + "%";
+  if($("allocationProgressBar")) $("allocationProgressBar").classList.toggle("over-budget", allocated > total);
+  const ratios = entries.map(a => a.amount/allocated).sort((a,b) => b-a);
+  const top1 = ratios[0] || 0, top3 = ratios.slice(0,3).reduce((a,b)=>a+b,0);
+  if($("kTop1")) $("kTop1").textContent = allocated > 0 ? formatPct(top1*100) : "--";
+  if($("kTop3")) $("kTop3").textContent = allocated > 0 ? formatPct(top3*100) : "--";
+  for(const [id,value] of [["top1Bar",top1],["top3Bar",top3],["riskBar",top3]]) if($(id)) $(id).style.width = value*100 + "%";
+  const concentration = top1 >= .65 || top3 >= .85 ? "集中偏高" : top1 >= .45 || top3 >= .7 ? "中等集中" : "相對分散";
+  if($("riskBadgeMini")) $("riskBadgeMini").textContent = allocated > 0 ? concentration : "尚未配置";
+  if($("riskMeterText")) $("riskMeterText").textContent = allocated > 0 ? formatPct(top3*100) + " · 僅配置集中度" : "尚未配置";
 }
 
 function updateBudgetSummary(){
@@ -118,45 +172,26 @@ function updateBudgetSummary(){
   if($("chartAssetCount")) $("chartAssetCount").textContent = Object.keys(portfolioAssets).length + " 種幣";
   if($("chartCenterText")) $("chartCenterText").textContent = allocated > 0 && total > 0 ? formatPct((allocated / total) * 100) : "--";
   if($("chartTotalText")) $("chartTotalText").textContent = allocated > 0 ? "已配置 " + formatMoney(allocated) : "尚未加入";
-}
-
-function selectCoin(symbol, name){
-  const upper = String(symbol || "BTC").toUpperCase();
-  if($("assetSelect")) $("assetSelect").value = upper;
-  if($("coinPickerAvatar")) $("coinPickerAvatar").textContent = coinIcon(upper);
-  if($("coinPickerSymbol")) $("coinPickerSymbol").textContent = upper;
-  if($("coinPickerName")) $("coinPickerName").textContent = name || upper;
-  if($("coinDropdown")) $("coinDropdown").classList.remove("show");
+  renderAllocationLegend();
+  updateAnalyzeReadiness();
 }
 
 function renderCoinOptions(){
-  const wrap = $("coinBubbleOptions");
-  const query = ($("coinSearchInput")?.value || "").trim().toUpperCase();
-
-  if(!wrap) return;
-
-  wrap.innerHTML = "";
-
-  const filtered = popularCoinsCache.filter((coin) => {
-    const text = `${coin.symbol || ""} ${coin.name || ""}`.toUpperCase();
-    return text.includes(query);
-  }).slice(0, 24);
-
-  filtered.forEach((coin) => {
+  const select = $("assetSelect");
+  if(!select) return;
+  const current = select.value || "BTC";
+  select.innerHTML = "";
+  popularCoinsCache.forEach((coin) => {
     const symbol = String(coin.symbol || "").toUpperCase();
     const name = coin.name || symbol;
 
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "coin-bubble";
-    btn.innerHTML = `<b>${symbol}</b><span>${name}</span>`;
-    btn.addEventListener("click", (event) => {
-      event.stopPropagation();
-      selectCoin(symbol, name);
-    });
-
-    wrap.appendChild(btn);
+    const option = document.createElement("option");
+    option.value = symbol;
+    option.dataset.name = name;
+    option.textContent = `${symbol}｜${name}`;
+    select.appendChild(option);
   });
+  select.value = popularCoinsCache.some(coin => String(coin.symbol).toUpperCase() === current) ? current : "BTC";
 }
 
 async function loadPopularCoins(){
@@ -188,10 +223,11 @@ function addAsset(){
   if(!requireHealthMember("建立投資配置")) return;
 
   const symbol = ($("assetSelect")?.value || "BTC").toUpperCase();
-  const name = $("coinPickerName")?.textContent || symbol;
+  const name = $("assetSelect")?.selectedOptions?.[0]?.dataset.name || symbol;
   const amount = Number($("assetAmount")?.value || 0);
 
-  if(!amount || amount <= 0){
+  if(analyzeBusy) return;
+  if(!Number.isFinite(amount) || Math.round(amount * 100) <= 0){
     alert("請先輸入大於 0 的配置金額。");
     $("assetAmount")?.focus();
     return;
@@ -200,7 +236,7 @@ function addAsset(){
   portfolioAssets[symbol] = {
     symbol,
     name,
-    amount
+    amount: Math.round(amount * 100) / 100
   };
 
   if($("assetAmount")) $("assetAmount").value = "";
@@ -208,11 +244,13 @@ function addAsset(){
 }
 
 function removeAsset(symbol){
+  if(analyzeBusy) return;
   delete portfolioAssets[symbol];
   renderAssets();
 }
 
 function renderAssets(){
+  invalidateHealthReport();
   const box = $("assetBubbles");
   const total = getTotalCapital();
 
@@ -238,8 +276,8 @@ function renderAssets(){
       <div class="asset-chip-main">
         <span class="asset-icon">${coinIcon(asset.symbol)}</span>
         <div>
-          <b>${asset.symbol}</b>
-          <small>${asset.name}</small>
+          <b>${escapeHTML(asset.symbol)}</b>
+          <small>${escapeHTML(asset.name)}</small>
         </div>
       </div>
       <div class="asset-chip-value">
@@ -266,6 +304,10 @@ function drawChart(){
 
   const labels = Object.keys(portfolioAssets);
   const data = labels.map((symbol) => portfolioAssets[symbol].amount);
+  const hasAssets = labels.length > 0;
+  const colors = labels.map((_,i) => ALLOCATION_COLORS[i % ALLOCATION_COLORS.length]);
+  const remainder = Math.max(0, getTotalCapital() - getAllocatedAmount());
+  if(hasAssets && remainder > 0) { labels.push("未配置"); data.push(remainder); colors.push("#e9ddcc"); }
 
   if(weightsChartInstance){
     weightsChartInstance.destroy();
@@ -274,25 +316,30 @@ function drawChart(){
   weightsChartInstance = new Chart(canvas, {
     type: "doughnut",
     data: {
-      labels,
+      labels: hasAssets ? labels : ["尚未配置"],
       datasets: [{
-        data,
-        borderWidth: 0,
-        hoverOffset: 8
+        data: hasAssets ? data : [1],
+        borderWidth: hasAssets ? 4 : 0,
+        borderColor: "#fff",
+        borderRadius: hasAssets ? 5 : 0,
+        backgroundColor: hasAssets ? colors : ["#ede4d7"],
+        hoverOffset: 5
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      cutout: "72%",
+      cutout: "78%",
       plugins: {
+        tooltip: { enabled: hasAssets, callbacks: {label:ctx => `${ctx.label}: ${formatMoney(ctx.raw)} (${formatPct(ctx.raw/data.reduce((a,b)=>a+b,0)*100)})`} },
         legend: {
+          display: false,
           position: "bottom",
           labels: {
             usePointStyle: true,
             boxWidth: 8,
             font: {
-              size: 12,
+              size: 16,
               weight: "bold"
             }
           }
@@ -304,6 +351,7 @@ function drawChart(){
 
 function clearAllAssets(){
   if(!requireHealthMember("清空投資配置")) return;
+  if(analyzeBusy) return;
 
   portfolioAssets = {};
   renderAssets();
@@ -315,22 +363,24 @@ function clearAllAssets(){
   if($("kMdd")) $("kMdd").textContent = "--";
   if($("riskMeterText")) $("riskMeterText").textContent = "尚未計算";
   if($("riskBar")) $("riskBar").style.width = "0%";
-  if($("aiReport")) $("aiReport").textContent = "完成健康度檢查後，這裡會顯示配置摘要。";
+  renderEmptyHealthReport();
 }
 
 function setAnalyzeLoading(isLoading){
+  analyzeBusy = isLoading;
+  document.querySelectorAll?.(".setup-card input,.setup-card select,.setup-card button,.asset-remove").forEach(el => { el.disabled = isLoading; });
   const btn = $("btnAnalyze");
-  if(!btn) return;
+  if(!btn) { updateAnalyzeReadiness(); return; }
 
   if(!btn.dataset.originalHtml){
     btn.dataset.originalHtml = btn.innerHTML;
   }
 
-  btn.disabled = isLoading;
   btn.classList.toggle("is-loading", isLoading);
   btn.innerHTML = isLoading
     ? '<i class="fas fa-spinner fa-spin"></i> 檢查中...'
     : btn.dataset.originalHtml;
+  updateAnalyzeReadiness();
 }
 
 function buildHoldingsPayload(){
@@ -342,70 +392,29 @@ function buildHoldingsPayload(){
 }
 
 function renderAiReport(narrative, highlights, metrics, analysisMode = "rules", aiStatus = ""){
-  const safeNarrative = String(narrative || "目前無法取得 AI 報告，請稍後再試。");
-  const list = Array.isArray(highlights) && highlights.length ? highlights : [
-    "檢查最大單一資產是否過度集中。",
-    "觀察前三大資產是否占比過高。",
-    "依照個人風險承受度定期再平衡。"
-  ];
-  const top1 = Number(metrics?.top1_weight || 0);
-  const top3 = Number(metrics?.top3_weight || 0);
-  const vol = metrics?.annual_vol == null ? null : Number(metrics.annual_vol);
-  const mdd = metrics?.max_drawdown == null ? null : Number(metrics.max_drawdown);
-  const riskTone = top3 >= 0.7 || top1 >= 0.5 ? "集中偏高" : top3 >= 0.55 ? "中等集中" : "相對分散";
-  const allocated = getAllocatedAmount();
-  const currency = $("capitalCcy")?.value || "TWD";
-  const assets = Object.values(portfolioAssets).sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0));
-  const statusNote = analysisMode === "ai" ? "AI 已結合配置與風險指標產生解說。"
-    : aiStatus === "market_data_unavailable" ? "部分行情不足；目前先呈現可計算的配置集中度。"
-    : "AI 服務目前不可用；以下為依配置與歷史行情產生的規則分析。";
-  const nextSteps = [
-    top3 >= .7 ? `前三大幣種占 ${formatPct(top3 * 100)}，核對是否超過你原先設定的上限。` : "定期核對前三大幣種比例是否偏離原先配置。",
-    vol !== null && Number.isFinite(vol) && mdd !== null && Number.isFinite(mdd)
-      ? `將年化波動 ${formatPct(vol * 100)} 與最大回撤 ${formatPct(mdd * 100)} 和你可承受的範圍比較；兩者都不是未來損失預測。`
-      : "待歷史行情恢復後重新計算年化波動與最大回撤，不能把缺資料視為低風險。",
-    "市場價格大幅變動後，重新檢查各幣種實際占比與再平衡條件。"
-  ];
-
   if(!$("aiReport")) return;
-
+  const allocated = getAllocatedAmount();
+  const assets = Object.values(portfolioAssets).sort((a,b)=>b.amount-a.amount);
+  const ratios = assets.map(a=>a.amount/allocated);
+  const top1 = Number(metrics?.top1_weight ?? ratios[0] ?? 0);
+  const top3 = Number(metrics?.top3_weight ?? ratios.slice(0,3).reduce((a,b)=>a+b,0));
+  const validMetric = value => metrics?.market_data_available !== false && value != null && Number.isFinite(Number(value));
+  const vol = validMetric(metrics?.annual_vol) ? Number(metrics.annual_vol) : null;
+  const mdd = validMetric(metrics?.max_drawdown) ? Number(metrics.max_drawdown) : null;
+  const riskTone = top1 >= .65 || top3 >= .85 ? "集中偏高" : top1 >= .45 || top3 >= .7 ? "中等集中" : "相對分散";
+  const statusNote = analysisMode === "ai" ? "AI 解說已完成" : "依資料產生的規則分析";
+  const marketNote = vol === null || mdd === null ? "行情不足；目前僅能核對配置集中度。" : "波動與回撤採歷史行情計算，不是未來損失預測。";
+  const list = Array.isArray(highlights) ? highlights.slice(0,5) : [];
+  const width = ratio => Math.max(0,Math.min(100,Number.isFinite(ratio)?ratio*100:0));
   $("aiReport").innerHTML = `
-    <div class="ai-report-grid">
-      <div class="ai-summary-panel">
-        <div>
-          <span class="report-kicker">${analysisMode === "ai" ? "AI Portfolio Brief" : "依資料產生的規則分析"}</span>
-          <h3>配置健康摘要</h3>
-          <p>${escapeHTML(safeNarrative).replace(/\n/g, "<br>")}</p>
-          <p class="report-data-note">${escapeHTML(statusNote)}</p>
-        </div>
-        <div class="report-status">
-          <small>目前狀態</small>
-          <strong>${riskTone}</strong>
-        </div>
-      </div>
-      <div class="report-stat-strip">
-        <div><span>最大占比</span><strong>${top1 ? formatPct(top1 * 100) : "--"}</strong></div>
-        <div><span>前三占比</span><strong>${top3 ? formatPct(top3 * 100) : "--"}</strong></div>
-        <div><span>年化波動</span><strong>${vol !== null && Number.isFinite(vol) ? formatPct(vol * 100) : "資料不足"}</strong></div>
-        <div><span>最大回撤</span><strong>${mdd !== null && Number.isFinite(mdd) ? formatPct(mdd * 100) : "資料不足"}</strong></div>
-      </div>
-      <section class="ai-report-section portfolio-breakdown">
-        <strong><i class="fas fa-chart-pie"></i> 配置明細 · ${escapeHTML(currency)} ${formatMoney(allocated)}</strong>
-        <div class="portfolio-breakdown-list">${assets.map((asset) => `<div><span>${escapeHTML(asset.symbol)}</span><strong>${formatMoney(asset.amount)}</strong><span>${allocated > 0 ? formatPct(Number(asset.amount || 0) / allocated * 100) : "--"}</span></div>`).join("")}</div>
-      </section>
-      <div class="report-detail-grid">
-        <section class="ai-report-section">
-          <strong><i class="fas fa-circle-exclamation"></i> 重點提醒</strong>
-          <ul>${list.slice(0, 5).map((item) => `<li>${escapeHTML(item)}</li>`).join("")}</ul>
-        </section>
-        <section class="ai-report-section">
-          <strong><i class="fas fa-list-check"></i> 下一步建議</strong>
-          <ul>
-            ${nextSteps.map((item) => `<li>${escapeHTML(item)}</li>`).join("")}
-          </ul>
-        </section>
-      </div>
+    <div class="health-report-overview"><div><span class="report-kicker">${statusNote}</span><h3>配置集中度 · ${riskTone}</h3><small>${assets.length} 種幣 / 已配置 ${formatMoney(allocated)}</small></div><span class="report-complete"><i class="fas fa-check" aria-hidden="true"></i> 檢查完成</span></div>
+    <div class="health-report-graphics">
+      <section class="report-allocation-graphic"><strong><i class="fas fa-chart-pie" aria-hidden="true"></i> 已配置部位比例</strong><div class="report-stack" role="img" aria-label="各幣種占已配置部位比例，詳細比例列於下方">${assets.map((asset,index)=>`<div style="width:${width(asset.amount/allocated)}%;background:${ALLOCATION_COLORS[index%ALLOCATION_COLORS.length]}"></div>`).join("")}</div><div class="report-asset-legend">${assets.map((asset,index)=>`<span><i style="background:${ALLOCATION_COLORS[index%ALLOCATION_COLORS.length]}" aria-hidden="true"></i>${escapeHTML(asset.symbol)} <b>${formatPct(asset.amount/allocated*100)}</b></span>`).join("")}</div><small>以已配置金額為 100%；未配置預算不計入。</small></section>
+      <section class="report-concentration-graphic"><strong><i class="fas fa-bullseye" aria-hidden="true"></i> 集中在哪裡？</strong><div><span>最大單幣</span><b>${formatPct(top1*100)}</b></div><div class="visual-track"><div style="width:${width(top1)}%"></div></div><div><span>前三大幣</span><b>${formatPct(top3*100)}</b></div><div class="visual-track"><div style="width:${width(top3)}%"></div></div><small>占比越高，配置越集中。</small></section>
     </div>
+    <div class="health-report-metrics"><div><i class="fas fa-wave-square" aria-hidden="true"></i><span>歷史年化波動</span><strong>${vol !== null ? formatPct(vol*100) : "資料不足"}</strong><small>觀察價格起伏幅度</small></div><div><i class="fas fa-arrow-trend-down" aria-hidden="true"></i><span>歷史最大回撤</span><strong>${mdd !== null ? formatPct(mdd*100) : "資料不足"}</strong><small>觀察區間最大跌幅</small></div><div><i class="fas fa-list-check" aria-hidden="true"></i><span>接下來留意</span><strong>${top1 >= .65 || top3 >= .85 ? "持幣集中" : "配置偏移"}</strong><small>核對比例與可承受範圍</small></div></div>
+    <p class="report-data-note"><i class="fas fa-circle-info" aria-hidden="true"></i> ${marketNote}</p>
+    <details class="health-report-details"><summary>查看完整解說與重點</summary><div class="report-narrative">${escapeHTML(String(narrative || "暫無解說。")).replace(/\n/g,"<br>")}</div>${list.length ? `<ul>${list.map(item=>`<li>${escapeHTML(item)}</li>`).join("")}</ul>` : ""}<small>${analysisMode === "ai" ? "" : "AI 服務目前不可用，以上為規則分析。"}</small></details>
   `;
 }
 
@@ -418,16 +427,32 @@ function escapeHTML(value){
     .replaceAll("'", "&#039;");
 }
 
+function scrollToHealthReport(){
+  const report = $("healthReportCard");
+  if(!report) return;
+  const headerHeight = document.querySelector?.(".site-header")?.getBoundingClientRect().height || 0;
+  const top = report.getBoundingClientRect().top + window.scrollY - headerHeight - 16;
+  const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  $("healthReportTitle")?.focus({preventScroll:true});
+  window.scrollTo({top:Math.max(0,top), behavior:reducedMotion ? "instant" : "smooth"});
+}
+
 async function analyzePortfolio(){
-  if(!requireHealthMember("投資配置健康度檢查")) return;
+  if(!requireHealthMember("投資健康度")) return;
+  if(analyzeBusy) return;
 
   const total = getTotalCapital();
   const allocated = getAllocatedAmount();
 
-  if(!allocated){
-    alert("請先加入至少一個幣種配置。");
+  const readiness = portfolioReadiness();
+  if(!readiness.ready){
+    updateAnalyzeReadiness();
     return;
   }
+  const revision = ++analysisRevision;
+  analysisController = new AbortController();
+  const signal = analysisController.signal;
+  let reportRendered = false;
 
   const ratios = Object.values(portfolioAssets)
     .map((asset) => asset.amount / allocated)
@@ -468,7 +493,7 @@ async function analyzePortfolio(){
   try{
     const payload = {
       user_id: "demo_user",
-      base_currency: $("capitalCcy")?.value || "TWD",
+      base_currency: "USD",
       days: Number($("days")?.value || 90),
       seed: Number($("seed")?.value || 42),
       holdings: buildHoldingsPayload()
@@ -481,32 +506,34 @@ async function analyzePortfolio(){
     let riskPayload = null;
     const aiRes = await fetch("/portfolio/analyze-llm", {
         method: "POST",
+        signal,
         headers,
         body: JSON.stringify(payload)
       });
     if(aiRes.ok) aiPayload = await aiRes.json();
+    if(revision !== analysisRevision) return;
     if(!aiPayload?.risk_health){
       const riskRes = await fetch("/portfolio/risk-health", {
         method: "POST",
+        signal,
         headers,
         body: JSON.stringify(payload)
       });
       if(riskRes.ok) riskPayload = await riskRes.json();
     }
+    if(revision !== analysisRevision) return;
 
     const rh = aiPayload?.risk_health || riskPayload?.risk_health;
     if(rh){
 
-      if($("kTop1")) $("kTop1").textContent = formatPct(Number(rh.top1_weight || top1) * 100);
-      if($("kTop3")) $("kTop3").textContent = formatPct(Number(rh.top3_weight || top3) * 100);
-      const hasMarketData = rh.market_data_available !== false && rh.annual_vol != null && rh.max_drawdown != null;
+      if($("kTop1")) $("kTop1").textContent = formatPct(Number(rh.top1_weight ?? top1) * 100);
+      if($("kTop3")) $("kTop3").textContent = formatPct(Number(rh.top3_weight ?? top3) * 100);
+      const hasMarketData = rh.market_data_available !== false && rh.annual_vol != null && rh.max_drawdown != null && Number.isFinite(Number(rh.annual_vol)) && Number.isFinite(Number(rh.max_drawdown));
       if($("kVol")) $("kVol").textContent = hasMarketData ? formatPct(Number(rh.annual_vol) * 100) : "資料不足";
       if($("kMdd")) $("kMdd").textContent = hasMarketData ? formatPct(Number(rh.max_drawdown) * 100) : "資料不足";
 
-      const apiScore = Math.min(95, Math.round((Number(rh.top1_weight || 0) * 55) + (Number(rh.top3_weight || 0) * 20) + (Number(rh.annual_vol || 0) * 55) + (Number(rh.herfindahl || 0) * 45)));
-      if($("riskBar")) $("riskBar").style.width = apiScore + "%";
-      if($("riskMeterText")) $("riskMeterText").textContent = apiScore >= 70 ? "偏高" : apiScore >= 45 ? "中等" : "分散";
-      if($("riskBadgeMini")) $("riskBadgeMini").textContent = apiScore >= 70 ? "偏高" : apiScore >= 45 ? "中等" : "分散";
+      if($("riskBar")) $("riskBar").style.width = Number(rh.top3_weight ?? top3)*100 + "%";
+      if($("riskMeterText")) $("riskMeterText").textContent = formatPct(Number(rh.top3_weight ?? top3)*100) + " · 僅配置集中度";
       if(!hasMarketData){
         if($("riskBar")) $("riskBar").style.width = "0%";
         if($("riskMeterText")) $("riskMeterText").textContent = "行情不足，無法評分";
@@ -520,11 +547,17 @@ async function analyzePortfolio(){
       `前三大持幣合計 ${formatPct(top3 * 100)}，請檢查是否需要再平衡。`,
       rh?.market_data_available ? "參考歷史波動與回撤，確認是否符合個人承受範圍。" : "行情不足，暫時無法估算歷史波動與回撤。"
     ], rh || {top1_weight: top1, top3_weight: top3}, aiPayload?.analysis_mode || "rules", aiPayload?.ai_status || (aiRes.ok ? "" : "service_unavailable"));
+    reportRendered = true;
   }catch(error){
+    if(revision !== analysisRevision || signal.aborted) return;
     console.warn("AI health report fallback:", error);
     renderAiReport(`目前配置 ${Object.keys(portfolioAssets).length} 種幣別，最大單一幣種占 ${formatPct(top1 * 100)}，前三大合計 ${formatPct(top3 * 100)}。完整波動與回撤資料暫時無法取得，請稍後重試。`, ["目前僅能核對配置集中度；缺少行情不代表零風險。"], {top1_weight: top1, top3_weight: top3}, "rules", "service_unavailable");
+    reportRendered = true;
   }finally{
-    setAnalyzeLoading(false);
+    if(revision === analysisRevision){
+      setAnalyzeLoading(false);
+      if(reportRendered && !signal.aborted) scrollToHealthReport();
+    }
   }
 }
 
@@ -532,31 +565,29 @@ document.addEventListener("DOMContentLoaded", () => {
   loadPopularCoins();
   renderAssets();
 
-  $("coinPickerBtn")?.addEventListener("click", (event) => {
-    event.stopPropagation();
-    $("coinDropdown")?.classList.toggle("show");
-  });
-
-  $("coinDropdown")?.addEventListener("click", (event) => {
-    event.stopPropagation();
-  });
-
-  document.addEventListener("click", () => {
-    $("coinDropdown")?.classList.remove("show");
-  });
-
-  $("coinSearchInput")?.addEventListener("input", renderCoinOptions);
   $("btnRefreshCoins")?.addEventListener("click", loadPopularCoins);
   $("btnAddAsset")?.addEventListener("click", addAsset);
   $("btnClearAll")?.addEventListener("click", clearAllAssets);
   $("btnAnalyze")?.addEventListener("click", analyzePortfolio);
   $("totalCapital")?.addEventListener("input", renderAssets);
+  $("days")?.addEventListener("change", invalidateHealthReport);
+  $("assetAmount")?.addEventListener("input", updateAnalyzeReadiness);
 
 
   $("fomoSymbol")?.addEventListener("change", updateFomoChange);
   $("btnFomo")?.addEventListener("click", runFomoCheck);
   $("btnAutoAllocate")?.addEventListener("click", runAutoAllocate);
   $("btnClearHealthRecords")?.addEventListener("click", clearHealthRecords);
+  $("healthHistoryRange")?.addEventListener("change", renderHealthRecords);
+  $("btnToggleHealthRecords")?.addEventListener("click", () => {
+    const button = $("btnToggleHealthRecords");
+    const expanded = button.getAttribute("aria-expanded") !== "true";
+    button.setAttribute("aria-expanded", String(expanded));
+    button.textContent = expanded ? "收合歷史" : "展開歷史";
+    $("healthRecordList").hidden = !expanded;
+    $("healthHistoryFilters").hidden = !expanded;
+    renderHealthRecords();
+  });
 
   $("assetAmount")?.addEventListener("keydown", (event) => {
     if(event.key === "Enter"){
@@ -572,7 +603,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 /* restored FOMO + AI one-click allocation */
-/* restored FOMO + AI one-click allocation */
 function syncFomoSymbolOptions(){
   const select = $("fomoSymbol");
   if(!select) return;
@@ -582,16 +612,9 @@ function syncFomoSymbolOptions(){
 
   const coins = popularCoinsCache.length ? popularCoinsCache : DEFAULT_COINS;
 
-  // ▼▼▼ 專題展示專用：強制在下拉選單最上方加入 TEST 幣 ▼▼▼
-  const testOption = document.createElement("option");
-  testOption.value = "TEST";
-  testOption.textContent = "TEST｜專題展示幣 (+18.5%)";
-  select.appendChild(testOption);
-  // ▲▲▲ 專題展示專用結束 ▲▲▲
-
   coins.slice(0, 24).forEach((coin) => {
     const symbol = String(coin.symbol || "").toUpperCase();
-    if(!symbol || symbol === "TEST") return; // 避免重複
+    if(!symbol) return;
 
     const option = document.createElement("option");
     option.value = symbol;
@@ -607,96 +630,60 @@ function syncFomoSymbolOptions(){
 }
 
 async function updateFomoChange(){
-  const symbol = $("fomoSymbol")?.value || "BTC";
-  const input = $("fomoChange");
-
+  const symbol = $("fomoSymbol")?.value || "BTC", input = $("fomoChange");
   if(!input) return;
-
-  // ▼▼▼ 專題展示專用：當選取 TEST 時，直接鎖定 18.5% 暴漲幅度以觸發 FOMO 紅燈 ▼▼▼
-  if(symbol === "TEST") {
-    input.value = "18.5%";
-    input.dataset.change = "18.5";
-    return;
-  }
-  // ▲▲▲ 專題展示專用結束 ▲▲▲
-
-  input.value = "讀取中...";
-
+  const requestId = ++fomoRequestId;
+  input.value = "--";
+  delete input.dataset.change;
+  input.dataset.direction = "neutral";
+  if($("btnFomo")) $("btnFomo").disabled = true;
+  if($("fomoMarker")) $("fomoMarker").hidden = true;
+  if($("fomoQuoteStatus")) $("fomoQuoteStatus").textContent = "讀取中";
+  if($("fomoResult")) { $("fomoResult").className = "fomo-result"; $("fomoResult").textContent = "讀取 24 小時行情中…"; }
   try{
     const res = await fetch("/crypto/popular?vs_currency=usd&per_page=50");
-
     if(res.ok){
       const data = await res.json();
-      const item = Array.isArray(data)
-        ? data.find((coin) => String(coin.symbol || "").toUpperCase() === symbol)
-        : null;
-
-      const change = Number(
-        item?.price_change_percentage_24h ??
-        item?.change_24h ??
-        item?.change ??
-        NaN
-      );
-
+      if(requestId !== fomoRequestId) return;
+      const item = Array.isArray(data) ? data.find(coin=>String(coin.symbol || "").toUpperCase()===symbol) : null;
+      const change = Number(item?.price_change_percentage_24h ?? item?.change_24h ?? item?.change ?? NaN);
       if(Number.isFinite(change)){
-        input.value = change.toFixed(2) + "%";
+        input.value = (change>0?"+":"")+change.toFixed(2)+"%";
         input.dataset.change = String(change);
+        input.dataset.direction = change>0?"up":change<0?"down":"neutral";
+        if($("fomoDirection")) $("fomoDirection").innerHTML = `<i class="fas fa-${change>0?"arrow-trend-up":change<0?"arrow-trend-down":"minus"}"></i>`;
+        if($("fomoMarker")) { $("fomoMarker").hidden = false; $("fomoMarker").style.left = `${Math.max(0,Math.min(100,(change+15)/30*100))}%`; }
+        if($("fomoScaleNote")) $("fomoScaleNote").textContent = Math.abs(change)>15 ? "圖尺顯示至 ±15%；上方為實際漲跌幅。" : "依 24H 漲跌幅檢測；不是價格預測。";
+        if($("fomoQuoteStatus")) $("fomoQuoteStatus").textContent = symbol+" · 已讀取";
+        if($("fomoResult")) $("fomoResult").textContent = "行情已就緒，按下按鈕查看追高風險。";
+        if($("btnFomo")) $("btnFomo").disabled = false;
         return;
       }
     }
-  }catch(error){
-    console.warn("FOMO change fallback:", error);
-  }
-
-  const fallbackMap = {
-    BTC: 2.4,
-    ETH: 1.1,
-    SOL: 8.6,
-    XRP: -0.8,
-    BNB: 0.9,
-    DOGE: 12.4,
-    ADA: 3.2,
-    AVAX: 6.8,
-    LINK: 4.5,
-    DOT: 2.6
-  };
-
-  const fallback = fallbackMap[symbol] ?? 2.0;
-  input.value = fallback.toFixed(2) + "%";
-  input.dataset.change = String(fallback);
+  }catch(error){ console.warn("FOMO 行情讀取失敗", error); }
+  if(requestId !== fomoRequestId) return;
+  if($("fomoQuoteStatus")) $("fomoQuoteStatus").textContent = "行情不足";
+  if($("fomoDirection")) $("fomoDirection").innerHTML = '<i class="fas fa-circle-question"></i>';
+  if($("fomoResult")) $("fomoResult").textContent = "暫無此幣種的 24H 行情，請換幣種或更新清單。";
 }
 
 function runFomoCheck(){
-  const symbol = $("fomoSymbol")?.value || "BTC";
-  const result = $("fomoResult");
-  const raw = Number($("fomoChange")?.dataset.change || 0);
-
-  if(!result) return;
-
-  let level = "low";
-  let title = "低度 FOMO";
-  let text = `目前 ${symbol} 的短線漲幅不算極端，但仍建議分批進場，避免一次投入造成壓力。`;
-
-  if(raw >= 10){
-    level = "high";
-    title = "高度 FOMO 風險";
-    text = `${symbol} 24H 漲幅已偏高，可能存在追高風險。建議先降低投入比例，等待回落或確認支撐後再評估。`;
-  }else if(raw >= 5){
-    level = "medium";
-    title = "中度 FOMO 風險";
-    text = `${symbol} 短線已出現明顯漲幅，若想進場建議分批，並設定可承受的停損或觀察點。`;
-  }else if(raw <= -8){
-    level = "medium";
-    title = "下跌恐慌風險";
-    text = `${symbol} 短線跌幅較明顯，請避免因恐慌殺低。可以先觀察是否有止跌訊號。`;
-  }
-
+  const symbol = $("fomoSymbol")?.value || "BTC", result = $("fomoResult");
+  const value = $("fomoChange")?.dataset.change;
+  if(!result || value == null) return;
+  const raw = Number(value);
+  if(!Number.isFinite(raw)) return;
+  let level = "low", title = "低度 FOMO", icon = "check", text = "漲幅未達追高門檻；不代表沒有風險。";
+  if(raw >= 10){ level="high"; title="高度 FOMO 風險"; icon="fire"; text="短線急漲，先確認資訊，留意追高情緒。"; }
+  else if(raw >= 5){ level="medium"; title="中度 FOMO 風險"; icon="triangle-exclamation"; text="短線漲幅偏高，留意情緒是否影響判斷。"; }
+  else if(raw <= -8){ level="medium"; title="下跌恐慌風險"; icon="arrow-trend-down"; text="短線跌幅明顯，留意恐慌情緒與價格波動。"; }
   result.className = `fomo-result show ${level}`;
-  result.innerHTML = `<strong>${title}</strong><br>${text}`;
+  result.innerHTML = `<span class="fomo-result-icon" aria-hidden="true"><i class="fas fa-${icon}"></i></span><div><strong>${title}</strong><small>${escapeHTML(symbol)} · ${text}</small></div>`;
 }
 
-function runAutoAllocate(){
-  if(!requireHealthMember("AI 自動配置")) return;
+async function runAutoAllocate(){
+  if(!requireHealthMember("一鍵配置")) return;
+  if(analyzeBusy || $("btnAutoAllocate")?.disabled) return;
 
   const risk = $("autoRiskLevel")?.value || "balanced";
   const total = getTotalCapital();
@@ -733,26 +720,26 @@ function runAutoAllocate(){
 
   portfolioAssets = {};
 
-  plans[risk].forEach(([symbol, name, ratio]) => {
+  const totalCents = Math.round(total * 100);
+  const amounts = plans[risk].map(([, , ratio]) => Math.floor(totalCents * ratio));
+  const remainders = plans[risk].map(([, , ratio], index) => ({index, fraction:totalCents * ratio - amounts[index]})).sort((a,b) => b.fraction - a.fraction);
+  const extraCents = totalCents - amounts.reduce((sum, value) => sum + value, 0);
+  for(let i = 0; i < extraCents; i++) amounts[remainders[i % remainders.length].index]++;
+  plans[risk].forEach(([symbol, name, ratio], index, plan) => {
+    const cents = amounts[index];
+    if(cents <= 0) return;
     portfolioAssets[symbol] = {
       symbol,
       name,
-      amount: Math.round(total * ratio)
+      amount: cents / 100
     };
   });
 
   renderAssets();
-  analyzePortfolio();
-
-  const riskNameMap = {
-    conservative: "保守型",
-    balanced: "穩健型",
-    aggressive: "激進型"
-  };
-
-  if($("aiReport")){
-    $("aiReport").textContent += `\n\nAI 智能一鍵配置已套用：${riskNameMap[risk]}。\n此配置為示範比例，實際投資前仍需依照個人可承受風險調整。`;
-  }
+  if($("assetAmount")) $("assetAmount").value = "";
+  updateAnalyzeReadiness();
+  if($("allocationReadyText")) $("allocationReadyText").textContent = "示範比例已套用；可調整金額，再按「檢查配置」。";
+  $("weightsChart")?.scrollIntoView({behavior:"smooth",block:"center"});
 }
 
 function readHealthRecords(){
@@ -767,7 +754,7 @@ function readHealthRecords(){
 }
 
 function writeHealthRecords(records){
-  localStorage.setItem(getHealthRecordKey(), JSON.stringify(records.slice(0, 8)));
+  localStorage.setItem(getHealthRecordKey(), JSON.stringify(records.slice(0, 100)));
 }
 
 function saveHealthRecord(record){
@@ -787,19 +774,24 @@ function renderHealthRecords(){
     return;
   }
 
-  const records = readHealthRecords();
+  const days = Number($("healthHistoryRange")?.value || 0);
+  const allRecords = readHealthRecords();
+  const records = allRecords.filter(record => !days || (window.SIFormat.date(record.createdAt)?.getTime() >= Date.now() - days * 86400000))
+    .sort((a,b) => (window.SIFormat.date(b.createdAt)?.getTime() || 0) - (window.SIFormat.date(a.createdAt)?.getTime() || 0));
+  if($("healthHistoryCount")) $("healthHistoryCount").textContent = `${records.length} 筆紀錄（最多保留 100 筆）`;
   if(!records.length){
-    list.innerHTML = `<div class="member-record-empty">尚未產生紀錄。完成一次健康度檢查後，這裡會自動保存摘要。</div>`;
+    list.innerHTML = `<div class="member-record-empty">${allRecords.length ? "此時間範圍沒有紀錄。" : "尚無紀錄。完成健康度檢查後，自動保存配置摘要。"}</div>`;
     return;
   }
 
-  list.innerHTML = records.map((record) => {
-    const date = new Date(record.createdAt || Date.now()).toLocaleString("zh-TW", {
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit"
-    });
+  const groups = new Map();
+  records.forEach(record => {
+    const day = window.SIFormat.dateKey(record.createdAt);
+    if(!groups.has(day)) groups.set(day, []);
+    groups.get(day).push(record);
+  });
+  list.innerHTML = Array.from(groups, ([day, items], index) => `<details class="history-day-group" ${index === 0 ? "open" : ""}><summary>${day === "unknown" ? "日期不明" : day.replaceAll("-", "/")} <span>${items.length} 筆</span></summary>${items.map((record) => {
+    const date = window.SIFormat.dateText(record.createdAt);
     const assets = Array.isArray(record.assets) ? record.assets : [];
     const assetText = assets.slice(0, 4)
       .map((asset) => `${escapeHTML(asset.symbol)} ${formatPct(Number(asset.ratio || 0) * 100)}`)
@@ -810,28 +802,32 @@ function renderHealthRecords(){
         <div>
           <span>${date}</span>
           <strong>${escapeHTML(record.riskLabel || "待分析")}</strong>
-          <p>${assetText || "未保存配置明細"}</p>
+          <p>${assetText || "未保存配置明細"}</p><details class="health-record-assets"><summary>查看配置明細</summary><table><thead><tr><th>幣種</th><th>配置金額（USD）</th><th>比例</th></tr></thead><tbody>${assets.map(asset => `<tr><td>${escapeHTML(asset.symbol)}</td><td>${formatMoney(asset.amount)}</td><td>${formatPct(Number(asset.ratio || 0)*100)}</td></tr>`).join("")}</tbody></table></details>
         </div>
         <div class="record-metrics">
-          <em>最大占比 ${formatPct(Number(record.top1 || 0) * 100)}</em>
-          <em>前三占比 ${formatPct(Number(record.top3 || 0) * 100)}</em>
+          <div><span>最大占比</span><strong class="numeric">${formatPct(Number(record.top1 || 0) * 100)}</strong></div>
+          <div><span>前三占比</span><strong class="numeric">${formatPct(Number(record.top3 || 0) * 100)}</strong></div>
         </div>
       </article>
     `;
-  }).join("");
+  }).join("")}</details>`).join("");
 }
 
 function clearHealthRecords(){
   if(!requireHealthMember("投資健康度紀錄")) return;
+  if(!confirm("確定清除這個帳號在此瀏覽器的健康度紀錄？")) return;
   localStorage.removeItem(getHealthRecordKey());
   renderHealthRecords();
 }
 
 function handleHealthAuthStateChange(event){
   const nextUserId = String(event?.detail?.userId || getHealthUserId() || "").trim();
-  if (nextUserId !== activeHealthUserId) {
+  const nextPremium = isHealthMember();
+  if (nextUserId !== activeHealthUserId || nextPremium !== activeHealthPremium) {
     activeHealthUserId = nextUserId;
+    activeHealthPremium = nextPremium;
     resetHealthWorkspace();
   }
   renderHealthRecords();
+  updateAnalyzeReadiness();
 }

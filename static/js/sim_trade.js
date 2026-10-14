@@ -10,6 +10,81 @@
   let initialAuthState = null;
   let authReloadPending = false;
   let orderPending = false;
+  let tradeHistory = [];
+  let tradeSideFilter = "all";
+  let marketChart = null;
+  let stressChart = null;
+  let equityDays = "all";
+  let marketDays = 7;
+  let marketRequestVersion = 0;
+  let quoteRequestVersion = 0;
+  let activeScenario = "normal";
+  let stressPending = false;
+  const ASSET_COLORS = ["#ef8a3b", "#5e9685", "#debb7e", "#aa927e", "#8b9cbd", "#bb8ca4", "#8da878", "#c7a27a"];
+  const SCENARIO_COLORS = { normal: "#aa9075", bull: "#3a8a72", bear: "#dc9b46", black_swan: "#c85851" };
+
+  function finiteNumber(value) {
+    if ((typeof value !== "number" && typeof value !== "string") || (typeof value === "string" && !value.trim())) return null;
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  }
+
+  function escapeHTML(value) {
+    return String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
+  }
+
+  function allocationData(snapshot) {
+    if (!snapshot || snapshot.price_unavailable_symbols?.length) return null;
+    const cash = finiteNumber(snapshot.cash);
+    const positions = Array.isArray(snapshot.positions) ? snapshot.positions : [];
+    if (cash === null || cash < 0 || positions.some(pos => finiteNumber(pos.market_value) === null || Number(pos.market_value) < 0)) return null;
+    const entries = positions.filter(pos => Number(pos.market_value) > 0).map((pos, index) => ({
+      symbol: String(pos.symbol || "--"), value: Number(pos.market_value), color: ASSET_COLORS[index % ASSET_COLORS.length]
+    }));
+    if (cash > 0) entries.push({ symbol: "現金", value: cash, color: "#e8dbc9" });
+    const total = entries.reduce((sum, item) => sum + item.value, 0);
+    return { entries: entries.map(item => ({ ...item, pct: total > 0 ? item.value / total * 100 : 0 })), total, investedPct: total > 0 ? (total - cash) / total * 100 : null };
+  }
+
+  function equityData(snapshot, days = "all", now = Date.now()) {
+    return (Array.isArray(snapshot?.equity_curve) ? snapshot.equity_curve : []).map((point, index) => ({
+      value: finiteNumber(point.total_value_usd), date: window.SIFormat?.date(point.timestamp) || null, timestamp: point.timestamp, index
+    })).filter(point => point.value !== null && point.value >= 0 && (days === "all" || (point.date && point.date.getTime() >= now - Number(days) * 86400000)))
+      .sort((a, b) => a.date && b.date ? a.date - b.date : a.index - b.index);
+  }
+
+  function orderDraft() {
+    const coin = getSelectedCoin(), symbol = String(coin.symbol || "BTC").toUpperCase();
+    const price = finiteNumber(coin.current_price), cash = finiteNumber(currentPortfolio?.cash);
+    const holdingQty = finiteNumber(getSelectedPosition(symbol)?.quantity) ?? 0;
+    const quantityRaw = $("orderQty")?.value.trim() || "", amountRaw = $("orderAmt")?.value.trim() || "";
+    const quantity = quantityRaw ? finiteNumber(quantityRaw) : amountRaw && price > 0 ? Number(amountRaw) / price : null;
+    const amount = amountRaw ? finiteNumber(amountRaw) : quantity !== null && price > 0 ? quantity * price : null;
+    const side = $("orderSide")?.value === "sell" ? "sell" : "buy";
+    const available = side === "buy" ? cash : holdingQty;
+    const used = side === "buy" ? amount : quantity;
+    const valid = !isLocked && currentPortfolio !== null && price > 0 && amount > 0 && quantity > 0
+      && !(quantityRaw && amountRaw) && available !== null && used <= available + 1e-8;
+    return { symbol, price, cash, holdingQty, quantity, amount, side, valid, usedPct: available > 0 && used !== null ? used / available * 100 : 0 };
+  }
+
+  function scrollToSection(id) {
+    const target = $(id);
+    if (!target) return;
+    const headerHeight = document.querySelector("header")?.getBoundingClientRect().height || 80;
+    window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - headerHeight - 18,
+      behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
+  }
+
+  function chartOptions(label) {
+    return { responsive: true, maintainAspectRatio: false, animation: !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
+      interaction: { intersect: false, mode: "index" },
+      plugins: { legend: { display: false }, tooltip: { backgroundColor: "#594333", padding: 12, cornerRadius: 9,
+        callbacks: { label: context => `${context.dataset.label || label} ${fmtUSD(context.parsed.y)}` } } },
+      scales: { x: { grid: { display: false }, border: { display: false }, ticks: { color: "#ae967e", maxTicksLimit: 5, maxRotation: 0, font: { size: 11 } } },
+        y: { grid: { color: "#f0e7dc" }, border: { display: false }, ticks: { color: "#a68d75", maxTicksLimit: 5, font: { size: 11 }, callback: value => fmtCompactUSD(value) } } }
+    };
+  }
   const DEFAULT_COINS = [
     { symbol: "BTC", name: "Bitcoin" },
     { symbol: "ETH", name: "Ethereum" },
@@ -27,27 +102,28 @@
   ];
 
   function fmtUSD(value) {
-    const n = Number(value || 0);
-    return "$" + n.toLocaleString(undefined, {
+    const n = finiteNumber(value);
+    if (n === null) return "--";
+    return "USD " + n.toLocaleString(undefined, {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
   }
 
   function fmtQty(value) {
-    const n = Number(value || 0);
-    return n.toLocaleString(undefined, {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 8
-    });
+    const quantity = finiteNumber(value);
+    if (quantity === null) return "--";
+    if (quantity !== 0 && Math.abs(quantity) < 1e-8) return quantity > 0 ? "<0.00000001" : ">-0.00000001";
+    return quantity.toLocaleString("zh-TW", { maximumFractionDigits: 8 });
   }
 
   function fmtCompactUSD(value) {
-    const n = Number(value || 0);
-    if (!n) return "--";
-    if (n >= 1_000_000_000_000) return "$" + (n / 1_000_000_000_000).toFixed(2) + "T";
-    if (n >= 1_000_000_000) return "$" + (n / 1_000_000_000).toFixed(2) + "B";
-    if (n >= 1_000_000) return "$" + (n / 1_000_000).toFixed(2) + "M";
+    const n = finiteNumber(value);
+    if (n === null) return "--";
+    if (n >= 1_000_000_000_000) return "USD " + (n / 1_000_000_000_000).toFixed(2) + "T";
+    if (n >= 1_000_000_000) return "USD " + (n / 1_000_000_000).toFixed(2) + "B";
+    if (n >= 1_000_000) return "USD " + (n / 1_000_000).toFixed(2) + "M";
+    if (n >= 1_000) return "USD " + (n / 1_000).toFixed(n >= 10000 ? 0 : 1) + "K";
     return fmtUSD(n);
   }
 
@@ -74,8 +150,8 @@
   }
 
   function fmtPct(value) {
-    const number = Number(value);
-    return Number.isFinite(number) ? (number * 100).toFixed(2) + "%" : "--";
+    const number = finiteNumber(value);
+    return number !== null ? (number * 100).toFixed(2) + "%" : "--";
   }
 
   function stressSnapshot() {
@@ -103,9 +179,10 @@
     const initial = Number(result?.snapshot?.initial_value || 0);
     if (!black || initial <= 0) return null;
 
-    const totalReturn = Number(black.total_return || 0);
-    const maxDrawdown = Number(black.max_drawdown || 0);
-    const finalValue = Number(black.final_value || 0);
+    const totalReturn = finiteNumber(black.total_return);
+    const maxDrawdown = finiteNumber(black.max_drawdown);
+    const finalValue = finiteNumber(black.final_value);
+    if (totalReturn === null || maxDrawdown === null || finalValue === null) return null;
     const drawdownAbs = Math.abs(maxDrawdown);
     let level = "low";
     let label = "風險低";
@@ -138,16 +215,42 @@
     const box = document.createElement("section");
     box.className = `stress-interpretation risk-${summary.level}`;
     appendStressText(box, "span", summary.label, "stress-risk-label");
-    appendStressText(box, "h3", "結果解讀");
+    appendStressText(box, "h3", "黑天鵝情境觀察");
     appendStressText(box, "p", summary.headline);
-    appendStressText(box, "p", summary.reason);
-    appendStressText(box, "p", `建議下一步：${summary.action}`, "stress-next-action");
+    appendStressText(box, "p", `${summary.action} 此結果以所選策略重新配置，不是直接測試原持倉比例。`, "stress-next-action");
     root.appendChild(box);
+  }
+
+  function drawStressChart(root, rows) {
+    const datasets = ["normal", "bull", "bear", "black_swan"].filter(key => Array.isArray(rows[key]?.path)
+      && rows[key].path.filter(value => finiteNumber(value) !== null && Number(value) >= 0).length >= 2).map(key => ({
+      label: rows[key].scenario_label || key, data: rows[key].path.map(value => finiteNumber(value) !== null && Number(value) >= 0 ? Number(value) : null),
+      borderColor: SCENARIO_COLORS[key] + (key === activeScenario ? "" : "b0"), borderWidth: key === activeScenario ? 3 : 1.7,
+      borderDash: key === "normal" ? [5, 4] : [], pointRadius: 0, pointHoverRadius: 4, tension: .12, fill: false
+    }));
+    if (!datasets.length || !ensureCharts()) {
+      appendStressText(root, "p", "合成路徑圖暫不可用，請查看下方結果數值。", "sim-inline-note");
+      return;
+    }
+    appendStressText(root, "h3", "合成資產路徑");
+    appendStressText(root, "small", "模型假設下的資產變化，並非歷史走勢。點選上方情境可突出對應曲線。", "sim-muted");
+    const stage = appendStressText(root, "div", "", "sim-stress-chart");
+    const canvas = document.createElement("canvas");
+    canvas.id = "stressPathChart"; canvas.setAttribute("role", "img"); canvas.setAttribute("aria-label", "四種假設情境下的合成資產路徑，詳細數值在下方情境卡片"); stage.appendChild(canvas);
+    const legend = appendStressText(root, "div", "", "sim-stress-legend");
+    ["normal", "bull", "bear", "black_swan"].forEach(key => {
+      if (!rows[key]) return;
+      const item = appendStressText(legend, "span", "");
+      const mark = appendStressText(item, "i", ""); mark.style.background = SCENARIO_COLORS[key];
+      appendStressText(item, "span", rows[key].scenario_label || key);
+    });
+    stressChart = new Chart(canvas, { type: "line", data: { labels: Array.from({ length: Math.max(...datasets.map(item => item.data.length)) }, (_, index) => `第 ${index} 天`), datasets }, options: chartOptions("情境資產") });
   }
 
   function renderStressResults(result) {
     const root = $("stressResults");
     if (!root) return;
+    stressChart?.destroy(); stressChart = null;
     root.replaceChildren();
     if (!result) return;
     const strategy = $("stressStrategy")?.value || "balanced";
@@ -160,10 +263,34 @@
     root.appendChild(meta);
     const allocation = rows.black_swan?.initial_allocation;
     if (allocation) {
-      appendStressText(root, "p", `測試起始配置：${Object.entries(allocation).map(([symbol, value]) => `${symbol === "CASH" ? "現金" : symbol} ${fmtUSD(value)}`).join("、")}；實際風險資產比例 ${fmtPct(rows.black_swan.actual_risk_weight)}。`);
+      appendStressText(root, "small", `按策略重新配置 · 實際風險資產 ${fmtPct(rows.black_swan.actual_risk_weight)}`, "sim-stress-allocation-note");
+      const mix = Object.entries(allocation).filter(([, value]) => finiteNumber(value) > 0), total = mix.reduce((sum, [, value]) => sum + Number(value), 0);
+      const bar = appendStressText(root, "div", "", "sim-stress-allocation");
+      mix.forEach(([symbol, value], index) => {
+        const segment = appendStressText(bar, "span", "");
+        segment.style.width = `${Number(value) / total * 100}%`; segment.style.background = symbol === "CASH" ? "#e8dbc9" : ASSET_COLORS[index % ASSET_COLORS.length];
+        segment.title = `${symbol === "CASH" ? "現金" : symbol} ${fmtUSD(value)}`;
+      });
+      appendStressText(root, "small", `測試起始配置：${mix.map(([symbol, value]) => `${symbol === "CASH" ? "現金" : symbol} ${fmtUSD(value)}`).join("、")}`, "sim-stress-allocation-note");
     }
+    drawStressChart(root, rows);
+    const cards = appendStressText(root, "div", "", "sim-stress-cards");
+    ["normal", "bull", "bear", "black_swan"].forEach(key => {
+      if (!rows[key]) return;
+      const metrics = rows[key].metrics || {}, value = finiteNumber(metrics.total_return);
+      const card = appendStressText(cards, "article", "", `sim-stress-metric${key === activeScenario ? " selected" : ""}`);
+      appendStressText(card, "strong", rows[key].scenario_label || key);
+      appendStressText(card, "b", (value !== null && value > 0 ? "+" : "") + fmtPct(value), value === null || value === 0 ? "" : value > 0 ? "ok" : "bad");
+      appendStressText(card, "small", "假設期末總報酬");
+      const list = appendStressText(card, "dl", "");
+      [["期末值", fmtUSD(metrics.final_value)], ["最大回撤", fmtPct(metrics.max_drawdown)], ["合成年化波動", fmtPct(metrics.volatility)]].forEach(([label, formatted]) => {
+        appendStressText(list, "dt", label); appendStressText(list, "dd", formatted);
+      });
+    });
     renderStressInterpretation(root, result, strategy);
 
+    const details = appendStressText(root, "details", "", "compact-explain");
+    appendStressText(details, "summary", "查看完整情境數據");
     const tableWrap = document.createElement("div");
     tableWrap.className = "table-wrap";
     const table = document.createElement("table");
@@ -184,13 +311,13 @@
       appendStressText(row, "td", fmtPct(metrics.total_return));
       appendStressText(row, "td", fmtPct(metrics.volatility));
       appendStressText(row, "td", fmtPct(metrics.max_drawdown));
-      appendStressText(row, "td", Number(metrics.sharpe_like || 0).toFixed(2));
+      appendStressText(row, "td", finiteNumber(metrics.sharpe_like) === null ? "--" : Number(metrics.sharpe_like).toFixed(2));
       appendStressText(row, "td", fmtUSD(metrics.final_value));
       tbody.appendChild(row);
     });
     table.appendChild(tbody);
     tableWrap.appendChild(table);
-    root.appendChild(tableWrap);
+    details.appendChild(tableWrap);
 
     if (Array.isArray(result.warnings) && result.warnings.length) {
       appendStressText(root, "p", `未納入資料：${result.warnings.join("、")}`, "stress-warning");
@@ -198,17 +325,22 @@
   }
 
   async function runStressTest() {
-    if (isLocked || !currentPortfolio) return;
+    if (isLocked || !currentPortfolio || stressPending) return;
     if (currentPortfolio.price_unavailable_symbols?.length) {
       setStressStatus("部分持倉行情暫不可用，無法進行情境比較。請稍後重新整理。", "warn");
       return;
     }
     const requestVersion = ++stressRequestVersion;
     lastStressResult = null;
+    stressChart?.destroy(); stressChart = null;
     $("stressResults")?.replaceChildren();
     const horizonDays = Number($("stressHorizon")?.value || 90);
     const seed = Number($("stressSeed")?.value || 20260820);
     const snapshot = stressSnapshot();
+    if (!Number.isInteger(horizonDays) || horizonDays < 7 || horizonDays > 365 || !Number.isInteger(seed) || seed < 0 || seed > 2147483647) {
+      setStressStatus("期間需為 7–365 天的整數；情境編號需為 0–2147483647 的整數。", "bad");
+      return;
+    }
     if (!hasStressablePositions(snapshot)) {
       lastStressResult = null;
       $("stressResults")?.replaceChildren();
@@ -216,10 +348,12 @@
         "目前組合只有現金，沒有可進行情境測試的持倉。請先建立一筆模擬買入訂單。",
         "bad"
       );
-      $("orderPanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      scrollToSection("orderPanel");
       return;
     }
     setStressStatus("正在建立獨立假設快照…", "");
+    stressPending = true;
+    if ($("runStressTest")) $("runStressTest").disabled = true;
     try {
       const data = await request("/api/paper-stress-test", {
         method: "POST",
@@ -234,6 +368,9 @@
     } catch (error) {
       if (requestVersion !== stressRequestVersion) return;
       setStressStatus(error.message || "壓力測試失敗。", "bad");
+    } finally {
+      stressPending = false;
+      if ($("runStressTest")) $("runStressTest").disabled = false;
     }
   }
 
@@ -265,6 +402,7 @@
       if (window.authManager?.whenReady) {
         await window.authManager.whenReady();
       }
+      if (window.authManager?.getMembershipTier?.() !== "premium") return null;
       return window.authManager ? await window.authManager.getToken().catch(() => null) : null;
     } catch {
       return null;
@@ -316,7 +454,90 @@
       if (!symbol) return;
       select.add(new Option(`${symbol} | ${coin.name || symbol}`, symbol));
     });
+    ensureHeldCoinOptions();
     updateQuotePanel();
+  }
+
+  function ensureHeldCoinOptions() {
+    const select = $("orderSymbol");
+    for (const position of currentPortfolio?.positions || []) {
+      const symbol = String(position.symbol || "").toUpperCase();
+      if (!/^[A-Z0-9]{2,12}$/.test(symbol) || coinOptions.some(coin => coin.symbol === symbol)) continue;
+      coinOptions.push({ symbol, name: symbol, current_price: finiteNumber(position.current_price) });
+      select?.add(new Option(symbol, symbol));
+    }
+    syncMarketSelector();
+  }
+
+  function syncMarketSelector() {
+    const marketSelect = $("marketSymbol"), orderSelect = $("orderSymbol");
+    if (!marketSelect || !orderSelect) return;
+    const options = Array.from(orderSelect.options);
+    if (marketSelect.options.length !== options.length || options.some((option, index) => (
+      marketSelect.options[index]?.value !== option.value || marketSelect.options[index]?.text !== option.text
+    ))) {
+      marketSelect.replaceChildren();
+      options.forEach(option => marketSelect.add(new Option(option.text, option.value)));
+    }
+    marketSelect.value = orderSelect.value;
+  }
+
+  function selectTradingSymbol(symbol) {
+    if (orderPending || isLocked || !$("orderSymbol")) return;
+    $("orderSymbol").value = symbol;
+    syncMarketSelector();
+    updateQuotePanel();
+    refreshSelectedQuote();
+    loadMarketSeries();
+  }
+
+  async function refreshSelectedQuote() {
+    const coin = getSelectedCoin(), version = ++quoteRequestVersion;
+    coin.current_price = null;
+    updateQuotePanel();
+    try {
+      const response = await fetch(`/crypto/quote?ticker=${encodeURIComponent(coin.symbol)}`, { cache: "no-store" });
+      if (!response.ok) throw new Error("quote unavailable");
+      const quote = await response.json();
+      if (version !== quoteRequestVersion) return;
+      const price = finiteNumber(quote.current_price);
+      coin.current_price = price > 0 ? price : null;
+    } catch { if (version !== quoteRequestVersion) return; }
+    updateQuotePanel();
+  }
+
+  async function loadMarketSeries() {
+    const canvas = $("marketChart");
+    if (!canvas) return;
+    const version = ++marketRequestVersion, symbol = getSelectedCoin().symbol;
+    marketChart?.destroy(); marketChart = null;
+    canvas.hidden = true;
+    $("marketChartEmpty").hidden = false;
+    $("marketChartEmpty").textContent = "價格走勢載入中…";
+    $("marketChartSource").textContent = "歷史價格走勢；目前市價另行取得";
+    canvas.setAttribute("aria-label", `${symbol} 近 ${marketDays} 天歷史價格走勢`);
+    try {
+      const response = await fetch(`/crypto/series?ticker=${encodeURIComponent(symbol)}&days=${marketDays}&vs_currency=usd`);
+      if (!response.ok) throw new Error("series unavailable");
+      const data = await response.json();
+      if (version !== marketRequestVersion) return;
+      const points = (Array.isArray(data.prices) ? data.prices : []).filter(point => Array.isArray(point)
+        && finiteNumber(point[0]) !== null && finiteNumber(point[1]) > 0).sort((a, b) => a[0] - b[0]);
+      if (points.length < 2 || !ensureCharts()) throw new Error("series unavailable");
+      const tone = Number(points.at(-1)[1]) >= Number(points[0][1]) ? "#3a8a72" : "#c85851";
+      const options = chartOptions("歷史價格");
+      options.plugins.tooltip.callbacks.title = items => window.SIFormat.dateText(points[items[0].dataIndex][0]);
+      marketChart = new Chart(canvas, { type: "line", data: {
+        labels: points.map(point => new Intl.DateTimeFormat("zh-TW", { timeZone: "Asia/Taipei", month: "2-digit", day: "2-digit" }).format(window.SIFormat.date(point[0]))),
+        datasets: [{ label: symbol, data: points.map(point => Number(point[1])), borderColor: tone, backgroundColor: tone + "12", fill: true, borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: .15 }]
+      }, options });
+      canvas.hidden = false; $("marketChartEmpty").hidden = true;
+      const sources = { coingecko: "CoinGecko", yfinance: "Yahoo Finance" };
+      $("marketChartSource").textContent = `${sources[data.source] || "歷史價格資料"} · ${points.length} 個價格點 · 不作為即時成交價`;
+    } catch {
+      if (version !== marketRequestVersion) return;
+      $("marketChartEmpty").textContent = "歷史走勢暫不可用，可稍後更新資料。";
+    }
   }
 
   async function refreshBtcQuote() {
@@ -358,7 +579,7 @@
     const symbol = String(coin.symbol || "BTC").toUpperCase();
     const price = Number(coin.current_price || 0);
     const marketCap = Number(coin.market_cap || 0);
-    const change24h = Number(coin.price_change_percentage_24h || 0);
+    const change24h = finiteNumber(coin.price_change_percentage_24h);
     const side = $("orderSide")?.value || "buy";
     const qtyRaw = $("orderQty")?.value.trim();
     const amountRaw = $("orderAmt")?.value.trim();
@@ -366,13 +587,15 @@
     const amount = Number(amountRaw || 0);
 
     if ($("quoteSymbol")) $("quoteSymbol").textContent = symbol;
+    if ($("quoteCoinIcon")) $("quoteCoinIcon").textContent = symbol === "BTC" ? "₿" : symbol === "ETH" ? "Ξ" : symbol.slice(0, 1);
     if ($("quoteName")) $("quoteName").textContent = coin.name || symbol;
     if ($("quotePrice")) $("quotePrice").textContent = price ? fmtUSD(price) : "--";
     if ($("quoteChange")) {
-      $("quoteChange").textContent = Number.isFinite(change24h)
+      $("quoteChange").textContent = change24h !== null
         ? `${change24h >= 0 ? "+" : ""}${change24h.toFixed(2)}%`
         : "--";
-      $("quoteChange").className = change24h >= 0 ? "ok" : "bad";
+      $("quoteChange").className = change24h === null || change24h === 0 ? "" : change24h > 0 ? "ok" : "bad";
+      $("quoteChange").setAttribute("aria-label", `24 小時漲跌 ${$("quoteChange").textContent}`);
     }
     if ($("quoteMarketCap")) $("quoteMarketCap").textContent = marketCap ? fmtCompactUSD(marketCap) : "--";
     if ($("quoteOne")) $("quoteOne").textContent = price ? fmtUSD(price) : "--";
@@ -395,23 +618,48 @@
     const cash = Number(currentPortfolio?.cash || 0);
     const position = getSelectedPosition(symbol);
     const holdingQty = Number(position?.quantity || 0);
+    const draft = orderDraft();
+    syncMarketSelector();
+    if ($("orderPreviewSymbol")) $("orderPreviewSymbol").textContent = `${side === "sell" ? "賣出" : "買入"} ${symbol}`;
+    if ($("orderPreviewPrice")) $("orderPreviewPrice").textContent = fmtUSD(draft.price);
+    if ($("orderPreviewQty")) $("orderPreviewQty").textContent = draft.quantity > 0 ? `${fmtQty(draft.quantity)} ${symbol}` : "--";
+    $("orderPanel")?.setAttribute("data-side", side);
+    document.querySelectorAll("[data-order-side]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.orderSide === side)));
+    if ($("orderAvailable")) $("orderAvailable").textContent = side === "buy" ? `可用現金 ${fmtUSD(draft.cash)}` : `可賣出 ${fmtQty(draft.holdingQty)} ${symbol}`;
+    if ($("orderAfterLabel")) $("orderAfterLabel").textContent = side === "buy" ? "買入後可用現金" : "賣出後剩餘持倉";
+    if ($("orderAfter")) $("orderAfter").textContent = draft.amount > 0 && draft.quantity > 0 ? side === "buy"
+      ? fmtUSD(draft.cash === null ? null : draft.cash - draft.amount) : `${fmtQty(draft.holdingQty - draft.quantity)} ${symbol}` : "--";
+    const usedPct = Number.isFinite(draft.usedPct) ? draft.usedPct : 0;
+    if ($("orderCapacityFill")) $("orderCapacityFill").style.width = `${Math.max(0, Math.min(100, usedPct))}%`;
+    if ($("orderCapacityLabel")) $("orderCapacityLabel").textContent = draft.amount > 0 ? `${side === "buy" ? "使用可用現金" : "賣出目前持倉"} ${usedPct.toFixed(1)}%` : "輸入金額或數量即可試算";
+    document.querySelectorAll("[data-order-fraction]").forEach(button => { button.disabled = orderPending || isLocked || !price || (side === "buy" ? cash <= 0 : holdingQty <= 0); });
+    if ($("btnPlaceOrder")) {
+      $("btnPlaceOrder").disabled = orderPending || !draft.valid;
+      $("btnPlaceOrder").innerHTML = `<i class="fas fa-${side === "buy" ? "plus" : "minus"}" aria-hidden="true"></i> ${orderPending ? "處理中…" : side === "buy" ? "模擬買入" : "模擬賣出"}`;
+    }
+    ["marketSymbol", "orderSymbol", "orderAmt", "orderQty", "btnLoadDemoPortfolio", "btnReset"].forEach(id => { if ($(id)) $(id).disabled = orderPending; });
+    document.querySelectorAll("[data-order-side]").forEach(button => { button.disabled = orderPending; });
 
     if (!price) {
       setAdvice("目前沒有可用市價，建議先重新整理行情後再下單。", "warn");
+    } else if (!currentPortfolio || draft.cash === null) {
+      setAdvice("帳戶資料尚未完整載入，請更新資料後再送出模擬單。", "warn");
     } else if (side === "buy" && orderAmount > cash) {
       setAdvice(`現金不足，帳戶目前可用現金 ${fmtUSD(cash)}。`, "bad");
     } else if (side === "sell" && orderQty > holdingQty) {
       setAdvice(`持倉不足，目前持有 ${fmtQty(holdingQty)} ${symbol}。`, "bad");
     } else if (side === "sell" && holdingQty <= 0) {
       setAdvice(`目前沒有 ${symbol} 持倉，暫不適合送出賣單。`, "bad");
-    } else if (side === "buy" && change24h >= 8) {
+    } else if ((qtyRaw && qty <= 0) || (amountRaw && amount <= 0) || (qtyRaw && amountRaw)) {
+      setAdvice("請輸入大於 0 的金額或數量，擇一填寫。", "bad");
+    } else if (side === "buy" && change24h !== null && change24h >= 8) {
       setAdvice(`24 小時漲幅約 +${change24h.toFixed(2)}%，價格偏熱，較適合小額分批。`, "warn");
-    } else if (side === "buy" && change24h <= -8) {
+    } else if (side === "buy" && change24h !== null && change24h <= -8) {
       setAdvice(`24 小時跌幅約 ${change24h.toFixed(2)}%，波動偏大，建議降低單筆金額。`, "warn");
     } else if (orderAmount > 0 || orderQty > 0) {
-      setAdvice("條件可送出模擬單；仍建議保留部分現金，避免一次投入過多。", "ok");
+      setAdvice("試算可送出。按下按鈕會記錄這筆虛擬買賣，成交以服務取得的市價為準。", "ok");
     } else {
-      setAdvice("選好幣種後，可先用 0.1 顆或小額金額試算，再決定是否下單。", "ok");
+      setAdvice("輸入金額或數量，先看試算再送出模擬單。", "");
     }
   }
 
@@ -421,58 +669,153 @@
     $("kpiTotal").textContent = valuationUnavailable ? "--" : fmtUSD(snapshot.total_value_usd);
     $("kpiCash").textContent = fmtUSD(snapshot.cash);
     $("kpiPnl").textContent = valuationUnavailable ? "--" : fmtUSD(snapshot.unrealized_pnl);
+    const mix = allocationData(snapshot);
+    if ($("kpiHoldings")) $("kpiHoldings").textContent = mix ? fmtUSD(mix.total - Number(snapshot.cash)) : "--";
+    if ($("kpiPositionCount")) $("kpiPositionCount").textContent = `${snapshot.positions?.length || 0} 種持倉`;
+    const pnl = finiteNumber(snapshot.unrealized_pnl);
+    $("kpiPnl").className = valuationUnavailable || pnl === null || pnl === 0 ? "" : pnl > 0 ? "ok" : "bad";
+    if ($("holdingsValuationState")) $("holdingsValuationState").textContent = valuationUnavailable ? "部分行情暫不可用" : "依最新取得市價估值";
 
-    const pnlPct = Number(snapshot.pnl_pct || 0);
+    const pnlPct = finiteNumber(snapshot.pnl_pct);
     const pnlPctEl = $("kpiPnlPct");
-    pnlPctEl.textContent = valuationUnavailable ? "--" : (pnlPct >= 0 ? "+" : "") + pnlPct.toFixed(2) + "%";
-    pnlPctEl.className = "sub " + (pnlPct >= 0 ? "ok" : "bad");
+    pnlPctEl.textContent = valuationUnavailable || pnlPct === null ? "--" : (pnlPct > 0 ? "+" : "") + pnlPct.toFixed(2) + "%";
+    pnlPctEl.className = "sub " + (valuationUnavailable || pnlPct === null || pnlPct === 0 ? "" : pnlPct > 0 ? "ok" : "bad");
   }
 
   function renderPositions(snapshot) {
     const body = $("positionsBody");
+    const performanceGrid = $("positionPerformanceGrid");
     if (!body) return;
-    const positions = snapshot?.positions || [];
+    const positions = Array.isArray(snapshot?.positions) ? snapshot.positions : [];
+    ensureHeldCoinOptions();
+    updateTradeFilters();
 
     if (!positions.length) {
       body.innerHTML = '<tr><td colspan="6">目前沒有持倉</td></tr>';
+      if (performanceGrid) {
+        performanceGrid.innerHTML = '<div class="position-performance-empty"><i class="fas fa-wallet"></i><strong>目前沒有持倉</strong><span>建立第一筆模擬買單後，幣種漲跌會顯示在這裡。</span></div>';
+      }
       return;
     }
 
+    if (performanceGrid) {
+      performanceGrid.innerHTML = positions.map((pos) => {
+        const rawSymbol = String(pos.symbol || "--").toUpperCase(), symbol = escapeHTML(rawSymbol);
+        const avgPrice = finiteNumber(pos.avg_price);
+        const currentPrice = finiteNumber(pos.current_price);
+        const pnl = finiteNumber(pos.unrealized_pnl);
+        const changePct = avgPrice > 0 && currentPrice > 0 ? ((currentPrice - avgPrice) / avgPrice) * 100 : null;
+        const unavailable = snapshot.price_unavailable_symbols?.includes(rawSymbol) || currentPrice === null || currentPrice <= 0 || changePct === null;
+        const tone = unavailable ? "unavailable" : (changePct >= 0 ? "gain" : "loss");
+        const priceMax = Math.max(avgPrice, currentPrice, 1);
+        const costWidth = (avgPrice || 0) / priceMax * 100;
+        const currentWidth = (currentPrice || 0) / priceMax * 100;
+        return `
+          <article class="position-performance-card ${tone}">
+            <div class="position-card-top">
+              <span class="position-symbol-icon">${escapeHTML(rawSymbol.slice(0, 1))}</span>
+              <span><strong>${symbol}</strong><small>${fmtQty(pos.quantity)} 顆</small></span>
+              <em class="position-change"><i class="fas fa-arrow-${changePct >= 0 ? "trend-up" : "trend-down"}"></i> ${unavailable ? "--" : `${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%`}</em>
+            </div>
+            <div class="position-price-compare">
+              <span><small>買入均價</small><strong>${fmtUSD(avgPrice)}</strong></span>
+              <i class="fas fa-arrow-right"></i>
+              <span><small>目前價格</small><strong>${unavailable ? "--" : fmtUSD(currentPrice)}</strong></span>
+            </div>
+            <div class="position-price-bars" aria-hidden="true"><span class="cost-bar" style="width:${costWidth}%"></span>${unavailable ? "" : `<span class="current-bar" style="width:${currentWidth}%"></span>`}</div>
+            <div class="position-price-bar-legend"><span>上：成本</span><span>下：現價</span></div>
+            <div class="position-card-bottom">
+              <span>未實現損益 <strong>${unavailable || pnl === null ? "--" : `${pnl > 0 ? "+" : ""}${fmtUSD(pnl)}`}</strong></span>
+              <button type="button" class="position-sell-shortcut" data-position-sell="${symbol}" data-position-qty="${Number(pos.quantity || 0)}" ${!/^[A-Z0-9]{2,12}$/.test(rawSymbol) || unavailable || !(Number(pos.quantity) > 0) ? "disabled" : ""}><i class="fas fa-arrow-up-from-bracket" aria-hidden="true"></i> 賣出</button>
+            </div>
+          </article>`;
+      }).join("");
+      performanceGrid.querySelectorAll("[data-position-sell]").forEach((button) => {
+        button.addEventListener("click", () => {
+          if (isLocked || orderPending) return;
+          if ($("orderSymbol")) $("orderSymbol").value = button.dataset.positionSell;
+          if ($("orderSide")) $("orderSide").value = "sell";
+          if ($("orderQty")) $("orderQty").value = button.dataset.positionQty || "";
+          if ($("orderAmt")) $("orderAmt").value = "";
+          updateQuotePanel();
+          refreshSelectedQuote();
+          loadMarketSeries();
+          scrollToSection("orderPanel");
+          setStatus(`已帶入 ${button.dataset.positionSell} 全部持倉；確認數量後再送出賣單。`, "ok");
+        });
+      });
+    }
+
     body.innerHTML = positions.map((pos) => {
-      const pnl = Number(pos.unrealized_pnl || 0);
-      const unavailable = snapshot.price_unavailable_symbols?.includes(pos.symbol);
+      const pnl = finiteNumber(pos.unrealized_pnl);
+      const unavailable = snapshot.price_unavailable_symbols?.includes(pos.symbol) || !(finiteNumber(pos.current_price) > 0);
       return `
         <tr>
-          <td>${pos.symbol}</td>
+          <td>${escapeHTML(pos.symbol)}</td>
           <td>${fmtQty(pos.quantity)}</td>
           <td>${fmtUSD(pos.avg_price)}</td>
           <td>${unavailable ? "--" : fmtUSD(pos.current_price)}</td>
           <td>${unavailable ? "--" : fmtUSD(pos.market_value)}</td>
-          <td class="${pnl >= 0 ? "ok" : "bad"}">${unavailable ? "--" : fmtUSD(pnl)}</td>
+          <td class="${pnl === null || pnl === 0 ? "" : pnl > 0 ? "ok" : "bad"}">${unavailable ? "--" : fmtUSD(pnl)}</td>
         </tr>
       `;
     }).join("");
   }
 
+  function updateTradeFilters() {
+    const select = $("tradeSymbolFilter");
+    if (!select) return;
+    const selected = select.value;
+    const symbols = new Set([
+      ...(currentPortfolio?.positions || []).map(item => item.symbol),
+      ...tradeHistory.map(item => item.symbol),
+    ].filter(Boolean).map(symbol => String(symbol).toUpperCase()));
+    select.replaceChildren(new Option("全部幣種", "all"));
+    Array.from(symbols).sort().forEach(symbol => select.add(new Option(symbol, symbol)));
+    if (symbols.has(selected)) select.value = selected;
+  }
+
   function renderTrades(trades) {
+    if (Array.isArray(trades)) {
+      tradeHistory = trades;
+      updateTradeFilters();
+    }
     const body = $("tradesBody");
     if (!body) return;
-
-    if (!Array.isArray(trades) || !trades.length) {
-      body.innerHTML = '<tr><td colspan="6">目前沒有交易紀錄</td></tr>';
+    const symbol = $("tradeSymbolFilter")?.value || "all";
+    const days = Number($("tradeTimeFilter")?.value || 0);
+    const filtered = tradeHistory.filter(trade => {
+      const date = window.SIFormat.date(trade.timestamp);
+      return (symbol === "all" || String(trade.symbol).toUpperCase() === symbol)
+        && (tradeSideFilter === "all" || trade.side === tradeSideFilter)
+        && (!days || (date && date.getTime() >= Date.now() - days * 86400000));
+    }).sort((a,b) => (window.SIFormat.date(b.timestamp)?.getTime() || 0) - (window.SIFormat.date(a.timestamp)?.getTime() || 0));
+    if ($("tradeFilterCount")) $("tradeFilterCount").textContent = `${filtered.length} / ${tradeHistory.length} 筆`;
+    for (const side of ["buy", "sell"]) {
+      const items = filtered.filter(trade => trade.side === side);
+      const total = items.some(trade => finiteNumber(trade.amount_usd) === null) ? null : items.reduce((sum, trade) => sum + Number(trade.amount_usd), 0);
+      if ($(side === "buy" ? "tradeBuyTotal" : "tradeSellTotal")) $(side === "buy" ? "tradeBuyTotal" : "tradeSellTotal").textContent = fmtUSD(total);
+    }
+    if (!filtered.length) {
+      body.innerHTML = `<tr><td colspan="6">${tradeHistory.length ? "沒有符合篩選條件的交易。" : "目前沒有交易紀錄"}</td></tr>`;
       return;
     }
-
-    body.innerHTML = trades.map((trade) => `
+    let lastDay = "";
+    body.innerHTML = filtered.map((trade) => {
+      const day = window.SIFormat.dateKey(trade.timestamp);
+      const group = day !== lastDay ? `<tr class="trade-date-group"><td colspan="6">${day === "unknown" ? "日期不明" : day.replaceAll("-", "/")}</td></tr>` : "";
+      lastDay = day;
+      const safeSymbol = String(trade.symbol || "--").replace(/[^A-Z0-9_-]/gi, "");
+      return `${group}
       <tr>
-        <td>${trade.timestamp || "--"}</td>
-        <td class="${trade.side === "buy" ? "ok" : "bad"}">${String(trade.side || "").toUpperCase()}</td>
-        <td>${trade.symbol || "--"}</td>
+        <td><time>${window.SIFormat.dateText(trade.timestamp)}</time></td>
+        <td class="${trade.side === "buy" ? "ok" : "bad"}">${trade.side === "buy" ? "買入" : trade.side === "sell" ? "賣出" : "--"}</td>
+        <td>${safeSymbol}</td>
         <td>${fmtUSD(trade.price)}</td>
         <td>${fmtQty(trade.quantity)}</td>
         <td>${fmtUSD(trade.amount_usd)}</td>
       </tr>
-    `).join("");
+    `; }).join("");
   }
 
   function ensureCharts() {
@@ -481,73 +824,46 @@
   }
 
   function drawEquity(snapshot) {
-    if (!ensureCharts()) return;
     const canvas = $("equityChart");
     if (!canvas) return;
-
-    const points = Array.isArray(snapshot?.equity_curve) ? snapshot.equity_curve : [];
-    const labels = points.map((_, idx) => `${idx + 1}`);
-    const values = points.map((item) => Number(item.total_value_usd || 0));
-
-    equityChart?.destroy();
-    equityChart = new Chart(canvas, {
-      type: "line",
-      data: {
-        labels,
-        datasets: [{
-          data: values,
-          borderColor: "#F97316",
-          backgroundColor: "rgba(249,115,22,.12)",
-          fill: true,
-          tension: .35,
-          borderWidth: 3,
-          pointRadius: 0
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { display: false, grid: { display: false } },
-          y: { grid: { color: "rgba(234,210,188,.5)" } }
-        }
-      }
-    });
+    const points = equityData(snapshot, equityDays);
+    equityChart?.destroy(); equityChart = null;
+    canvas.hidden = !points.length || !ensureCharts();
+    if ($("equityEmpty")) {
+      $("equityEmpty").hidden = !canvas.hidden;
+      $("equityEmpty").textContent = !ensureCharts() ? "圖表服務暫不可用" : "這段期間沒有帳戶快照，完成操作後可再查看。";
+    }
+    if ($("equityCaption")) $("equityCaption").textContent = `${points.length} 筆實際帳戶快照${snapshot?.price_unavailable_symbols?.length ? " · 目前部分估值暫缺" : ""}`;
+    if (canvas.hidden) return;
+    const options = chartOptions("總資產");
+    options.plugins.tooltip.callbacks.title = items => points[items[0].dataIndex].date
+      ? window.SIFormat.dateText(points[items[0].dataIndex].timestamp) : `快照 ${points[items[0].dataIndex].index + 1}`;
+    const labels = points.map(point => point.date ? new Intl.DateTimeFormat("zh-TW", { timeZone: "Asia/Taipei", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(point.date) : `快照 ${point.index + 1}`);
+    canvas.setAttribute("aria-label", `總資產走勢，${points.length} 筆帳戶快照；最近總值 ${fmtUSD(points.at(-1).value)}`);
+    equityChart = new Chart(canvas, { type: "line", data: { labels, datasets: [{ label: "總資產", data: points.map(point => point.value),
+      borderColor: "#e58a3e", backgroundColor: "rgba(239,138,59,.08)", fill: true, tension: .15, borderWidth: 2.5,
+      pointRadius: points.length <= 2 ? 4 : 0, pointHoverRadius: 5 }] }, options });
   }
 
   function drawAlloc(snapshot) {
-    if (!ensureCharts()) return;
     const canvas = $("allocChart");
     if (!canvas) return;
-
-    const positions = Array.isArray(snapshot?.positions) ? snapshot.positions : [];
-    const labels = positions.map((pos) => pos.symbol);
-    const values = positions.map((pos) => Number(pos.market_value || 0));
-
-    allocChart?.destroy();
-    allocChart = new Chart(canvas, {
-      type: "doughnut",
-      data: {
-        labels: labels.length ? labels : ["現金"],
-        datasets: [{
-          data: labels.length ? values : [Number(snapshot?.cash || 0)],
-          backgroundColor: ["#F97316", "#FDBA74", "#FB923C", "#7C9A6D", "#A85522", "#F59E0B"],
-          borderWidth: 0
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: "68%",
-        plugins: {
-          legend: {
-            position: "bottom",
-            labels: { usePointStyle: true, boxWidth: 8, font: { weight: "bold" } }
-          }
-        }
-      }
-    });
+    const mix = allocationData(snapshot);
+    allocChart?.destroy(); allocChart = null;
+    canvas.hidden = !mix?.total || !ensureCharts();
+    if ($("investedPct")) $("investedPct").textContent = mix && mix.investedPct !== null ? `${mix.investedPct.toFixed(1)}%` : "--";
+    if ($("allocationCount")) $("allocationCount").textContent = mix ? `${mix.entries.filter(item => item.symbol !== "現金").length} 種持倉` : "估值暫缺";
+    if ($("allocationLegend")) $("allocationLegend").innerHTML = mix ? mix.entries.map(item => `<div class="sim-allocation-row"><i class="sim-allocation-dot" style="background:${item.color}" aria-hidden="true"></i><span>${escapeHTML(item.symbol)}</span><b>${item.pct.toFixed(1)}%</b><small>${fmtUSD(item.value)}</small></div>`).join("") : "";
+    if ($("allocationEmpty")) {
+      $("allocationEmpty").hidden = !canvas.hidden;
+      $("allocationEmpty").textContent = !mix ? "部分估值資料缺少，配置比例暫不計算。" : !mix.total ? "目前沒有可計算的資產。" : "圖表服務暫不可用，配置數值仍可查看。";
+    }
+    if (canvas.hidden) return;
+    canvas.setAttribute("aria-label", `現金與持倉配置：${mix.entries.map(item => `${item.symbol} ${item.pct.toFixed(1)}%`).join("、")}`);
+    allocChart = new Chart(canvas, { type: "doughnut", data: { labels: mix.entries.map(item => item.symbol), datasets: [{
+      data: mix.entries.map(item => item.value), backgroundColor: mix.entries.map(item => item.color), borderWidth: 3, borderColor: "#fff", borderRadius: 3, hoverOffset: 3 }] },
+      options: { responsive: true, maintainAspectRatio: false, cutout: "78%", animation: !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: context => `${context.label} ${fmtUSD(context.raw)} · ${mix.entries[context.dataIndex].pct.toFixed(1)}%` } } } } });
   }
 
   async function refreshPortfolio() {
@@ -556,25 +872,30 @@
     currentPortfolio = data.portfolio || null;
     stressRequestVersion++;
     lastStressResult = null;
+    stressChart?.destroy(); stressChart = null;
     $("stressResults")?.replaceChildren();
     const unavailable = currentPortfolio?.price_unavailable_symbols || [];
     setStressStatus(unavailable.length
       ? `${unavailable.join("、")} 行情暫不可用，總資產與損益暫不顯示；請稍後重新整理。`
-      : "組合已更新，請重新執行情境測試以取得此快照的結果。", unavailable.length ? "warn" : "");
+      : hasStressablePositions(currentPortfolio)
+        ? "帳戶已更新，可比較這份快照在四種假設下的變化。"
+        : "尚未持倉：先閱讀情境假設，再到下方練習買入；有持倉後即可比較策略。", unavailable.length ? "warn" : "");
+    ensureHeldCoinOptions();
     updateKpis(data.portfolio);
     renderPositions(data.portfolio);
     drawEquity(data.portfolio);
     drawAlloc(data.portfolio);
     updateQuotePanel();
+    if ($("simUpdatedAt")) $("simUpdatedAt").textContent = `資料更新 ${new Intl.DateTimeFormat("zh-TW", { timeZone: "Asia/Taipei", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).format(new Date())}`;
   }
 
   async function refreshTrades() {
-    const data = await request("/api/sim-trade/history?limit=50", { headers: {} });
+    const data = await request("/api/sim-trade/history?limit=100", { headers: {} });
     renderTrades(data.trades);
   }
 
   async function placeOrder() {
-    if (orderPending) return;
+    if (orderPending || isLocked) return;
     const symbol = $("orderSymbol")?.value || "BTC";
     const side = $("orderSide")?.value || "buy";
     const quantityRaw = $("orderQty")?.value.trim();
@@ -588,6 +909,7 @@
     try {
       orderPending = true;
       if ($("btnPlaceOrder")) $("btnPlaceOrder").disabled = true;
+      if ($("quoteEstimate")) updateQuotePanel();
       setStatus("委託送出中...", "");
       await request("/api/sim-trade/order", {
         method: "POST",
@@ -602,16 +924,20 @@
       $("orderAmt").value = "";
       setStatus("委託成功，已更新持倉。", "ok");
       await Promise.all([refreshPortfolio(), refreshTrades()]);
+      if ($("simReviewLink")) $("simReviewLink").hidden = false;
     } catch (error) {
       setStatus(error.message || "下單失敗", "bad");
     } finally {
       orderPending = false;
       if ($("btnPlaceOrder")) $("btnPlaceOrder").disabled = false;
+      if ($("quoteEstimate")) updateQuotePanel();
     }
   }
 
   async function resetPortfolio() {
+    if (orderPending || isLocked) return;
     try {
+      orderPending = true; updateQuotePanel();
       setStatus("帳戶重置中...", "");
       await request("/api/sim-trade/reset", {
         method: "POST",
@@ -621,24 +947,27 @@
       await Promise.all([refreshPortfolio(), refreshTrades()]);
     } catch (error) {
       setStatus(error.message || "重置失敗", "bad");
+    } finally {
+      orderPending = false; updateQuotePanel();
     }
   }
 
   async function loadDemoPortfolio() {
-    if (isLocked) return;
+    if (isLocked || orderPending) return;
     if (hasStressablePositions(stressSnapshot())) {
-      setStatus("目前已有模擬持倉，可直接進行情境壓力測試；如需重做示範，請先重置帳戶。", "ok");
-      $("runStressTest")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      setStatus("目前已有模擬持倉，可直接進行情境壓力測試；如需重新練習，請先重置帳戶。", "ok");
+      scrollToSection("simStress");
       return;
     }
     const requiredCash = DEMO_PORTFOLIO_ORDERS.reduce((sum, order) => sum + order.amount_usd, 0);
     const cash = Number(currentPortfolio?.cash || 0);
     if (cash < requiredCash) {
-      setStatus(`示範組合需要至少 ${fmtUSD(requiredCash)} 模擬現金；目前可用 ${fmtUSD(cash)}。`, "bad");
+      setStatus(`練習配置需要至少 ${fmtUSD(requiredCash)} 模擬現金；目前可用 ${fmtUSD(cash)}。`, "bad");
       return;
     }
     try {
-      setStatus("正在載入示範投資組合（僅供展示，不是真實資產）...", "");
+      orderPending = true; updateQuotePanel();
+      setStatus("正在載入練習配置（僅用於模擬交易，不涉及真實資產）...", "");
       for (const order of DEMO_PORTFOLIO_ORDERS) {
         await request("/api/sim-trade/order", {
           method: "POST",
@@ -650,53 +979,74 @@
           })
         });
       }
-      setStatus("已載入示範投資組合：BTC / ETH / USDC。這只影響模擬交易帳本。", "ok");
+      setStatus("已載入練習配置：BTC / ETH / USDC。這只影響模擬交易帳本。", "ok");
       await Promise.all([refreshPortfolio(), refreshTrades()]);
-      $("runStressTest")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      scrollToSection("simStress");
     } catch (error) {
-      setStatus(error.message || "示範投資組合載入失敗。", "bad");
+      setStatus(error.message || "練習配置載入失敗。", "bad");
+      await Promise.allSettled([refreshPortfolio(), refreshTrades()]);
+    } finally {
+      orderPending = false; updateQuotePanel();
     }
   }
 
   window.addEventListener("smartinvest:auth-state", (event) => {
     if (initialAuthState === null || authReloadPending) return;
-    if (Boolean(event.detail?.isMember) !== initialAuthState) {
+    if (Boolean(event.detail?.isPremium) !== initialAuthState) {
       authReloadPending = true;
       window.location.reload();
     }
   });
 
   document.addEventListener("DOMContentLoaded", async function () {
+    ["tradeSymbolFilter", "tradeTimeFilter"].forEach(id => $(id)?.addEventListener("change", () => renderTrades()));
+    const setSideFilter = side => {
+      tradeSideFilter = side;
+      document.querySelectorAll("[data-trade-side]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.tradeSide === side)));
+      renderTrades();
+    };
+    document.querySelectorAll("[data-trade-side]").forEach(button => button.addEventListener("click", () => setSideFilter(button.dataset.tradeSide)));
+    $("tradeFilterReset")?.addEventListener("click", () => {
+      $("tradeSymbolFilter").value = "all";
+      $("tradeTimeFilter").value = "all";
+      setSideFilter("all");
+    });
     const token = await waitForAuthToken();
     initialAuthState = Boolean(token);
     if (!token) {
       setLockedState(true);
-      setStatus("目前尚未登入，請先登入會員。", "bad");
+      setStatus("模擬交易為進階會員功能，請完成付款開通。", "bad");
       return;
     }
 
     try {
-      await loadCoins();
-      await Promise.all([refreshPortfolio(), refreshTrades()]);
       setLockedState(false);
+      await Promise.all([refreshPortfolio(), refreshTrades(), loadCoins()]);
+      loadMarketSeries();
     } catch (error) {
       setStatus(error.message || "請先登入會員。", "bad");
     }
 
     $("btnPlaceOrder")?.addEventListener("click", function () {
       if (isLocked) return;
+      if (!orderDraft().valid) { setStatus("請先確認金額、數量與可用額度。", "bad"); return; }
       placeOrder();
     });
 
     $("btnReload")?.addEventListener("click", async function () {
-      if (isLocked) return;
+      if (isLocked || orderPending) return;
+      $("btnReload").disabled = true;
       setStatus("正在重新整理...", "");
-      await Promise.all([refreshPortfolio(), refreshTrades()]);
-      setStatus("資料已更新。", "ok");
+      try {
+        await Promise.all([refreshPortfolio(), refreshTrades(), refreshSelectedQuote(), loadMarketSeries()]);
+        setStatus("資料已更新。", "ok");
+      } catch (error) { setStatus(error.message || "更新失敗，請稍後再試。", "bad"); }
+      finally { $("btnReload").disabled = false; }
     });
 
     $("btnReset")?.addEventListener("click", function () {
-      if (isLocked) return;
+      if (isLocked || orderPending) return;
+      if (!window.confirm("重置會清空這個虛擬帳戶的持倉與交易紀錄。確定重置？")) return;
       resetPortfolio();
     });
     $("btnLoadDemoPortfolio")?.addEventListener("click", function () {
@@ -704,13 +1054,41 @@
       loadDemoPortfolio();
     });
 
-    ["orderSymbol", "orderSide", "orderQty", "orderAmt"].forEach((id) => {
-      $(id)?.addEventListener("input", updateQuotePanel);
-      $(id)?.addEventListener("change", updateQuotePanel);
+    ["orderQty", "orderAmt"].forEach(id => $(id)?.addEventListener("input", () => {
+      if ($(id).value) $(id === "orderQty" ? "orderAmt" : "orderQty").value = "";
+      updateQuotePanel();
+    }));
+    $("orderSide")?.addEventListener("change", updateQuotePanel);
+    $("orderSymbol")?.addEventListener("change", () => {
+      selectTradingSymbol($("orderSymbol").value);
     });
+    $("marketSymbol")?.addEventListener("change", () => selectTradingSymbol($("marketSymbol").value));
+    document.querySelectorAll("[data-order-side]").forEach(button => button.addEventListener("click", () => {
+      if (orderPending) return;
+      $("orderSide").value = button.dataset.orderSide; updateQuotePanel();
+    }));
+    document.querySelectorAll("[data-order-fraction]").forEach(button => button.addEventListener("click", () => {
+      if (orderPending || isLocked) return;
+      const draft = orderDraft(), fraction = Number(button.dataset.orderFraction);
+      $("orderQty").value = draft.side === "sell" ? String(Math.floor(draft.holdingQty * fraction * 1e8) / 1e8) : "";
+      $("orderAmt").value = draft.side === "buy" ? (Math.floor(draft.cash * fraction * 100) / 100).toFixed(2) : "";
+      updateQuotePanel();
+    }));
+    document.querySelectorAll("[data-equity-days]").forEach(button => button.addEventListener("click", () => {
+      equityDays = button.dataset.equityDays;
+      document.querySelectorAll("[data-equity-days]").forEach(item => item.setAttribute("aria-pressed", String(item === button)));
+      drawEquity(currentPortfolio);
+    }));
+    document.querySelectorAll("[data-market-days]").forEach(button => button.addEventListener("click", () => {
+      marketDays = Number(button.dataset.marketDays);
+      document.querySelectorAll("[data-market-days]").forEach(item => item.setAttribute("aria-pressed", String(item === button)));
+      loadMarketSeries();
+    }));
+    document.querySelectorAll(".sim-section-nav a").forEach(link => link.addEventListener("click", event => {
+      event.preventDefault(); scrollToSection(link.getAttribute("href").slice(1));
+    }));
 
     // —— Market Scenario Switcher ——
-    let activeScenario = "normal";
     let scenarioData = {};
 
     async function loadScenarios() {
@@ -727,7 +1105,9 @@
 
     function applyScenario(scenarioKey) {
       activeScenario = scenarioKey;
-      const sc = scenarioData[scenarioKey] || { label: "一般市場", price_multiplier: 1.0, volatility_multiplier: 1.0 };
+      const defaults = { normal: ["一般市場", 1, 1], bull: ["牛市", 1.3, .8], bear: ["熊市", .7, 1.5], black_swan: ["黑天鵝", .4, 3] };
+      const fallback = defaults[scenarioKey] || defaults.normal;
+      const sc = scenarioData[scenarioKey] || { label: fallback[0], price_multiplier: fallback[1], volatility_multiplier: fallback[2] };
       $("scenarioBadge") && ($("scenarioBadge").textContent = sc.label || scenarioKey);
       $("scPriceMult") && ($("scPriceMult").textContent = (sc.price_multiplier || 1).toFixed(1) + "x");
       $("scVolMult") && ($("scVolMult").textContent = (sc.volatility_multiplier || 1).toFixed(1) + "x");
@@ -742,10 +1122,9 @@
 
       document.querySelectorAll(".scenario-btn").forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.scenario === scenarioKey);
+        btn.setAttribute("aria-pressed", String(btn.dataset.scenario === scenarioKey));
       });
-
-      // placeholder: 展示情境資訊，不修改實際交易數據
-      console.log("[sim-trade] scenario switched to", scenarioKey, sc);
+      if (lastStressResult) renderStressResults(lastStressResult);
     }
 
     document.querySelectorAll(".scenario-btn").forEach((btn) => {

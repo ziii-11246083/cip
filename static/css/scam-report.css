@@ -1,0 +1,74 @@
+/* Categorical risk graphics use the API level; no invented safety score. */
+.scam-page.refresh-1012 .scam-stack{gap:26px}
+.scam-page.refresh-1012 .example-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:18px 0 20px}
+.scam-page.refresh-1012 main .example-label{font-size:14px!important;color:#967f6a;margin-right:2px}
+.scam-page.refresh-1012 main .exampleChip{display:inline-flex;align-items:center;justify-content:center;width:auto;min-width:0;min-height:36px;padding:7px 13px;border-radius:999px;border:1px solid #edddcc;background:#fffdf9;color:#ae703f;text-align:center;font-size:14px!important;font-weight:500;line-height:1.4;white-space:nowrap}
+.scam-page.refresh-1012 main .exampleChip[aria-pressed=true]{background:#fff1df;border-color:#ef9c52;color:#a65c26}
+.scam-page.refresh-1012 main #scamInput{min-height:180px;font-size:18px;line-height:1.8;border-radius:17px;border-color:#edddcc;padding:18px;background:#fff}
+.scam-page .scam-input-card>label{display:block;margin-bottom:9px;font-weight:650}
+.scam-page.refresh-1012 #btnScan{margin-top:16px;border-radius:14px;padding:13px 20px}
+.scam-page main :is(button,summary,textarea):focus-visible{outline:3px solid #dc914b;outline-offset:4px}
+.scam-page #btnCopyReport:disabled{opacity:.45;cursor:default}
+.scam-page.refresh-1012 .report-card{--report-accent:#a9794e;--report-soft:#fff7eb;--report-border:#efddc6;border-radius:28px;padding:0;overflow:hidden;background:#fff}
+.scam-page .report-card[data-risk=high]{--report-accent:#c14943;--report-soft:#fff1ed;--report-border:#efc7bf}
+.scam-page .report-card[data-risk=medium]{--report-accent:#cf812f;--report-soft:#fff5e5;--report-border:#f0d5ac}
+.scam-page .report-card[data-risk=low]{--report-accent:#a57b4e;--report-soft:#fff9ef;--report-border:#e8d8bc}
+.scam-page.refresh-1012 .report-head{padding:24px 28px;border-color:#f0e3d5;background:#fff;align-items:flex-start}
+.scam-page .report-head strong{font-size:24px;font-weight:700}
+.scam-page .report-head>div>span{display:block;margin-top:7px;color:#a18b76}
+.scam-page .report-head em{font-style:normal;white-space:nowrap}
+.scam-page .report-empty,.scam-page .scan-loading{min-height:310px;gap:14px;align-content:center;justify-items:center;padding:34px 24px;border-radius:0;background:radial-gradient(ellipse at 50% 0,#fff0dd,#fffdf9 70%);font-weight:400}
+.scam-page .report-empty>i,.scam-page .scan-loading>i{display:grid;place-items:center;width:70px;height:70px;border-radius:24px;background:#fff0dc;color:#d49450;font-size:28px}
+.scam-page .report-empty>strong,.scam-page .scan-loading>strong{font-size:23px;color:#7c5b40;font-weight:650}
+.scam-page.refresh-1012 main .report-empty>span,.scam-page.refresh-1012 main .scan-loading>span{font-size:17px!important;line-height:1.8;text-align:center;color:#a38c76}
+.scam-page .scan-loading.show{display:grid}
+.scam-page .scam-risk-hero{display:grid;grid-template-columns:150px minmax(0,1fr);align-items:center;gap:30px;margin:26px 28px;padding:30px;border:1px solid var(--report-border);border-radius:23px;background:linear-gradient(135deg,var(--report-soft),#fff)}
+.scam-page .scam-risk-symbol{display:grid;place-items:center;width:144px;height:144px;border-radius:50%;background:#fff;color:var(--report-accent);box-shadow:0 0 0 8px var(--report-soft),0 9px 26px #9b4a3010;border:1px solid var(--report-border)}
+.scam-page .scam-risk-symbol svg{width:105px;height:105px}
+.scam-page .scam-risk-summary{min-width:0}
+.scam-page.refresh-1012 main .scam-risk-kicker{font-size:15px!important;color:#9e816b}
+.scam-page.refresh-1012 #reportHeader{margin:6px 0 12px;padding:0;background:none!important;color:var(--report-accent);font-size:34px!important;font-weight:750;line-height:1.4}
+.scam-page.refresh-1012 main #scamRiskCaption{margin:0;font-size:18px!important;font-weight:400;line-height:1.8;color:#8b6e57}
+.scam-page .scam-risk-scale{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:18px;max-width:540px}
+.scam-page.refresh-1012 main .scam-risk-scale>span{display:block;text-align:center;padding:9px 12px;background:#fff;border:1px solid #ecdccd;border-radius:10px;font-size:16px!important;color:#b3987e;font-weight:500}
+.scam-page.refresh-1012 main .scam-risk-scale>span[aria-current=step]{background:var(--report-accent);color:#fff!important;border-color:var(--report-accent);font-weight:700}
+.scam-page .scam-evidence-flow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin:0 28px 28px}
+.scam-page .scam-evidence-flow>div{position:relative;display:grid;grid-template-columns:42px minmax(0,1fr);gap:6px 12px;padding:20px;border:1px solid #edddcb;border-radius:17px;background:#fffdf9;min-width:0}
+.scam-page .scam-evidence-flow>div>i{grid-column:1;grid-row:1/4;display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:#fff0df;color:#c3874a;font-size:20px}
+.scam-page .scam-evidence-flow>div>span,.scam-page .scam-evidence-flow>div>strong,.scam-page .scam-evidence-flow>div>small{grid-column:2}
+.scam-page .scam-evidence-flow>div>span{color:#94785f}
+.scam-page .scam-evidence-flow strong{font-size:24px;line-height:1.4;font-weight:700;color:#6a4933}
+.scam-page #scamRuleCount{font-family:Arial,"Microsoft JhengHei",sans-serif;font-variant-numeric:tabular-nums}
+.scam-page.refresh-1012 main .scam-evidence-flow small{font-size:15px!important;color:#ad9580}
+.scam-page .scam-evidence-flow>div:not(:last-child)::after{content:"→";position:absolute;right:-20px;top:42%;color:#d5bca3;font-size:18px}
+.scam-page .scam-report-body{display:grid;gap:22px;padding:0 28px 28px}
+.scam-page .scam-report-body>section>h3{display:flex;align-items:center;gap:9px;margin:0 0 14px;font-size:22px;color:#74533a}
+.scam-page .scam-report-body h3>i{font-size:19px;color:#d49151}
+.scam-page #scamReasons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0;padding:0;list-style:none;counter-reset:reason}
+.scam-page #scamReasons>li{position:relative;padding:18px 18px 18px 57px;border:1px solid var(--report-border);border-radius:16px;background:var(--report-soft);font-size:18px;line-height:1.8;font-weight:400;counter-increment:reason;overflow-wrap:anywhere}
+.scam-page #scamReasons>li::before{content:counter(reason);position:absolute;left:17px;top:19px;display:grid;place-items:center;width:27px;height:27px;border-radius:9px;background:#fff;color:var(--report-accent);font:600 15px Arial,sans-serif}
+.scam-page #reportContent{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:0;border-radius:0;white-space:normal;line-height:1.8}
+.scam-page .scam-analysis-block{min-width:0;padding:20px 22px;border:1px solid #ecdccb;border-radius:17px;background:#fffdf9}
+.scam-page .scam-analysis-block h4{font-size:19px;margin:0 0 12px;font-weight:650;color:#8a5834}
+.scam-page.refresh-1012 main .scam-analysis-block p{font-size:18px!important;font-weight:400;line-height:1.9;overflow-wrap:anywhere;white-space:pre-wrap;margin:0 0 12px;color:#806955}
+.scam-page .scam-analysis-block p:last-child{margin-bottom:0}
+.scam-page .scam-rule-summary{grid-column:1/-1;background:#fff8ef}
+.scam-page .scam-analysis-source{grid-column:1/-1;margin:7px 0 0;color:#a87951;font-size:18px;font-weight:600}
+.scam-page #scamWarnings{display:grid;gap:10px;list-style:none;margin:0;padding:0}
+.scam-page #scamWarnings>li{position:relative;margin:0;padding:15px 18px 15px 51px;border-radius:13px;background:#fff8ef;line-height:1.8;font-weight:400;overflow-wrap:anywhere}
+.scam-page #scamWarnings>li::before{content:"→";position:absolute;left:19px;top:15px;color:#cc8c49;font:22px Arial,sans-serif}
+.scam-page .scam-uncertainty{display:flex;gap:16px;padding:20px 22px;border:1px dashed #dabb99;border-radius:18px;background:#fffbf4}
+.scam-page .scam-uncertainty-mark{display:grid;place-items:center;flex-shrink:0;width:42px;height:42px;border-radius:50%;background:#fff0dc;color:#c88d48;font-size:20px}
+.scam-page .scam-uncertainty h3{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 9px;font-size:21px;color:#765337}
+.scam-page.refresh-1012 main #scamUncertaintyLevel{font-size:14px!important;color:#a98053;background:#fff0d8;padding:4px 10px;border-radius:999px;font-weight:500}
+.scam-page.refresh-1012 main #scamUncertainty{margin:0;font-size:17px!important;line-height:1.85;font-weight:400;color:#93775e}
+.scam-page .scam-evidence-details{border:1px solid #eddfcd;border-radius:14px;padding:15px 20px;background:#fff}
+.scam-page .scam-evidence-details summary{cursor:pointer;color:#a06e42;font-weight:600;line-height:1.7}
+.scam-page .scam-evidence-details summary>i{margin-right:8px}
+.scam-page #scamEvidence{display:grid;gap:9px;margin:15px 0 0;padding-left:22px;line-height:1.8;color:#9c8068;overflow-wrap:anywhere}
+.scam-page.refresh-1012 .report-actions{padding:18px 28px;border-color:#f0e1d2;flex-direction:row;flex-wrap:wrap;justify-content:flex-end}
+.scam-page .report-actions .button{border-radius:13px;padding:11px 17px}
+@media(max-width:1000px){.scam-page .scam-evidence-flow{gap:14px}.scam-page .scam-evidence-flow>div{grid-template-columns:1fr;padding:18px}.scam-page .scam-evidence-flow>div>i{grid-row:auto}.scam-page .scam-evidence-flow>div>span,.scam-page .scam-evidence-flow>div>strong,.scam-page .scam-evidence-flow>div>small{grid-column:1}.scam-page .scam-evidence-flow>div:not(:last-child)::after{display:none}}
+@media(max-width:650px){.scam-page.refresh-1012 .report-head{padding:21px;gap:12px}.scam-page .report-head em{align-self:flex-start}.scam-page .scam-risk-hero{grid-template-columns:1fr;justify-items:start;padding:24px;margin:20px;gap:24px}.scam-page .scam-risk-symbol{width:112px;height:112px}.scam-page .scam-risk-symbol svg{width:82px;height:82px}.scam-page.refresh-1012 #reportHeader{font-size:29px!important}.scam-page .scam-risk-scale{gap:7px}.scam-page.refresh-1012 main .scam-risk-scale>span{font-size:14px!important;padding:9px 7px}.scam-page .scam-evidence-flow{grid-template-columns:1fr;margin:0 20px 22px;gap:10px}.scam-page .scam-evidence-flow>div{grid-template-columns:42px minmax(0,1fr);gap:4px 13px}.scam-page .scam-evidence-flow>div>i{grid-row:1/4}.scam-page .scam-evidence-flow>div>span,.scam-page .scam-evidence-flow>div>strong,.scam-page .scam-evidence-flow>div>small{grid-column:2}.scam-page #scamReasons,.scam-page #reportContent{grid-template-columns:1fr}.scam-page .scam-report-body{padding:0 20px 20px;gap:22px}.scam-page .scam-analysis-block{padding:18px}.scam-page .scam-uncertainty{padding:17px;gap:11px}.scam-page .scam-uncertainty-mark{width:32px;height:32px;font-size:16px}.scam-page .scam-uncertainty h3{font-size:19px}.scam-page.refresh-1012 .report-actions{padding:16px 20px}.scam-page .report-empty>strong,.scam-page .scan-loading>strong{font-size:21px}}
+@media(prefers-reduced-motion:reduce){.scam-page *{animation:none!important;transition:none!important}}
+
