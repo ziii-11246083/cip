@@ -719,6 +719,12 @@ async function generatePodcast(btn) {
             : (data.script || "");
         if (!latestScript.trim()) throw new Error("Empty podcast content");
 
+        const fallbackMessage = data.generation_mode === "fallback"
+            ? (data.fallback_reason === "provider_timeout"
+                ? "AI 服務回應逾時，已提供備援文字稿。"
+                : "AI 服務暫時無法使用，已提供備援文字稿。")
+            : "";
+
         if (titleEl) titleEl.textContent = data.title || "Smart Invest Crypto 雙人市場快報";
         if (bulletEl) {
             const bullets = Array.isArray(data.bullets) ? data.bullets : [];
@@ -741,11 +747,14 @@ async function generatePodcast(btn) {
             }
         }
         if (!latestAudioUrl) {
-            resetChatStream("文字稿已備妥，按播放即可使用瀏覽器朗讀。");
+            resetChatStream(fallbackMessage || "文字稿已備妥，按播放即可使用瀏覽器朗讀。");
         }
         setPodcastState("ready");
 
-        showPodcastToast("生成成功", latestAudioUrl ? "雙人語音與聊天內容已完成" : "聊天內容已完成，語音暫時無法產生");
+        showPodcastToast(
+            fallbackMessage ? "已提供備援稿" : "生成成功",
+            fallbackMessage || (latestAudioUrl ? "雙人語音與聊天內容已完成" : "聊天內容已完成，語音暫時無法產生")
+        );
     } catch (err) {
         console.error(err);
         const hint = err.message === "Podcast requires two speakers" ? "這次未形成雙人對話，請重新生成。" : "請稍後重新生成。";

@@ -339,6 +339,30 @@ def refresh_openai_client() -> Optional[OpenAI]:
     client = OpenAI(api_key=latest_key) if latest_key and "sk-" in latest_key else None
     return client
 
+
+PODCAST_OPENAI_TIMEOUT_SECONDS = 18.0
+
+
+def _podcast_client_with_timeout(podcast_client: OpenAI) -> OpenAI:
+    """Keep Podcast provider calls below Gunicorn's default 30-second timeout."""
+    with_options = getattr(podcast_client, "with_options", None)
+    if callable(with_options):
+        return with_options(
+            timeout=PODCAST_OPENAI_TIMEOUT_SECONDS,
+            max_retries=0,
+        )
+    return podcast_client
+
+
+def _podcast_fallback_reason(error: Optional[Exception] = None) -> str:
+    if error is None:
+        return "llm_unavailable"
+    if type(error).__name__ == "APITimeoutError":
+        return "provider_timeout"
+    if type(error).__name__ == "APIConnectionError":
+        return "provider_connection_error"
+    return "provider_error"
+
 def is_openai_auth_error(error: Exception) -> bool:
     text = str(error).lower()
     return (
@@ -3408,11 +3432,18 @@ def generate_podcast():
                 trace_run.note_llm_unavailable()
             business = build_fallback_podcast(req, broadcast_at)
             _finish_trace(trace_run, answer=_trace_snapshot(business, max_len=8000))
-            return jsonify({**business, **_trace_meta(trace_run)})
+            return jsonify({
+                **business,
+                **_trace_meta(trace_run),
+                "generation_mode": "fallback",
+                "fallback_reason": _podcast_fallback_reason(),
+            })
+        podcast_client = _podcast_client_with_timeout(podcast_client)
         completion = podcast_client.beta.chat.completions.parse(
-            model=os.getenv("OPENAI_MODEL", "gpt-5.4"),
+            model=os.getenv("OPENAI_MODEL_PODCAST", "gpt-5.4-mini"),
             messages=[{"role": "system", "content": system_msg}, {"role": "user", "content": prompt}],
-            response_format=PodcastLLMOut
+            response_format=PodcastLLMOut,
+            max_completion_tokens=1800,
         )
         out = completion.choices[0].message.parsed
         lines = out.lines
@@ -3428,13 +3459,26 @@ def generate_podcast():
             "estimated_seconds": estimated_seconds, "lines": [l.model_dump() for l in lines],
         }
         _finish_trace(trace_run, answer=_trace_snapshot(business, max_len=8000))
-        return jsonify({**business, **_trace_meta(trace_run)})
-    except Exception:
-        # 不回傳 provider exception 資訊（安全修正）；trace 記固定代碼；
-        # 使用者實際收到 fallback podcast → 以同一份內容做 answer snapshot
+        return jsonify({
+            **business,
+            **_trace_meta(trace_run),
+            "generation_mode": "ai",
+        })
+    except Exception as error:
+        # Keep provider details out of the response while making fallback visible.
         business = build_fallback_podcast(req, broadcast_at)
+        fallback_reason = _podcast_fallback_reason(error)
+        app.logger.warning(
+            "Podcast LLM request failed; using fallback (reason=%s)",
+            fallback_reason,
+        )
         _finish_trace(trace_run, answer=_trace_snapshot(business, max_len=8000), error="llm_error")
-        return jsonify({**business, **_trace_meta(trace_run)})
+        return jsonify({
+            **business,
+            **_trace_meta(trace_run),
+            "generation_mode": "fallback",
+            "fallback_reason": fallback_reason,
+        })
 
 @app.route("/api/podcast/generate", methods=["POST"])
 def api_generate_podcast_alias():
@@ -3505,6 +3549,7 @@ def podcast_tts():
     except ValidationError as e: return jsonify({"detail": str(e)}), 422
     if not req.lines and not req.text.strip():
         return jsonify({"detail": "Podcast dialogue is empty"}), 422
+    podcast_client = _podcast_client_with_timeout(podcast_client)
     clean = re.sub(r"^(主持人|分析師)：", "", req.text, flags=re.MULTILINE).strip()[:3800]
     audio_id = uuid.uuid4().hex[:10]
     filename = f"podcast_{taipei_now().date().isoformat()}_{audio_id}.{'wav' if req.lines else 'mp3'}"
@@ -3527,6 +3572,8 @@ def podcast_tts():
             except Exception as model_error:
                 if is_openai_auth_error(model_error):
                     return jsonify({"detail": "OpenAI API Key 驗證失敗。請重新產生一把新的 API key，貼到 .env 的 OPENAI_API_KEY，然後重啟 Flask。"}), 401
+                if type(model_error).__name__ in {"APITimeoutError", "APIConnectionError"}:
+                    raise
                 errors.append(f"{tts_model}: {type(model_error).__name__}: {str(model_error)[:180]}")
         raise RuntimeError(" | ".join(errors))
     except Exception as e:

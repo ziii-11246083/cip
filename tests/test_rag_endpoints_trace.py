@@ -109,6 +109,11 @@ class FakeLLM:
     def __init__(self, create_error=None, parse_error=None):
         self._create_error = create_error
         self._parse_error = parse_error
+        self.last_client_options = None
+
+        def with_options(**options):
+            self.last_client_options = options
+            return self
 
         def create(**kwargs):
             if self._create_error:
@@ -143,6 +148,7 @@ class FakeLLM:
         self.chat = types.SimpleNamespace(completions=types.SimpleNamespace(create=create))
         self.beta = types.SimpleNamespace(
             chat=types.SimpleNamespace(completions=types.SimpleNamespace(parse=parse)))
+        self.with_options = with_options
 
 
 class BaseEndpointTraceTest(unittest.TestCase):
@@ -369,6 +375,9 @@ class PodcastTraceTests(BaseEndpointTraceTest):
         self.assertEqual(r.endpoint, "podcast")
         self.assertIsNone(r.user_id)
         self.assertEqual(r.status, "success")
+        self.assertEqual(data["generation_mode"], "ai")
+        self.assertEqual(self.fake_llm.last_client_options,
+                         {"timeout": 18.0, "max_retries": 0})
 
     def test_alias_one_trace(self):
         resp = self._post("/api/podcast/generate", self.PAYLOAD)
@@ -424,6 +433,19 @@ class PodcastTraceTests(BaseEndpointTraceTest):
         r = self._last()
         self.assertEqual(r.status, "error")
         self.assertEqual(r.error, "llm_error")
+
+    def test_provider_timeout_is_visible_fallback_without_provider_details(self):
+        timeout_error = type("APITimeoutError", (TimeoutError,), {})("slow provider")
+        app_module.refresh_openai_client = lambda: FakeLLM(parse_error=timeout_error)
+
+        resp = self._post("/podcast/generate", self.PAYLOAD)
+
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        self.assertEqual(data["generation_mode"], "fallback")
+        self.assertEqual(data["fallback_reason"], "provider_timeout")
+        self.assertIn("lines", data)
+        self.assertNotIn("slow provider", json.dumps(data, ensure_ascii=False))
 
 
 class HealthTraceTests(BaseEndpointTraceTest):
