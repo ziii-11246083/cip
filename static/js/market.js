@@ -83,12 +83,13 @@ async function fetchWithTimeout(url, timeoutMs = 9000) {
 
 function normalizeMarketCoin(coin) {
   const symbol = String(coin?.symbol || "").toUpperCase();
+  const rawChange = coin?.price_change_percentage_24h ?? coin?.change;
   return {
     id: coin?.id || symbol.toLowerCase(),
     symbol,
     name: coin?.name || coin?.cn_name || symbol,
     current_price: Number(coin?.current_price ?? coin?.price_usd ?? coin?.price ?? 0),
-    price_change_percentage_24h: Number(coin?.price_change_percentage_24h ?? coin?.change ?? 0),
+    price_change_percentage_24h: rawChange == null || rawChange === "" ? NaN : Number(rawChange),
     market_cap_rank: Number(coin?.market_cap_rank ?? coin?.rank ?? 999999)
   };
 }
@@ -442,26 +443,31 @@ function renderPopularCoinCards() {
 
   wrap.innerHTML = "";
   const coins = popularCoinsCache.slice(0, 10);
+  const maxChange = Math.max(...coins.map(coinChange).filter(Number.isFinite).map(Math.abs), .01);
   let upCount = 0;
   let downCount = 0;
 
   coins.forEach(function(coin) {
     const symbol = String(coin.symbol || "").toUpperCase();
     const change = coinChange(coin);
-    const isUp = change >= 0;
+    const hasChange = Number.isFinite(change);
+    const isUp = hasChange && change >= 0;
 
-    if (isUp) upCount += 1;
-    else downCount += 1;
+    if (hasChange && isUp) upCount += 1;
+    else if (hasChange) downCount += 1;
 
     const div = document.createElement("div");
-    div.className = `hotChip ${Math.abs(change)<.005?'flat':isUp?'rising':'falling'}`;
-    const maxChange=Math.max(...coins.map(c=>Math.abs(coinChange(c))),.01);
-    const moveWidth=Math.min(50,Math.abs(change)/maxChange*50);
+    div.className = `hotChip ${!hasChange || Math.abs(change)<.005?'flat':isUp?'rising':'falling'}`;
+    const moveWidth = hasChange ? Math.min(50, Math.abs(change) / maxChange * 50) : 0;
+    const moveLabel = !hasChange ? "漲跌資料不足" : Math.abs(change)<.005 ? "持平" : isUp ? "↗ 上漲" : "↘ 下跌";
+    const moveDescription = hasChange
+      ? `24 小時${isUp?'上漲':'下跌'} ${Math.abs(change).toFixed(2)}%，相對本列幣種的漲跌幅`
+      : "24 小時漲跌資料不足";
     div.innerHTML = `
-      <div class="hot-card-header"><div class="hot-coin-mark" aria-hidden="true">${escapeMarketText(symbol.slice(0,3))}</div><div><div class="hotSymbol">${escapeMarketText(symbol)}</div><div class="hotName">${escapeMarketText(coin.name || symbol)}</div></div><span class="hot-move-label">${Math.abs(change)<.005?'持平':isUp?'↗ 上漲':'↘ 下跌'}</span></div>
+      <div class="hot-card-header"><div class="hot-coin-mark" aria-hidden="true">${escapeMarketText(symbol.slice(0,3))}</div><div><div class="hotSymbol">${escapeMarketText(symbol)}</div><div class="hotName">${escapeMarketText(coin.name || symbol)}</div></div><span class="hot-move-label">${moveLabel}</span></div>
       <div class="hotPrice">${fmtUSD(coinPrice(coin))}</div>
-      <div class="hot-change-row"><small>24 小時漲跌</small><div class="hotChange ${isUp ? "up" : "down"}">${fmtChange(change)}</div></div>
-      <div class="hot-change-track" role="img" aria-label="24 小時${isUp?'上漲':'下跌'} ${Math.abs(change).toFixed(2)}%，相對本列幣種的漲跌幅"><i class="hot-change-fill" style="left:${isUp?50:50-moveWidth}%;width:${moveWidth}%"></i><b></b></div>
+      <div class="hot-change-row"><small>24 小時漲跌</small><div class="hotChange ${hasChange ? isUp ? "up" : "down" : ""}">${fmtChange(change)}</div></div>
+      <div class="hot-change-track" role="img" aria-label="${moveDescription}"><i class="hot-change-fill" style="left:${isUp?50:50-moveWidth}%;width:${moveWidth}%"></i><b></b></div>
       <div class="hotActions">
         <button type="button" data-symbol="${escapeMarketText(symbol)}"><i class="fas fa-chart-line" aria-hidden="true"></i> 看走勢</button>
         <a href="/analysis/${encodeURIComponent(symbol)}">深度分析</a>
@@ -486,16 +492,19 @@ function renderPopularCoinCards() {
   });
 
   if (meta) {
-    const mood = upCount >= downCount ? "偏強" : "偏弱";
+    const knownChangeCount = upCount + downCount;
+    const mood = knownChangeCount === 0 ? "資料不足" : upCount === downCount ? "漲跌接近" : upCount > downCount ? "偏強" : "偏弱";
     meta.innerHTML = `<i class="fas fa-fire"></i> 熱門幣種：${mood}`;
   }
   const breadth=document.getElementById('marketBreadth');
   if(breadth){
-    const rising=coins.filter(c=>coinChange(c)>=.005).length;
-    const falling=coins.filter(c=>coinChange(c)<=-.005).length;
-    const flat=coins.length-rising-falling;
+    const changes=coins.map(coinChange);
+    const rising=changes.filter(change=>Number.isFinite(change)&&change>=.005).length;
+    const falling=changes.filter(change=>Number.isFinite(change)&&change<=-.005).length;
+    const flat=changes.filter(change=>Number.isFinite(change)&&Math.abs(change)<.005).length;
+    const unavailable=changes.length-rising-falling-flat;
     breadth.hidden=!coins.length;
-    breadth.innerHTML=`<div class="breadth-title"><i class="fas fa-chart-simple" aria-hidden="true"></i><strong>這 ${coins.length} 種幣的漲跌分布</strong><small>24 小時 · 非全市場統計</small></div><div class="breadth-track" role="img" aria-label="${rising} 種上漲、${flat} 種持平、${falling} 種下跌"><i style="width:${rising/coins.length*100}%" class="breadth-up"></i><i style="width:${flat/coins.length*100}%" class="breadth-flat"></i><i style="width:${falling/coins.length*100}%" class="breadth-down"></i></div><div class="breadth-legend"><span class="up">↗ ${rising} 上漲</span><span>${flat} 持平</span><span class="down">↘ ${falling} 下跌</span></div>`;
+    breadth.innerHTML=`<div class="breadth-title"><i class="fas fa-chart-simple" aria-hidden="true"></i><strong>這 ${coins.length} 種幣的漲跌分布</strong><small>24 小時 · 非全市場統計</small></div><div class="breadth-track" role="img" aria-label="${rising} 種上漲、${flat} 種持平、${falling} 種下跌、${unavailable} 種資料不足"><i style="width:${rising/coins.length*100}%" class="breadth-up"></i><i style="width:${flat/coins.length*100}%" class="breadth-flat"></i><i style="width:${falling/coins.length*100}%" class="breadth-down"></i></div><div class="breadth-legend"><span class="up">↗ ${rising} 上漲</span><span>${flat} 持平</span><span class="down">↘ ${falling} 下跌</span>${unavailable ? `<span>${unavailable} 資料不足</span>` : ""}</div>`;
   }
 }
 

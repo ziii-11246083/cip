@@ -1832,7 +1832,7 @@ def live_data():
 
 @app.route('/api/market', methods=['GET'])
 def api_market():
-    crypto_list = DataManager.get_market_tickers()
+    crypto_list = DataManager.get_all_tickers()
     if not crypto_list:
         return jsonify({"timestamp": "", "data": []})
 

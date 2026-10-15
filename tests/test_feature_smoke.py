@@ -83,7 +83,7 @@ class FeatureSmokeTests(unittest.TestCase):
 
     def test_market_and_social_empty_provider_responses(self):
         m = self.module
-        with patch.object(m.DataManager, "get_all_tickers", return_value=[]), patch.object(m.DataManager, "get_market_tickers", return_value=[]), patch.object(m.SocialMediaEngine, "scrape_ptt", return_value=[]), patch.object(m.SocialMediaEngine, "scrape_cnyes", return_value=[]), patch.object(m.SocialMediaEngine, "scrape_rss_for_signals", return_value=[]), patch.object(m.SocialMediaEngine, "fetch_narratives_full", return_value=[]):
+        with patch.object(m.DataManager, "get_all_tickers", return_value=[]), patch.object(m.SocialMediaEngine, "scrape_ptt", return_value=[]), patch.object(m.SocialMediaEngine, "scrape_cnyes", return_value=[]), patch.object(m.SocialMediaEngine, "scrape_rss_for_signals", return_value=[]), patch.object(m.SocialMediaEngine, "fetch_narratives_full", return_value=[]):
             for path in ("/api/market", "/api/coingecko", "/api/social-data", "/api/narratives", "/api/sfi/search"):
                 with self.subTest(path=path):
                     response = self.client.get(path)
