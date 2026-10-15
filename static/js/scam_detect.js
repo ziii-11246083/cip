@@ -149,18 +149,42 @@ function renderFormattedReport(text) {
   if (!target) return;
   target.replaceChildren();
   const formatted = String(text).replace(/\r\n?/g, "\n").replace(/\*\*([^*]+)\*\*/g, "$1").replace(/((?:\d{1,2}[.．、)]\s*)?(?:文字規則命中|AI\s*文字分析|風險等級|疑點解析|防範建議|風險原因|注意事項|查證建議|建議)\s*[:：])/g, "\n\n$1");
+  
   formatted.split(/\n\s*\n/).map(part => part.trim()).filter(Boolean).forEach(part => {
+    const heading = part.match(/^(?:\d{1,2}[.．、)]\s*)?([^\n:：]{1,24})[:：]\s*([\s\S]*)$/);
+    const titleText = heading ? heading[1].trim() : "";
+    const body = heading ? heading[2] : part;
+
+    // ======== 過濾邏輯：只要標題是「風險等級」就跳過不顯示 ========
+    if (titleText === "風險等級" || /^(high|medium|low|unknown)$/i.test(body.trim())) {
+      return;
+    }
+
     const section = document.createElement("article");
     section.className = "scam-analysis-block";
-    const heading = part.match(/^(?:\d{1,2}[.．、)]\s*)?([^\n:：]{1,24})[:：]\s*([\s\S]*)$/);
-    const body = heading ? heading[2] : part;
+    
     if (heading && !body.trim()) {
-      const label = document.createElement("h4"); label.className = "scam-analysis-source"; label.textContent = heading[1]; target.appendChild(label); return;
+      const label = document.createElement("h4"); 
+      label.className = "scam-analysis-source"; 
+      label.textContent = heading[1]; 
+      target.appendChild(label); 
+      return;
     }
+    
     if (heading && heading[1] === "文字規則命中") section.classList.add("scam-rule-summary");
-    if (heading) { const title = document.createElement("h4"); title.textContent = heading[1]; section.appendChild(title); }
+    if (heading) { 
+      const title = document.createElement("h4"); 
+      title.textContent = heading[1]; 
+      section.appendChild(title); 
+    }
+    
     const paragraphs = body.length > 110 ? body.split(/(?<=[。！？；])\s*|\n+/) : body.split(/\n+/);
-    paragraphs.filter(value => value.trim()).forEach(value => { const p = document.createElement("p"); p.textContent = value.trim(); section.appendChild(p); });
+    paragraphs.filter(value => value.trim()).forEach(value => { 
+      const p = document.createElement("p"); 
+      p.textContent = value.trim(); 
+      section.appendChild(p); 
+    });
+    
     target.appendChild(section);
   });
 }
