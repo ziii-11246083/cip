@@ -1993,7 +1993,44 @@ def crypto_popular():
         return jsonify({"error": "per_page 必須是 1 到 250 的整數。"}), 400
     params = {"vs_currency": vs_currency, "order": "market_cap_desc", "per_page": per_page, "page": 1, "sparkline": "false"}
     data = DataManager._cg_get("/coins/markets", params) or []
-    return jsonify([{"id": c.get("id"), "symbol": (c.get("symbol") or "").upper(), "name": c.get("name"), "current_price": c.get("current_price"), "market_cap": c.get("market_cap"), "price_change_percentage_24h": c.get("price_change_percentage_24h"), "market_cap_rank": c.get("market_cap_rank")} for c in data])
+    
+    # 整理原本的真實幣種資料
+    results = [
+        {
+            "id": c.get("id"), 
+            "symbol": (c.get("symbol") or "").upper(), 
+            "name": c.get("name"), 
+            "current_price": c.get("current_price"), 
+            "market_cap": c.get("market_cap"), 
+            "price_change_percentage_24h": c.get("price_change_percentage_24h"), 
+            "market_cap_rank": c.get("market_cap_rank")
+        } for c in data
+    ]
+    
+    # ======== 在這裡強制塞入你要展示的測試幣 ========
+    test_coins = [
+        {
+            "id": "test01", 
+            "symbol": "TEST01", 
+            "name": "測試幣(暴漲)", 
+            "current_price": 100.0, 
+            "market_cap": 9999999, 
+            "price_change_percentage_24h": 16.8,  # 大於 15% 觸發高風險 FOMO
+            "market_cap_rank": 998
+        },
+        {
+            "id": "test02", 
+            "symbol": "TEST02", 
+            "name": "測試幣(暴跌)", 
+            "current_price": 50.0, 
+            "market_cap": 8888888, 
+            "price_change_percentage_24h": -19.4, # 小於 -15% 觸發恐慌拋售
+            "market_cap_rank": 999
+        }
+    ]
+    
+    # 將測試幣放在清單最前面回傳給前端
+    return jsonify(test_coins + results)
 
 @app.route("/api/sfi/search", methods=["GET"])
 def search_sfi_assets():
