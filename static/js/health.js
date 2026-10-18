@@ -12,6 +12,8 @@ let fomoRequestId = 0;
 const ALLOCATION_COLORS = ["#ef7d2d", "#368575", "#a5bd86", "#e4b551", "#bb7758", "#7b695d"];
 
 const DEFAULT_COINS = [
+  { symbol:"TEST01", name:"測試幣(暴漲)" },
+  { symbol:"TEST02", name:"測試幣(暴跌)" },
   { symbol:"BTC", name:"Bitcoin" },
   { symbol:"ETH", name:"Ethereum" },
   { symbol:"SOL", name:"Solana" },
