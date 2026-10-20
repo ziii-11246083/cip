@@ -17,7 +17,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=brand-width-20261013">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/visual-refresh-1012.css') }}?v=orange-white-20261013">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/site-theme.css') }}?v=money-type-20261013">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/sim-workspace.css') }}?v=sim-workflow-20261015">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/sim-workspace.css') }}?v=scenario-visual-20261020">
 </head>
 <body class="sim-page refresh-1012">
 {% include "partials/header.html" %}
@@ -66,19 +66,21 @@
 
         <section class="card sim-scenario-card" id="simStress" data-member-feature="市場情境模擬">
           <div class="sim-section-head"><div><span class="sim-eyebrow">02 / WHAT IF</span><h2 class="sim-title">下單前，先比較情境</h2></div><span class="sim-account-badge"><i class="fas fa-flask" aria-hidden="true"></i> 選填 · 假設試算</span></div>
-          <p class="sim-scenario-desc">用目前帳戶與所選策略，比較四種漲跌假設。<strong>這些假設不代表目前行情，也不會送出訂單。</strong></p>
-          <div class="sim-scenario-selector" role="group" aria-label="查看情境假設">
-            <button class="scenario-btn active" data-scenario="normal" type="button" aria-pressed="true"><i class="fas fa-balance-scale" aria-hidden="true"></i><strong>一般市場</strong><span>×1.0</span><small>風險資產期末目標</small></button>
-            <button class="scenario-btn" data-scenario="bull" type="button" aria-pressed="false"><i class="fas fa-chart-line" aria-hidden="true"></i><strong>牛市</strong><span>×1.3</span><small>風險資產期末目標</small></button>
-            <button class="scenario-btn" data-scenario="bear" type="button" aria-pressed="false"><i class="fas fa-arrow-trend-down" aria-hidden="true"></i><strong>熊市</strong><span>×0.7</span><small>風險資產期末目標</small></button>
-            <button class="scenario-btn" data-scenario="black_swan" type="button" aria-pressed="false"><i class="fas fa-bolt" aria-hidden="true"></i><strong>黑天鵝</strong><span>×0.4</span><small>風險資產期末目標</small></button>
-          </div>
-          <div class="sim-scenario-info" id="scenarioInfo"><span class="sim-scenario-badge" id="scenarioBadge">一般市場</span><span>期末目標 <b id="scPriceMult">1.0x</b></span><span>日波動乘數 <b id="scVolMult">1.0x</b></span><small id="scAdvice">基準假設</small></div>
-          <div class="stress-controls"><label for="stressStrategy">測試策略<select id="stressStrategy"><option value="conservative">保守型 · 風險資產 35%</option><option value="balanced" selected>穩健型 · 風險資產 65%</option><option value="aggressive">積極型 · 風險資產 90%</option></select></label><label for="stressHorizon">假設期間（天）<input id="stressHorizon" type="number" min="7" max="365" step="1" value="90"></label><label for="stressSeed">情境編號<input id="stressSeed" type="number" min="0" max="2147483647" step="1" value="20260820"></label><button type="button" id="runStressTest"><i class="fas fa-play" aria-hidden="true"></i> 比較四種情境</button></div>
+          <p class="sim-scenario-desc">同一筆資金，遇到漲跌會變多少？<strong>假設試算，不代表目前行情。</strong></p>
+          <div class="stress-controls"><label for="stressStrategy">配置方式<select id="stressStrategy"><option value="conservative">保守型 · 風險資產 35%</option><option value="balanced" selected>穩健型 · 風險資產 65%</option><option value="aggressive">積極型 · 風險資產 90%</option></select></label><label for="stressHorizon">假設期間（天）<input id="stressHorizon" type="number" min="7" max="365" step="1" value="90"></label><button type="button" id="runStressTest"><i class="fas fa-chart-bar" aria-hidden="true"></i> 比較四種情境</button></div>
+          <details class="sim-stress-advanced"><summary>進階設定</summary><label for="stressSeed">情境編號<input id="stressSeed" type="number" min="0" max="2147483647" step="1" value="20260820"></label><small>同一編號可重現相同路徑；更換編號不改變期末目標。</small></details>
           <div class="status" id="stressStatus" role="status" aria-live="polite">有持倉後可比較策略；尚未持倉可先閱讀假設，再到下方練習下單。</div>
+          <div class="sim-scenario-selector" role="group" aria-label="強調情境曲線，四種結果會同時比較">
+            <button class="scenario-btn active" data-scenario="normal" type="button" aria-pressed="true"><span class="scenario-symbol" aria-hidden="true"><i class="fas fa-arrows-left-right"></i></span><strong>一般市場<small>持平假設</small></strong><svg class="scenario-mini-path" viewBox="0 0 150 45" aria-hidden="true"><path d="M3 26 L25 22 L45 28 L65 17 L85 23 L105 19 L125 24 L147 23"/></svg><span class="scenario-assumption">風險資產 0%</span></button>
+            <button class="scenario-btn" data-scenario="bull" type="button" aria-pressed="false"><span class="scenario-symbol" aria-hidden="true"><i class="fas fa-arrow-trend-up"></i></span><strong>牛市<small>上漲假設</small></strong><svg class="scenario-mini-path" viewBox="0 0 150 45" aria-hidden="true"><path d="M3 39 L25 31 L45 34 L65 23 L85 27 L105 15 L125 18 L147 5"/></svg><span class="scenario-assumption">風險資產 +30%</span></button>
+            <button class="scenario-btn" data-scenario="bear" type="button" aria-pressed="false"><span class="scenario-symbol" aria-hidden="true"><i class="fas fa-arrow-trend-down"></i></span><strong>熊市<small>下跌假設</small></strong><svg class="scenario-mini-path" viewBox="0 0 150 45" aria-hidden="true"><path d="M3 5 L25 15 L45 11 L65 23 L85 19 L105 31 L125 27 L147 39"/></svg><span class="scenario-assumption">風險資產 −30%</span></button>
+            <button class="scenario-btn" data-scenario="black_swan" type="button" aria-pressed="false"><span class="scenario-symbol" aria-hidden="true"><i class="fas fa-bolt"></i></span><strong>黑天鵝<small>急跌假設</small></strong><svg class="scenario-mini-path" viewBox="0 0 150 45" aria-hidden="true"><path d="M3 4 L23 7 L37 4 L49 33 L70 29 L88 37 L108 32 L127 41 L147 39"/></svg><span class="scenario-assumption">風險資產 −60%</span></button>
+          </div>
+          <p class="sim-scenario-key"><i class="fas fa-circle-info" aria-hidden="true"></i> 上方是風險資產的漲跌假設；點圖示強調曲線，四種結果都會保留。</p>
           <div class="stress-results" id="stressResults"></div>
           <a class="sim-next-step" href="#orderPanel">接著規劃模擬買賣 <i class="fas fa-arrow-down" aria-hidden="true"></i></a>
           <details class="compact-explain"><summary>計算方式與限制</summary><div>
+          <p class="stress-limitations">圖示百分比是風險資產期末目標；日波動乘數依一般市場、牛市、熊市、黑天鵝分別為 1.0、0.8、1.5、3.0。小折線只示意漲跌方向，實際試算路徑見下方圖表。</p>
           <p class="stress-limitations"><strong>合成年化波動</strong>是合成日報酬標準差年化後的風險指標，可能超過 100%；它不是虧損比例或發生機率。</p>
           <p class="stress-limitations">計算方式：先依策略重新配置風險資產，保留各風險幣種之間的相對比例；不是直接測試原持倉比例。若沒有風險資產，則保留現金與穩定幣配置。黑天鵝假設風險資產期末下跌 60%、穩定幣期末下跌 3%、現金不變；第 5 日另有衝擊，已包含在期末目標中。最大回撤是路徑中從高點至低點的跌幅，可能大於期末虧損。情境編號改變中間路徑，不改變期末目標。</p>
           <p class="stress-limitations">限制：未模擬手續費、稅負、流動性與成交滑價；期末目標是風險資產的情境假設，不是實際歷史價格。</p>
@@ -159,7 +161,7 @@
 </script>
 <script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=join-carousel-20261013"></script>
 <script src="{{ url_for('static', filename='js/common.js') }}?v=money-type-20261013"></script>
-<script src="{{ url_for('static', filename='js/sim_trade.js') }}?v=sim-workflow-20261015"></script>
+<script src="{{ url_for('static', filename='js/sim_trade.js') }}?v=scenario-names-20261020"></script>
 </body>
 </html>
 
