@@ -1,4 +1,4 @@
-﻿/* =========================================================
+/* =========================================================
    Smart Invest Podcast Page
    只設計 Podcast main 區塊，不影響 header
 ========================================================= */
@@ -588,6 +588,8 @@
   color:rgba(255,255,255,.78);
   font-size:15px;
   line-height:1.8;
+  text-align: justify;
+  hanging-punctuation: allow-end last;
 }
 
 .dialogue-cast{
@@ -989,6 +991,7 @@
   font-size:15px;
   line-height:1.9;
   word-break:break-word;
+  text-align: justify;
 }
 
 .coin-bubbles,
