@@ -19,9 +19,11 @@
   let marketRequestVersion = 0;
   let quoteRequestVersion = 0;
   let activeScenario = "normal";
+  let scenarioData = {};
   let stressPending = false;
   const ASSET_COLORS = ["#ef8a3b", "#5e9685", "#debb7e", "#aa927e", "#8b9cbd", "#bb8ca4", "#8da878", "#c7a27a"];
-  const SCENARIO_COLORS = { normal: "#aa9075", bull: "#3a8a72", bear: "#dc9b46", black_swan: "#c85851" };
+  const SCENARIO_COLORS = { normal: "#827367", bull: "#167f68", bear: "#c48218", black_swan: "#c23e49" };
+  const SCENARIO_LABELS = { normal: "一般市場", bull: "牛市", bear: "熊市", black_swan: "黑天鵝" };
 
   function finiteNumber(value) {
     if ((typeof value !== "number" && typeof value !== "string") || (typeof value === "string" && !value.trim())) return null;
@@ -221,30 +223,193 @@
     root.appendChild(box);
   }
 
-  function drawStressChart(root, rows) {
+  function stressLineStyle(key) {
+    const selected = key === activeScenario;
+    return {
+      borderColor: SCENARIO_COLORS[key],
+      borderWidth: selected ? 5 : 3,
+      borderDash: key === "normal" ? [7, 5] : key === "bear" ? [8, 3] : [],
+      order: selected ? 0 : 2,
+      fill: selected ? "origin" : false,
+      pointRadius: context => context.dataIndex === context.dataset.data.length - 1 ? selected ? 6 : 4 : 0,
+      pointHoverRadius: selected ? 8 : 5, pointHitRadius: 18,
+      pointBorderWidth: selected ? 3 : 2, pointBorderColor: "#fff",
+      pointBackgroundColor: SCENARIO_COLORS[key],
+      backgroundColor: context => {
+        const chart = context.chart;
+        if (!chart.chartArea) return SCENARIO_COLORS[key] + "10";
+        const gradient = chart.ctx.createLinearGradient(0, chart.chartArea.top, 0, chart.chartArea.bottom);
+        gradient.addColorStop(0, SCENARIO_COLORS[key] + "14");
+        gradient.addColorStop(1, SCENARIO_COLORS[key] + "02");
+        return gradient;
+      },
+    };
+  }
+
+  function syncStressFocus() {
+    if (!stressChart) return;
+    const chart = stressChart, nodes = chart.$stressNodes;
+    const row = chart.$stressRows[activeScenario], metrics = row?.metrics || {};
+    chart.data.datasets.forEach(dataset => Object.assign(dataset, stressLineStyle(dataset.scenarioKey)));
+    nodes.shell.dataset.scenario = activeScenario;
+    nodes.name.textContent = `${SCENARIO_LABELS[activeScenario]}：這筆錢會變多少？`;
+    nodes.value.textContent = fmtUSD(metrics.final_value);
+    nodes.totalReturn.textContent = fmtPct(metrics.total_return);
+    const finalValue = finiteNumber(metrics.final_value), initial = chart.$stressInitial;
+    const difference = finalValue !== null && initial !== null ? finalValue - initial : null;
+    nodes.changeLabel.textContent = difference === null ? "金額差異" : difference > 0 ? "比起始多了" : difference < 0 ? "比起始少了" : "與起始相同";
+    nodes.change.textContent = difference === null ? "--" : fmtUSD(Math.abs(difference));
+    nodes.change.className = difference === null || difference === 0 ? "" : difference > 0 ? "ok" : "bad";
+    const totalReturn = finiteNumber(metrics.total_return);
+    nodes.totalReturn.className = totalReturn === null || totalReturn === 0 ? "" : totalReturn > 0 ? "ok" : "bad";
+    nodes.announcement.textContent = `目前強調${SCENARIO_LABELS[activeScenario]}，試算後剩 ${nodes.value.textContent}，${nodes.changeLabel.textContent} ${nodes.change.textContent}。四種情境仍同時顯示。`;
+    nodes.shell.querySelectorAll(".sim-outcome-row").forEach(item => item.classList.toggle("is-highlighted", item.dataset.outcome === activeScenario));
+    chart.update(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "none" : undefined);
+  }
+
+  function applyScenario(scenarioKey) {
+    if (!Object.prototype.hasOwnProperty.call(SCENARIO_COLORS, scenarioKey)) return;
+    activeScenario = scenarioKey;
+    document.querySelectorAll(".scenario-btn").forEach(button => {
+      const selected = button.dataset.scenario === scenarioKey;
+      button.classList.toggle("active", selected);
+      button.setAttribute("aria-pressed", String(selected));
+      const key = button.dataset.scenario, defaults = {normal:1,bull:1.3,bear:.7,black_swan:.4};
+      const multiplier = finiteNumber(lastStressResult?.scenarios?.[key]?.terminal_multiplier) ?? finiteNumber(scenarioData[key]?.price_multiplier) ?? defaults[key];
+      const assumption = button.querySelector(".scenario-assumption"), percent = (multiplier - 1) * 100;
+      if (assumption) assumption.textContent = `風險資產 ${percent > 0 ? "+" : percent < 0 ? "−" : ""}${Math.abs(percent).toFixed(0)}%`;
+    });
+    syncStressFocus();
+  }
+
+  function drawStressChart(root, rows, initialValue) {
     const datasets = ["normal", "bull", "bear", "black_swan"].filter(key => Array.isArray(rows[key]?.path)
       && rows[key].path.filter(value => finiteNumber(value) !== null && Number(value) >= 0).length >= 2).map(key => ({
-      label: rows[key].scenario_label || key, data: rows[key].path.map(value => finiteNumber(value) !== null && Number(value) >= 0 ? Number(value) : null),
-      borderColor: SCENARIO_COLORS[key] + (key === activeScenario ? "" : "b0"), borderWidth: key === activeScenario ? 3 : 1.7,
-      borderDash: key === "normal" ? [5, 4] : [], pointRadius: 0, pointHoverRadius: 4, tension: .12, fill: false
+      scenarioKey: key, label: SCENARIO_LABELS[key],
+      data: rows[key].path.map(value => finiteNumber(value) !== null && Number(value) >= 0 ? Number(value) : null),
+      tension: .15, spanGaps: false, ...stressLineStyle(key),
     }));
     if (!datasets.length || !ensureCharts()) {
-      appendStressText(root, "p", "合成路徑圖暫不可用，請查看下方結果數值。", "sim-inline-note");
+      appendStressText(root, "p", "路徑圖暫不可用，仍可比較下方的試算金額。", "sim-inline-note");
+      drawStressOutcomes(root, rows, initialValue);
       return;
     }
-    appendStressText(root, "h3", "合成資產路徑");
-    appendStressText(root, "small", "模型假設下的資產變化，並非歷史走勢。點選上方情境可突出對應曲線。", "sim-muted");
-    const stage = appendStressText(root, "div", "", "sim-stress-chart");
+    const shell = appendStressText(root, "section", "", "sim-stress-chart-panel");
+    shell.id = "stressChartPanel"; shell.dataset.scenario = activeScenario;
+    const head = appendStressText(shell, "div", "", "sim-stress-chart-head");
+    const title = appendStressText(head, "div", "");
+    appendStressText(title, "span", "同一筆資金 · 四種漲跌假設", "sim-stress-eyebrow");
+    const name = appendStressText(title, "h3", ""); name.id = "stressFocusName";
+    appendStressText(head, "span", "四種結果同時比較", "sim-stress-compare-badge");
+    const focus = appendStressText(shell, "div", "", "sim-stress-focus");
+    const start = appendStressText(focus, "div", "", "sim-stress-start");
+    appendStressText(start, "span", "起始資金");
+    appendStressText(start, "strong", fmtUSD(initialValue));
+    const arrow = appendStressText(focus, "span", "→", "sim-stress-flow-arrow"); arrow.setAttribute("aria-hidden", "true");
+    const endValue = appendStressText(focus, "div", "", "sim-stress-focus-value");
+    appendStressText(endValue, "span", "試算後剩多少");
+    const value = appendStressText(endValue, "strong", "--"); value.id = "stressFocusValue";
+    const returnBlock = appendStressText(focus, "div", "", "sim-stress-difference");
+    const changeLabel = appendStressText(returnBlock, "span", "金額差異");
+    const change = appendStressText(returnBlock, "strong", "--"); change.id = "stressFocusChange";
+    const totalReturn = appendStressText(returnBlock, "strong", "--"); totalReturn.id = "stressFocusReturn";
+    const announcement = appendStressText(shell, "span", "", "sim-stress-sr-only");
+    announcement.setAttribute("role", "status"); announcement.setAttribute("aria-live", "polite");
+    const visualGrid = appendStressText(shell, "div", "", "sim-stress-visual-grid");
+    const pathPane = appendStressText(visualGrid, "div", "", "sim-stress-path-pane");
+    const pathHead = appendStressText(pathPane, "div", "", "sim-stress-visual-heading");
+    appendStressText(pathHead, "h4", "途中怎麼變？");
+    appendStressText(pathHead, "span", "橫軸：天數 · 縱軸：帳戶 USD");
+    const stage = appendStressText(pathPane, "div", "", "sim-stress-chart");
     const canvas = document.createElement("canvas");
-    canvas.id = "stressPathChart"; canvas.setAttribute("role", "img"); canvas.setAttribute("aria-label", "四種假設情境下的合成資產路徑，詳細數值在下方情境卡片"); stage.appendChild(canvas);
-    const legend = appendStressText(root, "div", "", "sim-stress-legend");
+    canvas.id = "stressPathChart"; canvas.setAttribute("role", "img"); canvas.setAttribute("aria-label", "四種漲跌假設的帳戶金額變化；四條線同時顯示，所選情境加粗，結果可閱讀旁邊的金額比較"); stage.appendChild(canvas);
+    appendStressText(pathPane, "small", "粗線＝上方選取情境；其他三條線保留比較。", "sim-stress-focus-hint");
+    drawStressOutcomes(visualGrid, rows, initialValue);
+    appendStressText(shell, "small", "情境假設 · 非歷史回測、價格預測或實際投資報酬", "sim-stress-chart-note");
+    const reference = finiteNumber(initialValue) ?? finiteNumber(datasets[0].data[0]);
+    const values = datasets.flatMap(dataset => dataset.data).filter(value => value !== null);
+    const low = Math.min(...values), high = Math.max(...values), span = high - low || Math.max(Math.abs(high) * .05, 1);
+    const options = chartOptions("情境資產");
+    options.animation = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? false : {duration:280};
+    options.layout = {padding:{top:22,right:stage.clientWidth >= 600 ? 115 : 16,bottom:4}};
+    options.onResize = (chart, size) => {chart.options.layout.padding.right = size.width >= 600 ? 115 : 16;};
+    options.scales.y.suggestedMin = Math.max(0, low - span * .12);
+    options.scales.y.suggestedMax = high + span * .15;
+    options.scales.y.ticks.color = "#8b7c6e";
+    options.scales.y.grid.color = "#eee8df";
+    options.plugins.tooltip.usePointStyle = true;
+    options.plugins.tooltip.backgroundColor = "#332a23";
+    options.plugins.tooltip.itemSort = (a, b) => Number(b.dataset.scenarioKey === activeScenario) - Number(a.dataset.scenarioKey === activeScenario);
+    options.plugins.tooltip.callbacks.label = context => `${context.dataset.label}  ${fmtUSD(context.parsed.y)}${reference > 0 ? `  (${fmtPct(context.parsed.y / reference - 1)})` : ""}`;
+    const annotation = {
+      id:"stressScenarioFocus",
+      beforeDatasetsDraw(chart) {
+        const {ctx,chartArea,scales} = chart;
+        if (reference === null || !chartArea) return;
+        const y = scales.y.getPixelForValue(reference);
+        if (y < chartArea.top || y > chartArea.bottom) return;
+        ctx.save(); ctx.strokeStyle = "#b6a593"; ctx.lineWidth = 1.3; ctx.setLineDash([4,5]);
+        ctx.beginPath(); ctx.moveTo(chartArea.left,y); ctx.lineTo(chartArea.right,y); ctx.stroke();
+        ctx.setLineDash([]); ctx.fillStyle = "#8e7e6c"; ctx.font = "11px Arial, sans-serif";
+        ctx.fillText("起始資產",chartArea.left + 5, y > chartArea.top + 20 ? y - 8 : y + 15); ctx.restore();
+      },
+      beforeDatasetDraw(chart, args) {
+        chart.ctx.save();
+        if (chart.data.datasets[args.index].scenarioKey === activeScenario) {
+          chart.ctx.shadowColor = SCENARIO_COLORS[activeScenario] + "55";
+          chart.ctx.shadowBlur = 9;
+        }
+      },
+      afterDatasetDraw(chart) {chart.ctx.restore();},
+      afterDatasetsDraw(chart) {
+        const index = chart.data.datasets.findIndex(dataset => dataset.scenarioKey === activeScenario);
+        if (index < 0 || chart.width < 600) return;
+        const dataset = chart.data.datasets[index], last = dataset.data.length - 1;
+        if (last < 0 || dataset.data[last] === null) return;
+        const point = chart.getDatasetMeta(index).data[last];
+        if (!point) return;
+        const {ctx,chartArea} = chart, color = SCENARIO_COLORS[activeScenario];
+        const x = chartArea.right + 12, y = Math.max(chartArea.top + 16, Math.min(chartArea.bottom - 16, point.y));
+        ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(point.x + 7,point.y); ctx.lineTo(x - 3,y); ctx.stroke();
+        ctx.fillStyle = color; ctx.font = "bold 12px Arial, sans-serif";
+        ctx.fillText(dataset.label, x, y - 5); ctx.font = "bold 13px Arial, sans-serif";
+        ctx.fillText(fmtCompactUSD(dataset.data[last]), x, y + 14); ctx.restore();
+      },
+    };
+    stressChart = new Chart(canvas, { type: "line", data: { labels: Array.from({ length: Math.max(...datasets.map(item => item.data.length)) }, (_, index) => `第 ${index} 天`), datasets }, options, plugins:[annotation] });
+    stressChart.$stressRows = rows;
+    stressChart.$stressInitial = finiteNumber(initialValue);
+    stressChart.$stressNodes = {shell,name,value,totalReturn,changeLabel,change,announcement};
+    syncStressFocus();
+  }
+
+  function drawStressOutcomes(root, rows, initialValue) {
+    const box = appendStressText(root, "section", "", "sim-stress-outcomes");
+    box.setAttribute("aria-label", "四種情境的帳戶金額比較");
+    appendStressText(box, "h4", "最後剩多少？");
+    appendStressText(box, "small", "同一刻度 · 細刻線是起始資金");
+    const initial = finiteNumber(initialValue);
+    const maximum = Math.max(0, initial ?? 0, ...Object.values(rows).map(row => finiteNumber(row?.metrics?.final_value) ?? 0));
     ["normal", "bull", "bear", "black_swan"].forEach(key => {
       if (!rows[key]) return;
-      const item = appendStressText(legend, "span", "");
-      const mark = appendStressText(item, "i", ""); mark.style.background = SCENARIO_COLORS[key];
-      appendStressText(item, "span", rows[key].scenario_label || key);
+      const metrics = rows[key].metrics || {}, finalValue = finiteNumber(metrics.final_value), change = finiteNumber(metrics.total_return);
+      const row = appendStressText(box, "article", "", "sim-outcome-row");
+      row.dataset.outcome = key; row.style.setProperty("--outcome-color", SCENARIO_COLORS[key]);
+      const head = appendStressText(row, "div", "", "sim-outcome-head");
+      const label = appendStressText(head, "span", "", "sim-outcome-label");
+      const mark = appendStressText(label, "i", ""); mark.style.background = SCENARIO_COLORS[key]; mark.setAttribute("aria-hidden", "true");
+      appendStressText(label, "strong", SCENARIO_LABELS[key]);
+      appendStressText(head, "b", `${change !== null && change > 0 ? "+" : ""}${fmtPct(change)}`, change === null || change === 0 ? "" : change > 0 ? "ok" : "bad");
+      appendStressText(row, "strong", fmtUSD(finalValue), "sim-outcome-amount");
+      const track = appendStressText(row, "div", "", "sim-outcome-track"); track.setAttribute("aria-hidden", "true");
+      if (finalValue !== null && finalValue >= 0 && maximum > 0) {
+        const fill = appendStressText(track, "span", ""); fill.style.width = `${finalValue / maximum * 100}%`;
+      }
+      if (initial !== null && initial >= 0 && maximum > 0) {
+        const tick = appendStressText(track, "i", ""); tick.style.left = `${initial / maximum * 100}%`;
+      }
     });
-    stressChart = new Chart(canvas, { type: "line", data: { labels: Array.from({ length: Math.max(...datasets.map(item => item.data.length)) }, (_, index) => `第 ${index} 天`), datasets }, options: chartOptions("情境資產") });
   }
 
   function renderStressResults(result) {
@@ -259,38 +424,26 @@
     const meta = document.createElement("div");
     meta.className = "stress-result-meta";
     appendStressText(meta, "strong", result.strategies?.[strategy]?.label || strategy);
-    appendStressText(meta, "span", `起始基準 ${fmtUSD(result.snapshot?.initial_value)} · ${result.period?.days || 0} 個合成日 · seed ${result.seed}`);
+    appendStressText(meta, "span", `${result.period?.days ?? "--"} 天假設試算 · 依策略重新配置`);
     root.appendChild(meta);
+    drawStressChart(root, rows, result.snapshot?.initial_value);
+
+    const details = appendStressText(root, "details", "", "compact-explain");
+    appendStressText(details, "summary", "查看配置、風險指標與完整數據");
+    appendStressText(details, "p", `起始基準 ${fmtUSD(result.snapshot?.initial_value)} · ${result.period?.days ?? "--"} 個合成日 · seed ${result.seed}`, "sim-stress-allocation-note");
     const allocation = rows.black_swan?.initial_allocation;
     if (allocation) {
-      appendStressText(root, "small", `按策略重新配置 · 實際風險資產 ${fmtPct(rows.black_swan.actual_risk_weight)}`, "sim-stress-allocation-note");
+      appendStressText(details, "small", `按策略重新配置 · 實際風險資產 ${fmtPct(rows.black_swan.actual_risk_weight)}`, "sim-stress-allocation-note");
       const mix = Object.entries(allocation).filter(([, value]) => finiteNumber(value) > 0), total = mix.reduce((sum, [, value]) => sum + Number(value), 0);
-      const bar = appendStressText(root, "div", "", "sim-stress-allocation");
+      const bar = appendStressText(details, "div", "", "sim-stress-allocation");
       mix.forEach(([symbol, value], index) => {
         const segment = appendStressText(bar, "span", "");
         segment.style.width = `${Number(value) / total * 100}%`; segment.style.background = symbol === "CASH" ? "#e8dbc9" : ASSET_COLORS[index % ASSET_COLORS.length];
         segment.title = `${symbol === "CASH" ? "現金" : symbol} ${fmtUSD(value)}`;
       });
-      appendStressText(root, "small", `測試起始配置：${mix.map(([symbol, value]) => `${symbol === "CASH" ? "現金" : symbol} ${fmtUSD(value)}`).join("、")}`, "sim-stress-allocation-note");
+      appendStressText(details, "small", `測試起始配置：${mix.map(([symbol, value]) => `${symbol === "CASH" ? "現金" : symbol} ${fmtUSD(value)}`).join("、")}`, "sim-stress-allocation-note");
     }
-    drawStressChart(root, rows);
-    const cards = appendStressText(root, "div", "", "sim-stress-cards");
-    ["normal", "bull", "bear", "black_swan"].forEach(key => {
-      if (!rows[key]) return;
-      const metrics = rows[key].metrics || {}, value = finiteNumber(metrics.total_return);
-      const card = appendStressText(cards, "article", "", `sim-stress-metric${key === activeScenario ? " selected" : ""}`);
-      appendStressText(card, "strong", rows[key].scenario_label || key);
-      appendStressText(card, "b", (value !== null && value > 0 ? "+" : "") + fmtPct(value), value === null || value === 0 ? "" : value > 0 ? "ok" : "bad");
-      appendStressText(card, "small", "假設期末總報酬");
-      const list = appendStressText(card, "dl", "");
-      [["期末值", fmtUSD(metrics.final_value)], ["最大回撤", fmtPct(metrics.max_drawdown)], ["合成年化波動", fmtPct(metrics.volatility)]].forEach(([label, formatted]) => {
-        appendStressText(list, "dt", label); appendStressText(list, "dd", formatted);
-      });
-    });
-    renderStressInterpretation(root, result, strategy);
-
-    const details = appendStressText(root, "details", "", "compact-explain");
-    appendStressText(details, "summary", "查看完整情境數據");
+    renderStressInterpretation(details, result, strategy);
     const tableWrap = document.createElement("div");
     tableWrap.className = "table-wrap";
     const table = document.createElement("table");
@@ -318,6 +471,7 @@
     table.appendChild(tbody);
     tableWrap.appendChild(table);
     details.appendChild(tableWrap);
+    applyScenario(activeScenario);
 
     if (Array.isArray(result.warnings) && result.warnings.length) {
       appendStressText(root, "p", `未納入資料：${result.warnings.join("、")}`, "stress-warning");
@@ -1089,8 +1243,6 @@
     }));
 
     // —— Market Scenario Switcher ——
-    let scenarioData = {};
-
     async function loadScenarios() {
       try {
         const res = await fetch("/api/market-scenarios");
@@ -1103,35 +1255,11 @@
       }
     }
 
-    function applyScenario(scenarioKey) {
-      activeScenario = scenarioKey;
-      const defaults = { normal: ["一般市場", 1, 1], bull: ["牛市", 1.3, .8], bear: ["熊市", .7, 1.5], black_swan: ["黑天鵝", .4, 3] };
-      const fallback = defaults[scenarioKey] || defaults.normal;
-      const sc = scenarioData[scenarioKey] || { label: fallback[0], price_multiplier: fallback[1], volatility_multiplier: fallback[2] };
-      $("scenarioBadge") && ($("scenarioBadge").textContent = sc.label || scenarioKey);
-      $("scPriceMult") && ($("scPriceMult").textContent = (sc.price_multiplier || 1).toFixed(1) + "x");
-      $("scVolMult") && ($("scVolMult").textContent = (sc.volatility_multiplier || 1).toFixed(1) + "x");
-
-      const scenarioNoteMap = {
-        normal: "基準終值與起始價值相同",
-        bull: "假設風險資產終值上升",
-        bear: "假設風險資產終值下降並出現衝擊",
-        black_swan: "假設極端下跌與短期衝擊"
-      };
-      $("scAdvice") && ($("scAdvice").textContent = scenarioNoteMap[scenarioKey] || "基準假設");
-
-      document.querySelectorAll(".scenario-btn").forEach((btn) => {
-        btn.classList.toggle("active", btn.dataset.scenario === scenarioKey);
-        btn.setAttribute("aria-pressed", String(btn.dataset.scenario === scenarioKey));
-      });
-      if (lastStressResult) renderStressResults(lastStressResult);
-    }
-
     document.querySelectorAll(".scenario-btn").forEach((btn) => {
       btn.addEventListener("click", () => applyScenario(btn.dataset.scenario));
     });
 
-    loadScenarios().then(() => applyScenario("normal"));
+    loadScenarios().then(() => applyScenario(activeScenario));
     $("runStressTest")?.addEventListener("click", runStressTest);
     $("stressStrategy")?.addEventListener("change", () => {
       renderStressResults(lastStressResult);
