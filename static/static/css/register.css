@@ -1,0 +1,102 @@
+.register-grid{display:grid;grid-template-columns:1fr 460px;gap:34px;align-items:center}.register-features{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:28px}.register-features div{background:#fff;border:1px solid var(--line);border-radius:22px;padding:18px;box-shadow:var(--shadow)}.register-features b{display:block;color:var(--dark)}.register-features span{display:block;color:var(--muted);margin-top:5px;font-weight:760}.register-form{display:grid;gap:13px}.password-hints{background:#FBF6EF;border:1px solid var(--line);border-radius:18px;padding:13px;display:grid;gap:6px;color:var(--muted);font-size:13px;font-weight:850}.password-hints .ok{color:var(--good)}.agree{display:flex;gap:10px;align-items:flex-start;background:#FBF6EF;border:1px solid var(--line);border-radius:18px;padding:13px;color:var(--muted);font-weight:800}.agree input{width:18px;height:18px}.message-box{display:none;padding:13px;border-radius:16px}.message-box.show{display:block}.message-box.success{background:rgba(132,68,22,.10);color:var(--good);border:1px solid rgba(132,68,22,.18)}.message-box.error{background:rgba(194,65,59,.10);color:var(--bad);border:1px solid rgba(194,65,59,.18)}.login-text{text-align:center;color:var(--muted);font-weight:850}.login-text button{border:none;background:transparent;color:var(--brand);font-weight:950;cursor:pointer}
+@media(max-width:1000px){.register-grid{grid-template-columns:1fr}.register-features{grid-template-columns:1fr}}
+
+/* register page polish */
+.register-grid{
+  gap:42px;
+}
+
+.register-features{
+  gap:16px;
+}
+
+.register-features div,
+.password-hints,
+.agree,
+.message-box{
+  border-radius:18px;
+}
+
+.register-form{
+  gap:15px;
+}
+
+.login-text{
+  margin-bottom:0;
+}
+
+.register-hero .hero-grid{
+  display:grid;
+  grid-template-columns:1fr 460px;
+  gap:34px;
+  align-items:center;
+}
+
+@media(max-width:980px){
+  .register-hero .hero-grid{
+    grid-template-columns:1fr;
+  }
+}
+
+.register-plan-link{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  margin-top:18px;
+  color:#6b3814;
+  font-weight:900;
+}
+
+/* Account and checkout share one flow; no feature banner. */
+.refresh-1012.register-page .join-content{padding:32px 0 64px;background:linear-gradient(180deg,#fff7ec,#fffcf8)}
+.join-steps{display:flex;gap:32px;list-style:none;padding:0;margin:0 0 26px;color:#8d7d70;flex-wrap:wrap}
+.join-steps li{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:700}
+.join-steps li span{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:#f1e8df}
+.join-steps li[aria-current]{color:#b65318}.join-steps li[aria-current] span{background:#f77c25;color:#fff}
+.join-layout{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(320px,.8fr);gap:26px;align-items:start;max-width:1080px;margin:0 auto}
+.refresh-1012.register-page .join-content .card{width:100%;max-width:none;margin:0;padding:34px;border-radius:24px;box-sizing:border-box}
+.join-content h1{margin:0 0 10px}.join-intro,.join-account-note{margin:0 0 24px;color:#857365;line-height:1.7;font-size:18px}
+.join-content .register-form{gap:10px}.join-content .register-form label:not(.agree){margin-top:8px;font-size:18px;font-weight:700}
+.join-content input:not([type=checkbox]){width:100%;min-height:52px;font-size:18px;box-sizing:border-box}
+.join-content .password-hints{font-size:16px;line-height:1.5;gap:4px;padding:12px 16px}
+.join-content .agree{font-size:16px;line-height:1.7;margin:14px 0 8px;font-weight:500}
+.join-content .agree input{flex:0 0 18px;margin-top:5px}
+.join-google{background:#fff;border:1px solid #e4d4c6;font-size:17px;justify-content:center}
+.google-mark{font-family:Arial,sans-serif;font-size:23px;font-weight:700;color:#715847}
+.join-divider{display:flex;align-items:center;gap:16px;color:#a18e7d;margin:24px 0 16px;font-size:16px}
+.join-divider:before,.join-divider:after{content:"";height:1px;background:#eee1d5;flex:1}
+.join-login-link{margin:24px 0 0;font-size:17px;text-align:left;color:#857365}
+.join-login-link button,.join-payment-links button{padding:4px;border:0;background:transparent;color:#b65318;font:inherit;cursor:pointer;text-decoration:underline;text-underline-offset:4px}
+.join-plan-card{padding:28px;border:1px solid #c9dccb;border-radius:24px;background:#f2f7ef;color:#365748}
+.join-plan-head{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:18px;font-weight:700}
+.join-plan-head img{object-fit:contain}.join-plan-card h2{font-size:25px;line-height:1.5;margin:16px 0 20px}
+.join-plan-price{font-size:54px;font-weight:750;line-height:1.2;margin:0 0 26px;text-align:right;font-variant-numeric:tabular-nums;color:#365748}
+.join-plan-price span{font-size:18px;font-weight:500}.join-plan-features{list-style:none;padding:0;margin:0;display:grid;gap:20px}
+.join-plan-features li{display:flex;gap:12px;align-items:baseline;font-size:18px;line-height:1.6}.join-plan-features i{width:20px;flex:0 0 20px;color:#4b8278}
+.join-plan-foot{display:flex;gap:12px;border-top:1px solid #d6e2d2;padding-top:22px;margin-top:26px;font-size:16px;line-height:1.7}
+.join-plan-card>.button{margin-top:24px;background:#fff;border-color:#c9dccb;color:#365748}
+.join-account-ready{display:flex;gap:16px;padding:24px 0 32px;align-items:center}.join-account-ready>i{font-size:30px;color:#e98132}
+.join-account-ready strong{font-size:22px}.join-account-ready p{font-size:17px;color:#857365;line-height:1.6;margin:8px 0 0}
+.join-preview-tag{display:inline-block;padding:7px 11px;border-radius:9px;background:#fff0df;color:#a8531c;font-size:15px;margin-bottom:18px}
+.join-order-summary{margin:26px 0;border-top:1px solid #ecded1;border-bottom:1px solid #ecded1;padding:16px 0}
+.join-order-summary>div{display:flex;justify-content:space-between;gap:16px;padding:10px 0;font-size:18px}
+.join-order-summary dt{color:#857365;text-align:left}.join-order-summary dd{margin:0;text-align:right;font-weight:700}
+.join-order-summary .join-order-total{font-size:30px;color:#b65318;font-variant-numeric:tabular-nums}
+.join-payment-method{display:flex;align-items:center;gap:14px;padding:20px;background:#fff8ef;border:1px solid #f0deca;border-radius:18px}
+.join-payment-method>i:first-child{font-size:26px;color:#cb6a27}.join-payment-method>i:last-child{margin-left:auto;color:#a18e7d}
+.join-payment-method strong{font-size:18px}.join-payment-method p{margin:6px 0 0;font-size:16px;color:#857365;line-height:1.6}
+.join-preview-note{font-size:16px;color:#857365;line-height:1.7;margin:22px 0}.join-preview-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.join-preview-actions button{font-size:16px}.join-payment-links{display:flex;justify-content:space-between;gap:16px;margin-top:24px;font-size:17px}
+.join-content .message-box{margin-bottom:20px;font-size:17px;line-height:1.7}
+.join-result-dialog{max-width:500px;width:calc(100% - 40px);box-sizing:border-box;border:1px solid #efdfd0;border-radius:24px;padding:32px;background:#fffdf9;color:#493526}
+.join-result-dialog::backdrop{background:rgba(51,35,21,.38);backdrop-filter:blur(3px)}
+.join-result-icon{width:58px;height:58px;display:grid;place-items:center;background:#ffeddc;color:#c76b26;border-radius:50%;font-size:28px;margin:4px 0 20px}
+.join-result-dialog.is-failure .join-result-icon{background:#fae8e4;color:#bd4c3d}.join-result-dialog h2{font-size:26px;line-height:1.5}
+.join-result-dialog p{font-size:17px;line-height:1.8;color:#857365}.join-result-dialog .button{margin-top:16px}
+@media(max-width:800px){.join-layout{grid-template-columns:1fr}.join-plan-card{grid-row:1}.join-plan-head img{width:56px;height:56px}.join-plan-card h2{font-size:22px;margin:12px 0}.join-plan-price{font-size:42px;margin-bottom:20px}.join-plan-features{gap:12px}.join-steps{gap:16px}.join-steps li{font-size:15px}.refresh-1012.register-page .join-content .card{padding:24px}}
+@media(prefers-reduced-motion:reduce){.join-content *{scroll-behavior:auto}}
+.refresh-1012.register-page main .join-plan-price{font-size:54px!important;text-align:right!important;line-height:1.2}
+.refresh-1012.register-page main .join-content .button.full{width:100%;justify-content:center}
+.refresh-1012.register-page main .join-content input:not([type=checkbox]){font-size:18px!important}
+.refresh-1012.register-page main .join-content .register-form label:not(.agree){font-size:18px!important}
+@media(max-width:800px){.refresh-1012.register-page main .join-plan-price{font-size:42px!important}}

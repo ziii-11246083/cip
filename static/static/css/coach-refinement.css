@@ -1,0 +1,71 @@
+/* Original coach layout, with cat avatars and a wider visual buy planner. */
+.coach-page .avatar.coach-cat {width:48px;height:48px;overflow:hidden;border-radius:50%;background:#fff4e5;border:1px solid #eed5b7;}
+.coach-page .avatar.coach-cat img {display:block;width:100%;height:100%;object-fit:cover;transform:scale(1.2);}
+.coach-page .coach-context-row {margin:0 0 16px;}
+.coach-page.refresh-1012 main .coach-profile-badge {display:inline-flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid #ead6bd;border-radius:9px;background:#fff8ed;color:#99704e;font-size:14px!important;font-weight:500;}
+.coach-page .coach-profile-badge b {color:#a6642d;font-size:14px;}
+.coach-page.refresh-1012 main .coach-view-tabs {padding:8px 0;gap:8px;}
+.coach-page.refresh-1012 main .coach-view-tab {min-width:108px;padding:11px 18px;font-size:16px!important;}
+.coach-page main :is(button,input,select,textarea,summary):focus-visible {outline:3px solid #f3b77d;outline-offset:3px;}
+.coach-page.refresh-1012 main #coachPlanView {padding:16px 0 8px;width:100%;overflow:visible;flex:none;}
+.coach-page #coachPlanView .coach-agent-intro h2 {font-size:24px;}
+.coach-page #coachPlanView .coach-agent-intro p {margin:8px 0 14px;}
+.coach-page #coachPlanView .coach-agent-flow {display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 18px;padding:12px 16px;border:1px solid #f0dfc9;border-radius:13px;background:#fff7eb;}
+.coach-page.refresh-1012 main #coachPlanView .coach-agent-flow span {font-size:14px!important;font-weight:600;}
+.coach-page #coachPlanView .coach-agent-flow>i {color:#bf946d;}
+.coach-page #coachPlanView .coach-agent-examples {grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:20px;}
+.coach-page #coachPlanView .coach-agent-examples button {border-radius:14px;background:#fff;border-color:#ecdbc3;padding:15px 14px;gap:12px;min-height:84px;}
+.coach-page #coachPlanView .coach-agent-examples button:hover {background:#fff4e5;}
+.coach-page #coachPlanView .coach-agent-examples i {font-size:24px;}
+.coach-page #coachPlanView .coach-agent-examples span {display:block;}
+.coach-page #coachPlanView .coach-agent-examples strong {display:block;font-size:16px;font-weight:650;}
+.coach-page.refresh-1012 main #coachPlanView .coach-agent-examples small {display:block;font-size:12px!important;color:#94765b;margin-top:5px;}
+.coach-page #coachPlanView .coach-agent-examples small b {font:700 23px Arial,sans-serif;color:#754d2f;}
+.coach-page #coachPlanView .coach-tool-form {max-width:none;width:100%;padding:0;border:0;background:none;gap:8px;}
+.coach-page #coachPlanView .coach-tool-form textarea {width:100%;min-height:86px;border-radius:12px;background:#fffaf4;padding:12px 14px;}
+.coach-page #coachPlanView .coach-tool-form label {margin-top:7px;}
+.coach-page #coachPlanView .coach-tool-actions {display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:stretch;}
+.coach-page #coachPlanView .coach-tool-actions input {max-width:none;width:100%;min-height:46px;border-radius:12px;}
+.coach-page #coachPlanView .coach-tool-actions button {padding:11px 20px;}
+.coach-page #coachPlanStatus:empty {display:none;}
+.coach-page .coach-plan-result {margin-top:24px;padding:20px 0 0;border-top:1px solid #ecd7be;}
+.coach-page .coach-allocation-visual {padding:20px;background:#fff8ed;border:1px solid #ecd8bd;border-radius:16px;}
+.coach-page .coach-allocation-heading {display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;}
+.coach-page .coach-allocation-heading strong {font-size:18px;}
+.coach-page .coach-allocation-heading>small {font-size:14px!important;color:#997550;}
+.coach-page .coach-allocation-stack {display:flex;height:30px;gap:3px;overflow:hidden;border-radius:9px;margin:0 0 18px;background:#ede4d8;}
+.coach-page .coach-allocation-stack>div {height:100%;}
+.coach-page .coach-allocation-rows {display:grid;gap:12px;}
+.coach-page .coach-allocation-row {display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:16px;}
+.coach-page .coach-allocation-row>div {display:flex;align-items:center;gap:8px;}
+.coach-page .coach-allocation-dot {width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.coach-page .coach-allocation-row>b {font:650 18px Arial,sans-serif;}
+.coach-page .coach-allocation-row>strong {font:650 19px Arial,sans-serif;}
+.coach-page.refresh-1012 main .coach-allocation-row .money-amount {font-size:inherit!important;}
+.coach-page.refresh-1012 main .coach-allocation-row .money-currency {font-size:12px!important;}
+.coach-page.refresh-1012 main .coach-allocation-note {display:block;margin-top:16px;color:#9b8167;font-size:13px!important;font-weight:400;}
+.coach-page .coach-plan-details {margin:18px 0;border:1px solid #ebdac3;border-radius:12px;padding:14px 16px;}
+.coach-page .coach-plan-details>summary {cursor:pointer;color:#a56d38;font-weight:600;}
+.coach-page .coach-plan-details .coach-reply-content {margin-top:14px;}
+.coach-page .coach-plan-result>.coach-confirm-area {padding:18px;border:1px solid #e8d3b6;border-radius:14px;background:#fffaf3;}
+.coach-page .coach-plan-result>.coach-confirm-area p {font-size:15px!important;}
+.coach-page.refresh-1012 main .coach-reply-content :is(.coach-market-up,.coach-market-down) {font-size:inherit!important;line-height:inherit;font-weight:650;}
+.coach-page.refresh-1012 main .coach-reply-content .coach-market-up {color:#18745e!important;}
+.coach-page.refresh-1012 main .coach-reply-content .coach-market-down {color:#bd3f38!important;}
+.coach-page .coach-reply-content .coach-market-number {white-space:nowrap;font-variant-numeric:tabular-nums;}
+@media(max-width:900px){.coach-page.refresh-1012 .ai-coach-app {grid-template-columns:1fr;}}
+@media(max-width:600px){
+  .coach-page.refresh-1012 main .coach-view-tabs {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));}
+  .coach-page.refresh-1012 main .coach-view-tab {min-width:0;padding:10px 8px;font-size:14px!important;}
+  .coach-page #coachPlanView .coach-agent-examples {gap:7px;}
+  .coach-page #coachPlanView .coach-agent-examples button {flex-direction:column;align-items:flex-start;padding:12px 9px;gap:7px;}
+  .coach-page #coachPlanView .coach-agent-examples strong {font-size:13px;}
+  .coach-page #coachPlanView .coach-agent-examples small b {font-size:18px;}
+  .coach-page #coachPlanView .coach-agent-flow {padding:10px;gap:8px;}
+  .coach-page.refresh-1012 main #coachPlanView .coach-agent-flow span {font-size:12px!important;}
+  .coach-page #coachPlanView .coach-tool-actions {grid-template-columns:1fr;}
+  .coach-page .coach-allocation-visual {padding:14px;}
+  .coach-page .coach-allocation-row {grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;}
+  .coach-page .coach-allocation-row>strong {grid-column:1/-1;font-size:17px;}
+  .coach-page .coach-allocation-heading {align-items:flex-start;flex-direction:column;gap:6px;}
+}
