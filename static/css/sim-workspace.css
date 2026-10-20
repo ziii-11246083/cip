@@ -143,8 +143,6 @@
 .sim-page .scenario-btn[data-scenario=bull] i {color:var(--sim-up);}
 .sim-page .scenario-btn[data-scenario=bear] i {color:#d18c42;}
 .sim-page .scenario-btn[data-scenario=black_swan] i {color:var(--sim-down);}
-.sim-page .sim-scenario-info {display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin:14px 0 22px;padding:0;background:none;border:0;}
-.sim-page.refresh-1012 main .sim-scenario-info :is(span,small) {font-size:12px!important;color:#9c7f65;}
 .sim-page .stress-controls {grid-template-columns:minmax(0,1.3fr) minmax(0,.7fr) minmax(0,.8fr) auto;gap:14px;border-radius:14px;padding:18px;background:#fff8ef;border:1px solid var(--line);}
 .sim-page.refresh-1012 main .stress-controls label {font-size:12px!important;}
 .sim-page .stress-controls :is(input,select) {width:100%;min-width:0;margin-top:7px;padding:10px;}
@@ -152,18 +150,6 @@
 .sim-page .stress-result-meta {display:flex;gap:10px;flex-wrap:wrap;margin:24px 0 16px;}
 .sim-page.refresh-1012 main .stress-result-meta span {font-size:12px!important;color:#9d826a;}
 .sim-page .sim-stress-chart {height:290px;position:relative;margin:20px 0;}
-.sim-page .sim-stress-legend {display:flex;flex-wrap:wrap;gap:15px;margin:10px 0 15px;}
-.sim-page.refresh-1012 main .sim-stress-legend span {font-size:12px!important;display:flex;align-items:center;gap:6px;color:#8a7058;}
-.sim-page .sim-stress-legend i {width:15px;height:3px;display:block;border-radius:3px;}
-.sim-page .sim-stress-cards {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;}
-.sim-page .sim-stress-metric {padding:16px;border:1px solid var(--line);border-radius:14px;background:#fffaf5;}
-.sim-page .sim-stress-metric.selected {border-color:#d6a678;box-shadow:0 0 0 1px #d6a678;}
-.sim-page .sim-stress-metric>strong {display:block;font-size:14px;}
-.sim-page .sim-stress-metric>b {display:block;margin:12px 0 6px;font:700 25px Arial,sans-serif;}
-.sim-page.refresh-1012 main .sim-stress-metric>small {font-size:11px!important;display:block;color:#9b8168;}
-.sim-page .sim-stress-metric dl {display:grid;grid-template-columns:1fr auto;gap:7px;margin:15px 0 0;padding-top:12px;border-top:1px solid var(--line);font-size:11px;}
-.sim-page .sim-stress-metric dt {color:#9b8168;}
-.sim-page .sim-stress-metric dd {margin:0;font:600 12px Arial,sans-serif;text-align:right;}
 .sim-page.refresh-1012 main .stress-interpretation {border-radius:12px;padding:16px;margin:18px 0;background:#fff8ed;border:1px solid #efddc3;}
 .sim-page.refresh-1012 main .stress-interpretation :is(p,h3) {font-size:13px!important;margin:6px 0;}
 .sim-page.refresh-1012 main .stress-risk-label {font-size:11px!important;padding:4px 8px;}
@@ -192,7 +178,6 @@
  .sim-page .sim-allocation-legend {grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
  .sim-page .position-performance-grid {grid-template-columns:repeat(2,minmax(0,1fr));}
  .sim-page .stress-controls {grid-template-columns:1fr 1fr;}
- .sim-page .sim-stress-cards {grid-template-columns:repeat(2,minmax(0,1fr));}
 }
 @media(max-width:800px){
  .sim-page.refresh-1012 .sim-kpi-grid {grid-template-columns:repeat(2,minmax(0,1fr));}
@@ -232,11 +217,6 @@
  .sim-page .scenario-btn {padding:12px;gap:5px 8px;}
  .sim-page .scenario-btn i {font-size:18px;}
  .sim-page.refresh-1012 main .scenario-btn>span {font-size:18px!important;}
- .sim-page .sim-stress-cards {gap:8px;}
- .sim-page .sim-stress-metric {padding:12px;}
- .sim-page .sim-stress-metric>b {font-size:21px;}
- .sim-page .sim-stress-metric dl {grid-template-columns:1fr;gap:3px;}
- .sim-page .sim-stress-metric dd {text-align:left;margin-bottom:6px;}
  .sim-page .stress-controls {gap:10px;padding:13px;}
  .sim-page .stress-controls label:first-child {grid-column:1/-1;}
  .sim-page .stress-controls button {grid-column:1/-1;}
@@ -327,3 +307,110 @@
  .sim-page .sim-review-summary {gap:17px;}
  .sim-page.refresh-1012 main .sim-review-summary strong {font-size:21px!important;}
 }
+
+/* One scenario selector; every outcome remains visible for comparison. */
+.sim-page [data-scenario="normal"] {--scenario-accent:#827367;--scenario-rgb:130,115,103;}
+.sim-page [data-scenario="bull"] {--scenario-accent:#167f68;--scenario-rgb:22,127,104;}
+.sim-page [data-scenario="bear"] {--scenario-accent:#c48218;--scenario-rgb:196,130,24;}
+.sim-page [data-scenario="black_swan"] {--scenario-accent:#c23e49;--scenario-rgb:194,62,73;}
+.sim-page .sim-scenario-selector {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;}
+.sim-page.refresh-1012 main .scenario-btn {position:relative;display:grid;grid-template-columns:44px 1fr;gap:9px 12px;padding:18px;text-align:left;background:#fffdf9;border:1px solid #eadfd3;border-radius:16px;transition:border-color .2s,background .2s,box-shadow .2s;min-width:0;}
+.sim-page.refresh-1012 main .scenario-btn .scenario-symbol {grid-row:auto;display:grid;place-items:center;width:44px;height:44px;background:rgba(var(--scenario-rgb),.09);color:var(--scenario-accent);border-radius:14px;}
+.sim-page.refresh-1012 main .scenario-btn .scenario-symbol i {grid-row:auto;color:inherit;font-size:23px;}
+.sim-page.refresh-1012 main .scenario-btn strong {font-size:19px!important;color:#4a392c;}
+.sim-page.refresh-1012 main .scenario-btn strong small {display:block;font-size:11px!important;font-weight:400;color:#9c8773;margin-top:3px;}
+.sim-page .scenario-mini-path {grid-column:1/-1;width:100%;height:37px;color:var(--scenario-accent);overflow:visible;margin-top:5px;}
+.sim-page .scenario-mini-path path {fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;}
+.sim-page.refresh-1012 main .scenario-btn .scenario-assumption {grid-column:1/-1;color:var(--scenario-accent);font:600 12px Arial,sans-serif!important;}
+.sim-page .scenario-btn::after {content:"點選強調曲線";grid-column:1/-1;color:#a28d78;font-size:10px;border-top:1px solid #eee6dc;padding-top:9px;margin-top:3px;}
+.sim-page.refresh-1012 main .scenario-btn[aria-pressed="true"] {border-color:var(--scenario-accent);background:rgba(var(--scenario-rgb),.055);box-shadow:0 0 0 1px var(--scenario-accent),0 6px 18px rgba(var(--scenario-rgb),.07);}
+.sim-page .scenario-btn[aria-pressed="true"]::after {content:"✓ 已強調曲線";color:var(--scenario-accent);font-weight:700;}
+.sim-page.refresh-1012 main .scenario-btn:focus-visible {outline:3px solid var(--scenario-accent);outline-offset:3px;}
+.sim-page.refresh-1012 main .sim-scenario-key {font-size:12px!important;color:#967c64;margin:13px 0 20px;line-height:1.7;}
+.sim-page .sim-scenario-key i {margin-right:5px;color:#c29464;}
+.sim-page .stress-controls {grid-template-columns:minmax(0,1.3fr) minmax(100px,.7fr) auto;align-items:end;}
+.sim-page .sim-stress-advanced {margin:12px 0;color:#987d66;font-size:12px;}
+.sim-page .sim-stress-advanced summary {cursor:pointer;width:fit-content;}
+.sim-page .sim-stress-advanced label {display:inline-flex;align-items:center;gap:10px;margin:12px 14px 0 0;}
+.sim-page .sim-stress-advanced input {width:145px;padding:9px;border:1px solid var(--line);border-radius:9px;background:#fff;}
+.sim-page.refresh-1012 main .sim-stress-advanced small {font-size:11px!important;}
+.sim-page .stress-result-meta {margin:20px 0 12px;align-items:center;}
+.sim-page .sim-stress-chart-panel {margin:12px 0 18px;padding:24px;border:1px solid #e9ded0;border-radius:20px;background:radial-gradient(ellipse at 0 0,rgba(var(--scenario-rgb),.045),transparent 60%),#fff;min-width:0;}
+.sim-page .sim-stress-chart-head {display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px;}
+.sim-page.refresh-1012 main .sim-stress-eyebrow {display:block;color:var(--scenario-accent);font-size:11px!important;letter-spacing:.08em;font-weight:600;margin-bottom:7px;}
+.sim-page.refresh-1012 main .sim-stress-chart-head h3 {font-size:22px!important;margin:0;color:#49372a;}
+.sim-page.refresh-1012 main .sim-stress-compare-badge {font-size:11px!important;padding:7px 11px;border:1px solid #e8dfd3;border-radius:25px;color:#96795e;background:#fffaf3;white-space:nowrap;}
+.sim-page .sim-stress-focus {display:grid;grid-template-columns:minmax(0,1fr) 28px minmax(0,1.15fr) minmax(0,1fr);gap:16px;align-items:center;padding-bottom:24px;border-bottom:1px solid #eee6dc;}
+.sim-page .sim-stress-focus>div {min-width:0;padding:15px;border-radius:12px;background:#faf6f0;}
+.sim-page .sim-stress-focus>div.sim-stress-focus-value {background:rgba(var(--scenario-rgb),.065);}
+.sim-page .sim-stress-focus>div.sim-stress-difference {background:transparent;padding:15px 0;}
+.sim-page.refresh-1012 main .sim-stress-focus>div>span {display:block;color:#9e8975;font-size:11px!important;margin-bottom:9px;}
+.sim-page.refresh-1012 main .sim-stress-focus strong {display:block;font:700 24px Arial,sans-serif!important;letter-spacing:-.02em;}
+.sim-page.refresh-1012 main .sim-stress-focus-value strong {font-size:29px!important;color:var(--scenario-accent);}
+.sim-page.refresh-1012 main .sim-stress-flow-arrow {font-size:27px!important;color:var(--scenario-accent);}
+.sim-page.refresh-1012 main .sim-stress-difference strong {font-size:22px!important;}
+.sim-page.refresh-1012 main #stressFocusReturn {display:inline-block;font-size:12px!important;margin-top:8px;padding:4px 7px;border-radius:5px;background:#f7f2ec;}
+.sim-page .sim-stress-visual-grid {display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:24px;padding-top:24px;}
+.sim-page .sim-stress-path-pane {min-width:0;}
+.sim-page .sim-stress-visual-heading {display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.sim-page.refresh-1012 main .sim-stress-visual-grid h4 {font-size:15px!important;color:#65503d;margin:0;}
+.sim-page.refresh-1012 main .sim-stress-visual-heading>span {font-size:10px!important;color:#a28d78;}
+.sim-page .sim-stress-chart-panel .sim-stress-chart {height:340px;margin:10px 0 0;position:relative;min-width:0;}
+.sim-page.refresh-1012 main .sim-stress-focus-hint {display:block;font-size:11px!important;color:#9b846e;margin:8px 0 0;}
+.sim-page .sim-stress-outcomes {background:#fcf9f5;border:1px solid #f1e8dd;border-radius:14px;padding:17px;min-width:0;}
+.sim-page.refresh-1012 main .sim-stress-outcomes>small {display:block;font-size:10px!important;color:#a08a74;margin:6px 0 10px;}
+.sim-page .sim-outcome-row {padding:12px 0;border-bottom:1px solid #ebe2d7;cursor:default;}
+.sim-page .sim-outcome-row:last-child {border-bottom:0;padding-bottom:0;}
+.sim-page .sim-outcome-head,.sim-page .sim-outcome-label {display:flex;align-items:center;gap:6px;}
+.sim-page .sim-outcome-head {justify-content:space-between;}
+.sim-page.refresh-1012 main .sim-outcome-head :is(strong,b) {font-size:12px!important;}
+.sim-page .sim-outcome-label i {width:7px;height:7px;border-radius:50%;}
+.sim-page.refresh-1012 main .sim-outcome-amount {display:block;font:600 18px Arial,sans-serif!important;color:#665241;margin:7px 0 10px;}
+.sim-page .sim-outcome-track {height:7px;border-radius:5px;background:#eee6dc;position:relative;}
+.sim-page .sim-outcome-track span {display:block;height:100%;border-radius:5px;background:var(--outcome-color);}
+.sim-page .sim-outcome-track i {position:absolute;top:-4px;height:15px;width:2px;background:#584e44;transform:translateX(-1px);border-radius:1px;}
+.sim-page .sim-outcome-row.is-highlighted .sim-outcome-label {color:var(--outcome-color);}
+.sim-page .sim-outcome-row.is-highlighted .sim-outcome-track {box-shadow:0 0 0 3px #fff,0 0 0 4px var(--outcome-color);}
+.sim-page.refresh-1012 main .sim-stress-chart-note {display:block;font-size:10px!important;color:#aa917b;border-top:1px solid #f0e9e1;padding-top:15px;margin-top:22px;}
+.sim-page .sim-stress-sr-only {position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;}
+@media(max-width:1100px){
+ .sim-page .sim-stress-visual-grid {grid-template-columns:1fr;}
+ .sim-page .sim-stress-outcomes {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0 17px;}
+ .sim-page .sim-stress-outcomes>h4,.sim-page .sim-stress-outcomes>small {grid-column:1/-1;}
+ .sim-page .sim-outcome-row {border-bottom:0;padding:12px 0 3px;}
+ .sim-page .sim-outcome-row:last-child {padding-bottom:3px;}
+ .sim-page .sim-outcome-head {flex-wrap:wrap;}
+}
+@media(max-width:760px){
+ .sim-page .sim-scenario-selector {grid-template-columns:repeat(2,minmax(0,1fr));}
+ .sim-page .sim-stress-chart-head {align-items:flex-start;flex-direction:column;gap:10px;}
+ .sim-page .sim-stress-focus {grid-template-columns:minmax(0,1fr) 22px minmax(0,1.15fr);gap:10px;}
+ .sim-page .sim-stress-focus>div.sim-stress-difference {grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:0;}
+ .sim-page .sim-stress-difference>span {margin-bottom:0!important;}
+ .sim-page.refresh-1012 main #stressFocusReturn {margin-top:0;}
+ .sim-page .sim-stress-outcomes {grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 20px;}
+ .sim-page .stress-controls {grid-template-columns:1fr 1fr;}
+ .sim-page .stress-controls button {grid-column:1/-1;}
+}
+@media(max-width:550px){
+ .sim-page.refresh-1012 main .scenario-btn {padding:13px;gap:8px;grid-template-columns:36px 1fr;}
+ .sim-page.refresh-1012 main .scenario-btn .scenario-symbol {width:36px;height:36px;border-radius:10px;}
+ .sim-page.refresh-1012 main .scenario-btn .scenario-symbol i {font-size:18px;}
+ .sim-page.refresh-1012 main .scenario-btn strong {font-size:17px!important;}
+ .sim-page .scenario-mini-path {height:30px;margin-top:0;}
+ .sim-page .sim-stress-chart-panel {padding:17px 12px;border-radius:15px;}
+ .sim-page.refresh-1012 main .sim-stress-chart-head h3 {font-size:18px!important;}
+ .sim-page .sim-stress-focus>div {padding:12px 9px;}
+ .sim-page.refresh-1012 main .sim-stress-focus strong {font-size:19px!important;}
+ .sim-page.refresh-1012 main .sim-stress-focus-value strong {font-size:22px!important;}
+ .sim-page.refresh-1012 main .sim-stress-flow-arrow {font-size:22px!important;}
+ .sim-page.refresh-1012 main .sim-stress-difference strong {font-size:19px!important;}
+ .sim-page .sim-stress-visual-heading {flex-wrap:wrap;}
+ .sim-page .sim-stress-chart-panel .sim-stress-chart {height:290px;}
+ .sim-page .sim-stress-outcomes {padding:14px;gap:9px 15px;}
+ .sim-page.refresh-1012 main .sim-outcome-amount {font-size:17px!important;}
+ .sim-page .stress-controls label:first-child {grid-column:auto;}
+ .sim-page .stress-controls :is(input,select) {font-size:12px;}
+ .sim-page .sim-stress-advanced small {display:block;margin-top:8px;}
+}
+@media(prefers-reduced-motion:reduce){.sim-page .scenario-btn {transition:none;}}
