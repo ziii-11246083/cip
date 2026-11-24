@@ -7,15 +7,15 @@
   </style>
   <script>document.documentElement.classList.add('js-enabled');</script>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,interactive-widget=resizes-content" />
   <title>AI Agent | Smart Invest Crypto</title>
-  <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo.jpg') }}">
+  <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo-compact.jpg') }}">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=member-overlay-20260604">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=phone-copy-20261124">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/agent.css') }}?v=agent-member-20260514">
-</head>
+{% include "partials/phone_layout.html" %}</head>
 <body class="ai-coach-page">
 
 {% include "partials/header.html" %}
@@ -141,8 +141,8 @@
     anonKey: '{{ supabase_anon_key | default("dummy") }}'
   };
 </script>
-<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=auth-state-20260830"></script>
-<script src="{{ url_for('static', filename='js/common.js') }}?v=member-nav-lock-20260604"></script>
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=mobile-rwd-20261124"></script>
+<script src="{{ url_for('static', filename='js/common.js') }}?v=phone-layout-20261124"></script>
 <script src="{{ url_for('static', filename='js/agent.js') }}?v=agent-member-20260514"></script>
 </body>
 </html>

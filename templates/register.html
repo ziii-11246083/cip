@@ -1,11 +1,12 @@
-<!doctype html><html lang="zh-Hant"><head><style>html.js-enabled body{opacity:0;transition:opacity .5s ease;}html.js-enabled body.page-ready{opacity:1;}</style><script>document.documentElement.classList.add('js-enabled');</script><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><title>加入進階會員 | Smart Invest Crypto｜智慧虛擬貨幣平台</title><link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/logo.svg') }}"><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"><link rel="preconnect" href="https://cdn.jsdelivr.net"><script src="https://cdn.jsdelivr.net/npm/chart.js"></script><link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=brand-width-20261013"><link rel="stylesheet" href="{{ url_for('static', filename='css/register.css') }}?v=join-carousel-20261013">  <link rel="stylesheet" href="{{ url_for('static', filename='css/visual-refresh-1012.css') }}?v=orange-white-20261013">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/site-theme.css') }}?v=money-type-20261013">
-</head><body class="register-page refresh-1012">{% include "partials/header.html" %}
+<!doctype html>
+{% from "partials/phone_copy.html" import phone_copy %}<html lang="zh-Hant"><head><style>html.js-enabled body{opacity:0;transition:opacity .5s ease;}html.js-enabled body.page-ready{opacity:1;}</style><script>document.documentElement.classList.add('js-enabled');</script><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1,interactive-widget=resizes-content" /><title>加入進階會員 | Smart Invest Crypto｜智慧虛擬貨幣平台</title><link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo-compact.jpg') }}"><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"><link rel="preconnect" href="https://cdn.jsdelivr.net"><link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=phone-copy-20261124"><link rel="stylesheet" href="{{ url_for('static', filename='css/register.css') }}?v=join-carousel-20261013">  <link rel="stylesheet" href="{{ url_for('static', filename='css/visual-refresh-1012.css') }}?v=orange-white-20261013">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/site-theme.css') }}?v=mobile-scale-20261124">
+{% include "partials/phone_layout.html" %}</head><body class="register-page refresh-1012">{% include "partials/header.html" %}
 <main aria-label="加入進階會員"><section class="section register-content join-content"><div class="container wide-container">
 <ol class="join-steps" aria-label="加入會員流程"><li id="joinStepAccount" aria-current="step"><span>1</span>建立帳號</li><li id="joinStepPlan"><span>2</span>確認方案</li><li id="joinStepPayment"><span>3</span>付款開通</li></ol>
 <div class="join-layout">
 <section class="card join-account-card" id="joinAccountStep" aria-labelledby="joinAccountTitle">
-<h1 id="joinAccountTitle">加入進階會員</h1><p class="join-intro">建立帳號，確認方案，再完成付款。</p>
+<h1 id="joinAccountTitle">加入進階會員</h1><p class="join-intro">{{ phone_copy("建立帳號，確認方案，再完成付款。", "帳號 · 方案 · 付款") }}</p>
 <div class="message-box" id="messageBox" role="status" aria-live="polite"></div>
 <div id="existingAccountPanel" hidden><div class="join-account-ready"><i class="fas fa-user-check" aria-hidden="true"></i><div><strong id="joinAccountName">你的帳號已準備好</strong><p id="joinAccountStatus">繼續確認方案與付款。</p></div></div><button class="button primary full" id="btnContinuePayment" type="button">確認方案並前往付款 <i class="fas fa-arrow-right" aria-hidden="true"></i></button><p class="join-login-link"><button type="button" data-open-login>登入後繼續付款</button></p></div>
 <div id="newAccountPanel"><button class="button full join-google" id="btnGoogleRegister" type="button"><span class="google-mark" aria-hidden="true">G</span> 使用 Google 建立帳號／登入</button><div class="join-divider"><span>或使用 Email</span></div>
@@ -37,7 +38,7 @@
 		url: {{ (supabase_url or "") | tojson }},
 		anonKey: {{ (supabase_anon_key or "") | tojson }}
 	};
-</script><script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=join-carousel-20261013"></script><script src="{{ url_for('static', filename='js/common.js') }}?v=money-type-20261013"></script><script src="{{ url_for('static', filename='js/register.js') }}?v=join-carousel-20261013"></script></body></html>
+</script><script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=mobile-rwd-20261124"></script><script src="{{ url_for('static', filename='js/common.js') }}?v=phone-layout-20261124"></script><script src="{{ url_for('static', filename='js/register.js') }}?v=join-carousel-20261013"></script></body></html>
 
 
 

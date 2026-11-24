@@ -1,4 +1,5 @@
 <!doctype html>
+{% from "partials/phone_copy.html" import phone_copy %}
 <html lang="zh-Hant">
 <head>
   <style>
@@ -7,17 +8,17 @@
   </style>
   <script>document.documentElement.classList.add('js-enabled');</script>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,interactive-widget=resizes-content" />
   <title>Smart Invest Crypto｜智慧虛擬貨幣平台</title>
-  <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo.jpg') }}">
+  <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo-compact.jpg') }}">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=brand-width-20261013">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=phone-copy-20261124">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/visual-refresh-1012.css') }}?v=orange-white-20261013">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/site-theme.css') }}?v=money-type-20261013">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}?v=home-cards-20261013">
-</head>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/site-theme.css') }}?v=mobile-scale-20261124">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}?v=mobile-scale-20261124">
+{% include "partials/phone_layout.html" %}</head>
 <body class="home-page refresh-1012">
   
 {% include "partials/header.html" %}
@@ -29,10 +30,10 @@
       <div class="home-copy reveal is-visible">
         <div class="eyebrow"><i class="fas fa-chart-simple"></i>Smart Invest Crypto</div>
         <h1>智慧虛擬貨幣平台</h1>
-        <p>把市場總覽、投資健康度、AI 投資教練、Podcast 與模擬交易整合在同一個決策流程中，讓新手也能更快看懂行情、建立配置並形成自己的投資節奏。</p>
+        <p>{{ phone_copy("把市場總覽、投資健康度、AI 投資教練、Podcast 與模擬交易整合在同一個決策流程中，讓新手也能更快看懂行情、建立配置並形成自己的投資節奏。", "看行情 · 查風險 · 練交易") }}</p>
         <div class="hero-actions">
-          <a class="button primary" href="#learn">了解平台功能</a>
-          <a class="button" href="/market">前往市場總覽</a>
+          <a class="button primary" href="#learn"><i class="fas fa-compass phone-only" aria-hidden="true"></i> {{ phone_copy("了解平台功能", "看功能") }}</a>
+          <a class="button" href="/market"><i class="fas fa-chart-line phone-only" aria-hidden="true"></i> {{ phone_copy("前往市場總覽", "看行情") }}</a>
         </div>
       </div>
     </div>
@@ -42,28 +43,28 @@
     <div class="container">
       <div class="section-head reveal">
         <div>
-          <h2 class="section-title">你可以怎麼開始使用</h2>
-          <p class="section-copy">不需要一次學很多。我們把操作流程拆成幾個明確步驟，讓你先看市場行情，再評估配置，最後用 AI 與模擬工具輔助決策。</p>
+          <h2 class="section-title">{{ phone_copy("你可以怎麼開始使用", "開始使用") }}</h2>
+          <p class="section-copy">{{ phone_copy("不需要一次學很多。我們把操作流程拆成幾個明確步驟，讓你先看市場行情，再評估配置，最後用 AI 與模擬工具輔助決策。", "從行情到決策") }}</p>
         </div>
       </div>
 
       <div class="process-grid">
         <div class="process-card reveal">
-          <div class="process-num">01</div>
+          <div class="process-num" aria-hidden="true"><span class="phone-hide">01</span><i class="fas fa-chart-line phone-only"></i></div>
           <h3>先看市場狀態</h3>
-          <p>從主流幣價格、熱門幣種、價格走勢比較與 TradingView 圖表入口開始，先掌握整體市場方向與波動感受。</p>
+          <p>{{ phone_copy("從主流幣價格、熱門幣種、價格走勢比較與 TradingView 圖表入口開始，先掌握整體市場方向與波動感受。", "價格與走勢") }}</p>
         </div>
 
         <div class="process-card reveal delay-1">
-          <div class="process-num">02</div>
+          <div class="process-num" aria-hidden="true"><span class="phone-hide">02</span><i class="fas fa-chart-pie phone-only"></i></div>
           <h3>再做配置評估</h3>
-          <p>用投資健康度、FOMO 檢測與一鍵配置，快速確認目前的資產分配是否過度集中、過度追價，或有需要調整的地方。</p>
+          <p>{{ phone_copy("用投資健康度、FOMO 檢測與一鍵配置，快速確認目前的資產分配是否過度集中、過度追價，或有需要調整的地方。", "集中度與波動風險") }}</p>
         </div>
 
         <div class="process-card reveal delay-2">
-          <div class="process-num">03</div>
+          <div class="process-num" aria-hidden="true"><span class="phone-hide">03</span><i class="fas fa-comments phone-only"></i></div>
           <h3>最後交給 AI 輔助</h3>
-          <p>你可以用 AI 投資教練進一步提問，也能把市場與配置資訊轉成 Podcast，用更輕鬆的方式理解投資重點。</p>
+          <p>{{ phone_copy("你可以用 AI 投資教練進一步提問，也能把市場與配置資訊轉成 Podcast，用更輕鬆的方式理解投資重點。", "AI 提問與語音摘要") }}</p>
         </div>
       </div>
     </div>
@@ -72,10 +73,10 @@
   
 
     <section class="section"><div class="container">
-    <div class="section-head reveal"><div><h2 class="section-title">使用模式差異</h2><p class="section-copy">公開功能直接使用；進階功能需完成付款開通。</p></div></div>
+    <div class="section-head reveal"><div><h2 class="section-title">使用模式差異</h2><p class="section-copy">{{ phone_copy("公開功能直接使用；進階功能需完成付款開通。", "公開功能免登入 · 進階功能需開通") }}</p></div></div>
     <div class="access-grid access-grid-two">
-      <article class="access-card reveal"><div class="mode-pill"><i class="fas fa-globe"></i> 公開使用</div><h3>免登入，直接開始</h3><p>先掌握市場資訊，再決定是否加入進階會員。</p><ul class="access-list"><li><i class="fas fa-check"></i><span>市場總覽、技術指標與幣種分析</span></li><li><i class="fas fa-check"></i><span>社群分析、敘事雷達與防詐檢測</span></li><li><i class="fas fa-check"></i><span>Podcast 生成與播放</span></li></ul><a class="button" href="/market">開始看市場 <i class="fas fa-arrow-right"></i></a></article>
-      <article class="access-card access-card-premium reveal"><div class="mode-pill"><i class="fas fa-crown"></i> 進階會員</div><h3>99 TWD／月</h3><p>包含所有公開功能，付款開通後即可使用個人投資工具。</p><ul class="access-list"><li><i class="fas fa-check"></i><span>投資健康度與配置分析</span></li><li><i class="fas fa-check"></i><span>AI 投資教練與對話紀錄</span></li><li><i class="fas fa-check"></i><span>模擬交易、個人持倉與交易紀錄</span></li></ul><a class="button primary" href="/register">加入進階會員 <i class="fas fa-arrow-right"></i></a></article>
+      <article class="access-card reveal"><div class="mode-pill"><i class="fas fa-globe"></i> 公開使用</div><h3>免登入，直接開始</h3><p>{{ phone_copy("先掌握市場資訊，再決定是否加入進階會員。", "直接看市場") }}</p><ul class="access-list"><li><i class="fas fa-check"></i><span>市場總覽、技術指標與幣種分析</span></li><li><i class="fas fa-check"></i><span>社群分析、敘事雷達與防詐檢測</span></li><li><i class="fas fa-check"></i><span>Podcast 生成與播放</span></li></ul><a class="button" href="/market">開始看市場 <i class="fas fa-arrow-right"></i></a></article>
+      <article class="access-card access-card-premium reveal"><div class="mode-pill"><i class="fas fa-crown"></i> 進階會員</div><h3>99 TWD／月</h3><p>{{ phone_copy("包含所有公開功能，付款開通後即可使用個人投資工具。", "開通後使用個人投資工具") }}</p><ul class="access-list"><li><i class="fas fa-check"></i><span>投資健康度與配置分析</span></li><li><i class="fas fa-check"></i><span>AI 投資教練與對話紀錄</span></li><li><i class="fas fa-check"></i><span>模擬交易、個人持倉與交易紀錄</span></li></ul><a class="button primary" href="/register">加入進階會員 <i class="fas fa-arrow-right"></i></a></article>
     </div></div></section>
 
   <section class="section feature-explorer" id="features">
@@ -94,34 +95,34 @@
         <a class="feature-card reveal" href="/market">
           <span><i class="fas fa-chart-line"></i></span>
           <h3>市場總覽</h3>
-          <p>查看主流幣漲跌、人氣快選、互動式走勢比較，並開啟 TradingView 專業圖表。</p>
+          <p>{{ phone_copy("查看主流幣漲跌、人氣快選、互動式走勢比較，並開啟 TradingView 專業圖表。", "行情與走勢比較") }}</p>
         </a>
 
         <a class="feature-card reveal delay-1" href="/podcast">
           <span><i class="fas fa-podcast"></i></span>
           <h3>Podcast</h3>
-          <p>把市場與個人配置轉成語音晨報，用更口語、更容易吸收的方式掌握重點。</p>
+          <p>{{ phone_copy("把市場與個人配置轉成語音晨報，用更口語、更容易吸收的方式掌握重點。", "用聽的掌握行情") }}</p>
         </a>
 
         <a class="feature-card feature-card-premium reveal delay-2" href="/health">
           <em class="member-tag"><i class="fas fa-crown" aria-hidden="true"></i> 進階會員</em>
           <span><i class="fas fa-chart-pie"></i></span>
           <h3>投資健康度</h3>
-          <p>輸入你的配置後，快速評估集中度、波動風險、FOMO 狀態與 AI 健康度建議。</p>
+          <p>{{ phone_copy("輸入你的配置後，快速評估集中度、波動風險、FOMO 狀態與 AI 健康度建議。", "評估配置風險") }}</p>
         </a>
 
         <a class="feature-card feature-card-premium reveal delay-3" href="/ai-coach">
           <em class="member-tag"><i class="fas fa-crown" aria-hidden="true"></i> 進階會員</em>
           <span><i class="fas fa-robot"></i></span>
           <h3>AI 投資教練</h3>
-          <p>針對風險偏好、配置方向與市場判斷提出問題，獲得更清楚的整理與建議。</p>
+          <p>{{ phone_copy("針對風險偏好、配置方向與市場判斷提出問題，獲得更清楚的整理與建議。", "提問投資與配置") }}</p>
         </a>
 
         <a class="feature-card feature-card-premium reveal delay-1" href="/sim-trade">
           <em class="member-tag"><i class="fas fa-crown" aria-hidden="true"></i> 進階會員</em>
           <span><i class="fas fa-chart-column"></i></span>
           <h3>模擬交易</h3>
-          <p>以 USD 虛擬資金練習買賣，觀察持倉損益與配置變化。</p>
+          <p>{{ phone_copy("以 USD 虛擬資金練習買賣，觀察持倉損益與配置變化。", "用虛擬資金練習買賣") }}</p>
         </a>
       </div>
       </div>
@@ -131,7 +132,7 @@
           <span><i class="fas fa-satellite-dish"></i></span>
           <div>
             <h3>社群分析</h3>
-            <p>整理市場社群情緒，幫你分辨現在的話題熱度、偏多偏空與市場雜訊。</p>
+            <p>{{ phone_copy("整理市場社群情緒，幫你分辨現在的話題熱度、偏多偏空與市場雜訊。", "看熱門討論") }}</p>
           </div>
         </a>
 
@@ -139,7 +140,7 @@
           <span><i class="fas fa-microscope"></i></span>
           <div>
             <h3>BTC 深度分析</h3>
-            <p>針對單一幣種查看更細的風險結構、價格特徵與相對位置。</p>
+            <p>{{ phone_copy("針對單一幣種查看更細的風險結構、價格特徵與相對位置。", "查看單幣風險") }}</p>
           </div>
         </a>
 
@@ -147,15 +148,15 @@
           <span><i class="fas fa-brain"></i></span>
           <div>
             <h3>敘事雷達</h3>
-            <p>追蹤熱門市場敘事，搭配 SFI 風險排名觀察市場變化。</p>
+            <p>{{ phone_copy("追蹤熱門市場敘事，搭配 SFI 風險排名觀察市場變化。", "熱門題材與風險") }}</p>
           </div>
         </a>
       </div>
       </div>
       <button type="button" class="carousel-arrow" data-carousel-direction="1" aria-controls="featureCarousel" aria-label="下一張核心功能"><i class="fas fa-chevron-right" aria-hidden="true"></i></button>
-      </div>
       <div class="feature-carousel-navigation" aria-label="核心功能卡片切換">
         <div class="carousel-pages" aria-label="卡片位置"></div>
+      </div>
       </div>
       <p class="carousel-position" aria-live="polite" aria-atomic="true"></p>
     </div>
@@ -166,7 +167,7 @@
       <div class="section-head reveal">
         <div>
           <h2 class="section-title">快速切換</h2>
-          <p class="section-copy">快速前往市場分析、配置檢查與模擬交易。</p>
+          <p class="section-copy">{{ phone_copy("快速前往市場分析、配置檢查與模擬交易。", "常用投資入口") }}</p>
         </div>
       </div>
 
@@ -232,7 +233,7 @@
         </div>
 
         <div class="cta-actions">
-          <a class="button primary" href="/market">前往市場總覽</a>
+          <a class="button primary" href="/market">{{ phone_copy("前往市場總覽", "看行情") }}</a>
           <a class="button" href="/health">查看投資健康度</a>
         </div>
       </div>
@@ -255,8 +256,8 @@
     anonKey: '{{ supabase_anon_key | default("dummy") }}'
   };
 </script>
-<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=join-carousel-20261013"></script>
-<script src="{{ url_for('static', filename='js/common.js') }}?v=money-type-20261013"></script>
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=mobile-rwd-20261124"></script>
+<script src="{{ url_for('static', filename='js/common.js') }}?v=phone-layout-20261124"></script>
 <script src="{{ url_for('static', filename='js/index.js') }}?v=home-cards-20261013"></script>
 </body>
 </html>

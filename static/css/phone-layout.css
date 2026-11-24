@@ -1,0 +1,267 @@
+@media (max-width: 600px), (max-width: 960px) and (max-height: 540px) {
+  body {
+    --phone-inset: clamp(12px, 3.8vw, 16px);
+    --phone-gap: 10px;
+    --phone-page-title: clamp(24px, 6.2vw, 26px);
+    --phone-section-title: 20px;
+    --phone-card-title: 18px;
+    --phone-copy-size: 15px;
+  }
+
+  .refresh-1012:not(.home-page) main h1 { font-size: var(--phone-page-title) !important; }
+  .refresh-1012:not(.home-page) main h2 { font-size: var(--phone-section-title) !important; }
+  .refresh-1012:not(.home-page) main h3 { font-size: var(--phone-card-title) !important; }
+  .refresh-1012:not(.home-page) main :is(p, li, span, small, em, label, td, th, a, button) {
+    font-size: var(--phone-copy-size) !important;
+  }
+
+  .phone-hide { display: none !important; }
+  .phone-only { display: revert !important; }
+
+  .refresh-1012 main :is(.tools-eyebrow, .sim-eyebrow, .member-eyebrow, .coach-tool-kicker),
+  .home-page main :is(.home-copy > .eyebrow, .cta-card .eyebrow, #featureCategoryCopy),
+  .health-page .fomo-heading .eyebrow,
+  .tools-page .tools-tabs small,
+  .sim-page .sim-workflow-nav a > span > small,
+  .podcast-page .podcast-generate-bubble small { display: none !important; }
+
+  .phone-heading-icon { margin-inline-end: 7px; color: var(--brand); font-size: .78em; vertical-align: .08em; }
+  .site-header .header-nav .primary-links i { color: var(--brand); }
+  .site-header .header-nav .primary-links .active i { color: inherit; }
+
+  .footer { margin-top: 28px; padding-block: 18px; }
+  .footer .footer-inner { gap: 5px; }
+  .footer details.footer-disclaimer { margin: 0; padding-top: 3px; }
+  .footer details.footer-disclaimer summary { padding: 9px 0; cursor: pointer; }
+  .footer details.footer-disclaimer p { color: #fff; margin-top: 4px; font-weight: 400; }
+
+  .refresh-1012:not(.home-page) main :is(.section, .health-section, .member-page, .membership-comparison, .membership-next) {
+    padding-block: 20px;
+  }
+
+  .refresh-1012:not(.home-page) main :is(.card, .member-card, .membership-plan, .member-upgrade):not(.report-card) {
+    padding: var(--phone-inset);
+    border-radius: 15px;
+    min-width: 0;
+  }
+
+  .refresh-1012:not(.home-page) main .section-head {
+    gap: var(--phone-gap);
+    margin-bottom: 14px;
+  }
+
+  .refresh-1012 main .divider { margin-block: 12px; }
+
+  .refresh-1012 main .member-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .refresh-1012 main .member-actions > :is(a, button) {
+    flex: 1 1 auto;
+    min-height: var(--mobile-touch-size, 48px);
+    justify-content: center;
+  }
+
+  .site-header[data-mobile-nav] .account-popup { padding: var(--phone-inset); }
+
+  .home-page .home-hero { min-height: 0; padding-block: clamp(28px, 6vh, 52px); }
+  .home-page .home-copy h1 { margin-top: 0; font-size: var(--phone-page-title); }
+  .home-page main :is(.section-title, .cta-card h2) { font-size: var(--phone-section-title); }
+  .home-page main :is(h3, .tool-directory-item strong) { font-size: var(--phone-card-title); }
+  .home-page .home-copy p,
+  .home-page main :is(.section-copy, .button, .feature-tabs button),
+  .home-page .feature-explorer :is(.feature-card, .addon-card) p { font-size: var(--phone-copy-size); }
+  .home-page .hero-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .home-page .hero-actions .button { min-height: var(--mobile-touch-size, 48px); padding-inline: 8px; }
+  .home-page main .section { padding-block: 24px; }
+  .home-page main .section-head { margin-bottom: 16px; }
+  .home-page :is(.process-grid, .access-grid, .tool-directory) { gap: var(--phone-gap); }
+  .home-page :is(.process-card, .access-card, .tool-directory-item, .cta-card) { padding: 16px; border-radius: 16px; }
+  .home-page .process-card {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 3px 10px;
+    align-items: center;
+  }
+  .home-page .process-num { grid-row: span 2; width: 42px; height: 42px; margin: 0; border-radius: 12px; }
+  .home-page .process-card > :is(h3, p) { margin: 0; }
+  .home-page .process-card::after { display: none; }
+  .home-page .feature-explorer .card-carousel-track { padding-bottom: 12px; }
+  .home-page .feature-explorer .card-carousel-track > :is(.feature-card, .addon-card) { min-height: 190px; padding-block: 45px 16px; }
+  .home-page .feature-explorer :is(.feature-card, .addon-card) p { margin-bottom: 12px; }
+
+  .market-page.refresh-1012 main .market-snapshot-tools {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .market-page.refresh-1012 main .market-snapshot-tools .market-badge {
+    padding: 4px 8px;
+    font-size: 13px !important;
+    overflow-wrap: anywhere;
+  }
+
+  .market-page.refresh-1012 main .market-refresh-button { padding: 8px 10px; font-size: 14px !important; }
+  .market-page.refresh-1012 main .coin-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .market-page.refresh-1012 main .coin-card { min-height: 0; padding: 10px 12px; border-radius: 14px; }
+  .market-page.refresh-1012 main .coin-head { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+  .market-page.refresh-1012 main .coin-card > strong {
+    margin-block: 6px 3px;
+    font-size: clamp(18px, 4.9vw, 23px) !important;
+  }
+  .market-page.refresh-1012 main .coin-head span { font-size: var(--phone-card-title) !important; }
+  .market-page.refresh-1012 main :is(.hotPrice, .summary-tile > strong, .ta-card > strong, .tv-last-price > strong) {
+    font-size: 23px;
+  }
+
+  .market-page .market-content-section > .container {
+    display: flex;
+    flex-direction: column;
+    reading-flow: flex-visual;
+  }
+
+  .market-page .market-content-section .market-tools { order: 1; margin-block: var(--phone-gap) 0; }
+  .market-page #marketComparisonSection .control-row {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    gap: 8px;
+  }
+  .market-page #marketComparisonSection .control-row > div:has(#overlaySelect) { grid-column: 1 / -1; }
+  .market-page #marketComparisonSection .control-row > :is(div, button) { min-width: 0; width: 100%; }
+
+  .coach-page.refresh-1012 main .coach-chat { padding: var(--phone-inset); }
+  .coach-page.refresh-1012 main :is(.chat-head strong, .coach-identity strong) { font-size: var(--phone-section-title); }
+  .coach-page.refresh-1012 main :is(.coach-panel .section-title, .coach-agent-intro h2, .coach-tool-heading h2) {
+    font-size: var(--phone-section-title) !important;
+  }
+  .coach-page.refresh-1012 main .welcome-row h3 { font-size: var(--phone-card-title) !important; }
+  .coach-page.refresh-1012 main .coach-view-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px;
+    padding-block: 6px;
+  }
+  .coach-page.refresh-1012 main .coach-view-tab { min-width: 0; padding: 7px; }
+  .coach-page .coach-chat .chat-stream {
+    height: clamp(155px, 30vh, 250px);
+    height: clamp(155px, 30svh, 250px);
+    padding: 10px;
+  }
+  .coach-page .chat-row .bubble { min-width: 0; padding: 10px 12px; }
+  .coach-page .chat-input-row { padding-top: 8px; }
+  .coach-page .coach-side-toggle { padding-block: 6px; }
+
+  .health-page .fomo-feature { padding: var(--phone-inset); border-radius: 16px; gap: var(--phone-gap); }
+  .health-page main #fomoTitle { font-size: var(--phone-page-title) !important; }
+  .health-page main #fomoTitle span { font-size: var(--phone-section-title) !important; }
+  .health-page main #fomoChange { font-size: 32px !important; height: auto; }
+  .health-page .fomo-visual { padding: var(--phone-inset); }
+  .health-page .fomo-controls { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
+  .health-page .fomo-controls > div { min-width: 0; }
+  .health-page .fomo-controls button { padding-inline: 9px; }
+  .health-page .health-workspace { gap: var(--phone-gap); }
+  .health-page .setup-card .control-row.three,
+  .health-page .setup-card .amount-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .health-page .setup-card .control-row.three > div { grid-column: auto; min-width: 0; }
+  .health-page .setup-card .amount-row > div { grid-column: 1 / -1; }
+  .health-page .setup-card .amount-row > button { width: 100%; padding-inline: 8px; }
+
+  .sim-page.refresh-1012 .sim-app { gap: 14px; }
+  .sim-page.refresh-1012 main .sim-workflow-nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    padding: 6px;
+  }
+  .sim-page.refresh-1012 main .sim-workflow-nav a {
+    display: flex;
+    flex-direction: row;
+    min-height: var(--mobile-touch-size, 48px);
+    justify-content: flex-start;
+    gap: 7px;
+    padding: 7px;
+  }
+  .sim-page.refresh-1012 main .sim-workflow-nav a > span { font-size: 14px !important; }
+  .sim-page.refresh-1012 main .sim-workflow-nav a > i { display: none; }
+  .sim-page.refresh-1012 main .order-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .sim-page.refresh-1012 main .order-symbol-field { grid-column: 1 / -1; }
+  .sim-page.refresh-1012 main .order-grid :is(input, select) { min-width: 0; width: 100%; }
+  .sim-page .sim-order-preview { padding: var(--phone-inset); }
+  .sim-page .sim-stress-chart-panel { padding: var(--phone-inset); }
+  .sim-page.refresh-1012 main :is(.sim-chart-head h3, .sim-stress-chart-head h3) { font-size: var(--phone-card-title) !important; }
+  .sim-page .sim-market-quote .sim-quote-price { font-size: 23px; }
+
+  .member-page-body .member-section-nav {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 5px;
+  }
+  .member-page-body.refresh-1012 main .member-section-nav a {
+    grid-column: span 2;
+    min-width: 0;
+    min-height: var(--mobile-touch-size, 48px);
+    font-size: 13px !important;
+    gap: 3px;
+    padding: 5px;
+  }
+  .member-page-body .member-section-nav a:nth-child(n+4) { grid-column: span 3; }
+  .member-page-body .member-grid { gap: var(--phone-gap); }
+  .member-page-body.refresh-1012 main .member-chart-head h2 { font-size: var(--phone-card-title) !important; }
+  .member-page-body .member-form.order-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .member-page-body .member-form.order-form > :is(.member-field-wide, button) { grid-column: 1 / -1; }
+
+  .refresh-1012:not(.home-page) main :is(.membership-price, .member-plan-price, .join-plan-price) { font-size: 28px !important; }
+  .refresh-1012.register-page main .join-content .register-form label:not(.agree) { font-size: var(--phone-copy-size) !important; }
+
+  .scam-page.refresh-1012 main .scam-input-card {
+    display: grid;
+    reading-flow: grid-order;
+    gap: 8px;
+  }
+  .scam-page.refresh-1012 main .scam-input-card .example-row { order: 1; margin: 3px 0 0; }
+  .scam-page.refresh-1012 main #scamInput { min-height: 130px; margin: 0; }
+  .scam-page.refresh-1012 main #btnScan { margin: 0; }
+  .scam-page.refresh-1012 main .report-actions { gap: 8px; padding: var(--phone-inset); }
+  .scam-page .report-head strong { font-size: var(--phone-section-title); }
+
+  .podcast-page.refresh-1012 main .podcast-player-section .podcast-hero-card {
+    padding: var(--phone-inset);
+    gap: var(--phone-gap);
+    border-radius: 16px;
+  }
+  .podcast-page.refresh-1012 .podcast-cover-art {
+    min-height: 119px;
+    height: 119px;
+    display: grid;
+    grid-template-columns: 1fr;
+    place-items: center;
+  }
+  .podcast-page .podcast-cover-caption { display: none; }
+  .podcast-page.refresh-1012 .podcast-preview-copy > strong { font-size: var(--phone-section-title); }
+  .podcast-page.refresh-1012 main .chat-empty > strong { font-size: var(--phone-card-title); }
+  .podcast-page.refresh-1012 main .podcast-generate-bubble span { font-size: var(--phone-copy-size) !important; }
+  .podcast-page.refresh-1012 .chatText { font-size: var(--phone-copy-size); }
+  .podcast-page.refresh-1012 main .podcast-hero-controls {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    justify-items: center;
+    gap: 7px;
+    reading-flow: grid-order;
+  }
+  .podcast-page.refresh-1012 main .podcast-hero-controls button {
+    width: var(--mobile-touch-size, 48px);
+    min-width: 0;
+    height: var(--mobile-touch-size, 48px);
+    margin: 0;
+  }
+  .podcast-page #btnPodcastBack { order: -1; }
+  .podcast-page.refresh-1012 main .podcast-hero-controls .time { grid-column: span 3; justify-self: start; margin: 0; }
+  .podcast-page.refresh-1012 main .podcast-hero-controls .podcast-speed { justify-self: end; }
+}

@@ -101,20 +101,6 @@ document.addEventListener("DOMContentLoaded", () => {
   new MutationObserver(alignTables).observe(main, {childList:true,subtree:true});
 });
 
-function restoreOriginalSiteIcon() {
-  const iconUrl = "/static/img/logo.jpg";
-  let icon = document.querySelector('link[rel="icon"]');
-  if (!icon) {
-    icon = document.createElement("link");
-    icon.rel = "icon";
-    document.head.appendChild(icon);
-  }
-  icon.type = "image/jpeg";
-  icon.href = iconUrl;
-}
-
-restoreOriginalSiteIcon();
-
 window.waitForSmartInvestAuth = async function waitForSmartInvestAuth(timeoutMs = 5000) {
   if (window.authManager) {
     await window.authManager.ensureReady?.();
@@ -186,67 +172,97 @@ function initCommonUI() {
   const forgotPasswordBtn = document.getElementById("forgotPasswordBtn");
   const backToTopBtn = document.getElementById("backToTopBtn");
   const path = window.location.pathname;
+  const mobileNavToggle = document.getElementById("mobileNavToggle");
+  const primaryNavigation = document.getElementById("primaryNavigation");
+  const mobileLayout = window.matchMedia("(max-width: 900px), (max-width: 960px) and (max-height: 540px)");
   const navMore = document.querySelector(".nav-more");
   const userMenu = document.querySelector(".user-menu");
 
+  function closeMobileNav() {
+    mobileNavToggle?.setAttribute("aria-expanded", "false");
+    if (mobileLayout.matches) navMore?.removeAttribute("open");
+  }
+
   function closePopup() {
-    if (accountPopup) {
-      accountPopup.classList.remove("show");
-    }
+    accountPopup?.classList.remove("show");
+    loginToggle?.setAttribute("aria-expanded", "false");
   }
 
   function openPopup() {
-    if (accountPopup) {
-      accountPopup.classList.add("show");
+    closeMobileNav();
+    navMore?.removeAttribute("open");
+    userMenu?.removeAttribute("open");
+    accountPopup?.classList.add("show");
+    loginToggle?.setAttribute("aria-expanded", "true");
+    emailInput?.focus({ preventScroll: true });
+  }
+
+  if (mobileNavToggle && primaryNavigation) {
+    mobileNavToggle.closest(".site-header").setAttribute("data-mobile-nav", "");
+    mobileNavToggle.addEventListener("click", () => {
+      if (mobileNavToggle.getAttribute("aria-expanded") === "true") {
+        closeMobileNav();
+        return;
+      }
+      closePopup();
+      userMenu?.removeAttribute("open");
+      mobileNavToggle.setAttribute("aria-expanded", "true");
+    });
+    primaryNavigation.addEventListener("click", (event) => {
+      if (mobileLayout.matches && event.target.closest("a")) closeMobileNav();
+    });
+    mobileLayout.addEventListener("change", () => {
+      closeMobileNav();
+      navMore?.removeAttribute("open");
+    });
+  }
+
+  loginToggle?.addEventListener("click", () => {
+    if (accountPopup?.classList.contains("show")) closePopup();
+    else openPopup();
+  });
+  popupClose?.addEventListener("click", () => {
+    closePopup();
+    loginToggle?.focus();
+  });
+  document.addEventListener("smartinvest:open-login", openPopup);
+  document.getElementById("headerLoginForm")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const { email, password } = event.currentTarget.elements;
+    window.authManager?.loginWithEmail(email.value, password.value);
+  });
+
+  navMore?.querySelectorAll("a").forEach((link) => {
+    link.addEventListener("click", () => navMore.removeAttribute("open"));
+  });
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    const opensLogin = target.closest?.("#loginToggle, [data-open-login], [data-member-required]");
+    if (!accountPopup?.contains(target) && !opensLogin) closePopup();
+    if (!navMore?.contains(target)) navMore?.removeAttribute("open");
+    if (!userMenu?.contains(target)) userMenu?.removeAttribute("open");
+    if (!primaryNavigation?.contains(target) && !mobileNavToggle?.contains(target)) closeMobileNav();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    if (accountPopup?.classList.contains("show")) {
+      closePopup();
+      loginToggle?.focus();
+    } else if (userMenu?.open) {
+      userMenu.open = false;
+      userMenu.querySelector("summary")?.focus();
+    } else if (navMore?.open) {
+      navMore.open = false;
+      navMore.querySelector("summary")?.focus();
+    } else if (mobileNavToggle?.getAttribute("aria-expanded") === "true") {
+      closeMobileNav();
+      mobileNavToggle.focus();
     }
-  }
-
-  if (loginToggle && accountPopup) {
-    loginToggle.addEventListener("click", (e) => {
-      e.stopPropagation();
-      accountPopup.classList.toggle("show");
-    });
-
-    accountPopup.addEventListener("click", (e) => {
-      e.stopPropagation();
-    });
-
-    document.addEventListener("click", closePopup);
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") closePopup();
-    });
-  }
-
-  if (navMore) {
-    navMore.addEventListener("click", (e) => e.stopPropagation());
-    document.addEventListener("click", () => {
-      navMore.removeAttribute("open");
-    });
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") navMore.removeAttribute("open");
-    });
-    navMore.querySelectorAll("a").forEach((link) => {
-      link.addEventListener("click", () => navMore.removeAttribute("open"));
-    });
-  }
-
-  if (userMenu) {
-    userMenu.addEventListener("click", (e) => e.stopPropagation());
-    document.addEventListener("click", () => userMenu.removeAttribute("open"));
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") userMenu.removeAttribute("open");
-    });
-  }
-
-  if (popupClose) {
-    popupClose.addEventListener("click", closePopup);
-  }
+  });
 
   document.querySelectorAll("[data-open-login]").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      openPopup();
-    });
+    btn.addEventListener("click", openPopup);
   });
 
   if (forgotPasswordBtn) {
@@ -269,15 +285,16 @@ function initCommonUI() {
 
   if (backToTopBtn) {
     backToTopBtn.addEventListener("click", () => {
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
     });
   }
 
   document.querySelectorAll(".nav a").forEach((link) => {
     const href = link.getAttribute("href") || "";
-    const isHome = href === "/" && path === "/";
-    const isCurrent = href !== "/" && path.startsWith(href);
-    link.classList.toggle("active", isHome || isCurrent);
+    const isCurrent = path === href || (href === "/" && path === "/ui") || (href.length > 1 && path.startsWith(`${href}/`));
+    link.classList.toggle("active", isCurrent);
+    if (isCurrent) link.setAttribute("aria-current", "page");
   });
 
   document.querySelectorAll("[data-member-required]").forEach((link) => {
@@ -299,11 +316,12 @@ function initCommonUI() {
   });
 
   const revealEls = document.querySelectorAll(".reveal");
-  if ("IntersectionObserver" in window) {
+  if ("IntersectionObserver" in window && !mobileLayout.matches && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     const obs = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
           entry.target.classList.add("is-visible");
+          obs.unobserve(entry.target);
         }
       });
     }, { threshold: 0.14 });
@@ -345,16 +363,17 @@ function applyMemberFeatureGating() {
     });
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
-    initCommonUI();
-    if (window.Chart) {
-      Chart.defaults.font.size = 16;
-      Chart.defaults.font.family = 'Arial, "Microsoft JhengHei", sans-serif';
-      Chart.defaults.color = '#796b60';
-      Chart.defaults.plugins.legend.labels.usePointStyle = true;
-      Chart.defaults.plugins.legend.labels.padding = 20;
-    }
-    window.waitForSmartInvestAuth?.().then(applyMemberFeatureGating);
-    window.addEventListener("smartinvest:auth-state", applyMemberFeatureGating);
-  });
+initCommonUI();
+
+document.addEventListener("DOMContentLoaded", () => {
+  if (window.Chart) {
+    Chart.defaults.font.size = 16;
+    Chart.defaults.font.family = 'Arial, "Microsoft JhengHei", sans-serif';
+    Chart.defaults.color = '#796b60';
+    Chart.defaults.plugins.legend.labels.usePointStyle = true;
+    Chart.defaults.plugins.legend.labels.padding = 20;
+  }
+  window.waitForSmartInvestAuth?.().then(applyMemberFeatureGating);
+  window.addEventListener("smartinvest:auth-state", applyMemberFeatureGating);
+});
 

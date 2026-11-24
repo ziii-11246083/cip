@@ -1,4 +1,5 @@
 <!doctype html>
+{% from "partials/phone_copy.html" import phone_copy %}
 <html lang="zh-Hant">
 <head>
   <style>
@@ -7,19 +8,19 @@
   </style>
   <script>document.documentElement.classList.add('js-enabled');</script>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,interactive-widget=resizes-content" />
   <title>投資健康度 | Smart Invest Crypto｜智慧虛擬貨幣平台</title>
-  <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo.jpg') }}">
+  <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo-compact.jpg') }}">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=brand-width-20261013">
+  <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=phone-copy-20261124">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/health.css') }}?v=orange-white-20261013">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/visual-refresh-1012.css') }}?v=orange-white-20261013">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/site-theme.css') }}?v=money-type-20261013">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/site-theme.css') }}?v=mobile-scale-20261124">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/health-visual.css') }}?v=health-report-scroll-20261014">
-</head>
+{% include "partials/phone_layout.html" %}</head>
 <body class="health-page refresh-1012">
   
 {% include "partials/header.html" %}
@@ -39,7 +40,7 @@
         <div class="fomo-feature-copy">
           <div class="fomo-heading"><span class="fomo-fire" aria-hidden="true"><i class="fas fa-fire"></i></span><span class="eyebrow">01 / 先看情緒，再看配置</span></div>
           <h2 id="fomoTitle">FOMO <span>追高檢測</span></h2>
-          <p>現在的漲幅，值得先冷靜一下嗎？</p>
+          <p>{{ phone_copy("現在的漲幅，值得先冷靜一下嗎？", "檢查 24 小時漲幅") }}</p>
           <div class="fomo-controls"><div><label for="fomoSymbol">觀察幣種</label><select id="fomoSymbol"></select></div><button class="button primary" id="btnFomo" type="button" disabled><i class="fas fa-fire"></i> 檢測追高風險</button></div>
           <div id="fomoResult" class="fomo-result" role="status" aria-live="polite"><span>讀取 24 小時行情中…</span></div>
         </div>
@@ -55,7 +56,7 @@
       <div class="health-workspace">
         <section class="card setup-card" data-member-feature="投資健康度">
           <div class="section-head">
-            <div><div class="eyebrow">02 / 建立你的配置</div><h2 class="section-title">建立配置</h2></div>
+            <div><div class="eyebrow">02 / 建立你的配置</div><h2 class="section-title"><i class="fas fa-sliders phone-heading-icon phone-only" aria-hidden="true"></i>建立配置</h2></div>
           </div>
           <div class="control-row three">
             <div><label for="totalCapital">總投資預算（USD）</label><input id="totalCapital" type="number" value="100000" min="0.01" step="0.01"></div>
@@ -82,7 +83,7 @@
         </section>
 
         <section class="card preview-card" data-member-feature="投資健康度">
-          <div class="section-head"><div><div class="eyebrow">03 / 看懂比例，再檢查</div><h2 class="section-title">配置視覺化</h2></div><div id="chartAssetCount" class="asset-count">0 種幣</div></div>
+          <div class="section-head"><div><div class="eyebrow">03 / 看懂比例，再檢查</div><h2 class="section-title"><i class="fas fa-chart-pie phone-heading-icon phone-only" aria-hidden="true"></i>配置視覺化</h2></div><div id="chartAssetCount" class="asset-count">0 種幣</div></div>
           <div class="allocation-visual-grid">
             <div class="chart-center-wrap"><canvas id="weightsChart" role="img" aria-label="配置比例圖，明細列於右側"></canvas><div class="chart-center"><span>預算已配置</span><strong id="chartCenterText">--</strong><small id="chartTotalText">尚未加入</small></div></div>
             <div id="allocationLegend" class="allocation-legend" aria-live="polite"></div>
@@ -95,15 +96,15 @@
       </div>
 
       <section class="card report-card" id="healthReportCard" aria-labelledby="healthReportTitle">
-        <div class="section-head"><div><h2 class="section-title" id="healthReportTitle" tabindex="-1">AI 健康度報告</h2><p class="section-copy">用比例、指標與重點，看懂這份配置。</p></div></div>
+        <div class="section-head"><div><h2 class="section-title" id="healthReportTitle" tabindex="-1"><i class="fas fa-file-lines phone-heading-icon phone-only" aria-hidden="true"></i>AI 健康度報告</h2><p class="section-copy">用比例、指標與重點，看懂這份配置。</p></div></div>
         <div id="aiReport"><div class="health-report-empty"><i class="fas fa-chart-simple" aria-hidden="true"></i><strong>你的配置，會在這裡變成一份圖解</strong><div><span>配置比例</span><span>歷史波動</span><span>重點提醒</span></div><small>完成配置後，按「檢查配置」。</small></div></div>
       </section>
 
       <section class="card health-record-card" data-member-feature="投資健康度紀錄">
         <div class="section-head">
           <div>
-            <h2 class="section-title">投資健康度紀錄</h2>
-            <p class="section-copy">按日期回顧配置與風險。紀錄保存在此瀏覽器。</p>
+            <h2 class="section-title"><i class="fas fa-clock-rotate-left phone-heading-icon phone-only" aria-hidden="true"></i>投資健康度紀錄</h2>
+            <p class="section-copy">{{ phone_copy("按日期回顧配置與風險。紀錄保存在此瀏覽器。", "配置與風險紀錄 · 保存在此瀏覽器") }}</p>
           </div>
           <div class="record-actions"><button class="button" id="btnToggleHealthRecords" type="button" aria-expanded="false" aria-controls="healthRecordList">展開歷史</button><button class="button" id="btnClearHealthRecords" type="button">清除紀錄</button></div>
         </div>
@@ -119,8 +120,8 @@
 {% include "partials/footer.html" %}
 <div class="toast" id="toast"><div class="t" id="toastT">提示</div><div class="m" id="toastM">--</div></div>
 <script>window.__SUPABASE_CONFIG__ = { url: '{{ supabase_url | default("https://dummy.supabase.co") }}', anonKey: '{{ supabase_anon_key | default("dummy") }}' };</script>
-<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=join-carousel-20261013"></script>
-<script src="{{ url_for('static', filename='js/common.js') }}?v=money-type-20261013"></script>
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=mobile-rwd-20261124"></script>
+<script src="{{ url_for('static', filename='js/common.js') }}?v=phone-layout-20261124"></script>
 <script src="{{ url_for('static', filename='js/health.js') }}?v=health-report-scroll-20261014"></script>
 </body>
 </html>

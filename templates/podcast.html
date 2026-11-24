@@ -1,4 +1,5 @@
 <!doctype html>
+{% from "partials/phone_copy.html" import phone_copy %}
 <html lang="zh-Hant">
 <head>
   <style>
@@ -7,19 +8,18 @@
   </style>
   <script>document.documentElement.classList.add('js-enabled');</script>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,interactive-widget=resizes-content" />
   <title>Podcast | Smart Invest Crypto｜智慧虛擬貨幣平台</title>
-  <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo.jpg') }}">
+  <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo-compact.jpg') }}">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=brand-width-20261013">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=phone-copy-20261124">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/podcast.css') }}?v=orange-white-20261013">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/visual-refresh-1012.css') }}?v=orange-white-20261013">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/site-theme.css') }}?v=money-type-20261013">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/site-theme.css') }}?v=mobile-scale-20261124">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/podcast-studio.css') }}?v=topic-cards-20261014">
-</head>
+{% include "partials/phone_layout.html" %}</head>
 <body class="podcast-page refresh-1012">
   
 {% include "partials/header.html" %}
@@ -36,9 +36,9 @@
             <div class="podcast-cover-caption"><span>SMART INVEST CRYPTO</span><strong>市場，<br>用聽的。</strong><small>Nova × Onyx</small></div>
           </div>
           <div class="podcast-preview-copy">
-            <div class="podcast-program-meta"><span><i class="fas fa-headphones" aria-hidden="true"></i> 雙人市場 Podcast</span><em id="podcastState" role="status">等待生成</em></div>
+            <div class="podcast-program-meta"><span><i class="fas fa-headphones" aria-hidden="true"></i> {{ phone_copy("雙人市場 Podcast", "市場 Podcast") }}</span><em id="podcastState" role="status">等待生成</em></div>
             <strong id="podcastTitleText">把市場重點，聽進去。</strong>
-            <small id="podcastBulletText">選一個主題，讓 Nova 與 Onyx 陪你看懂市場。</small>
+            <small id="podcastBulletText">{{ phone_copy("選一個主題，讓 Nova 與 Onyx 陪你看懂市場。", "選主題，聽市場") }}</small>
             <div class="podcast-hero-builder">
               <div class="podcast-hero-builder-row">
                 <div class="podcast-topic-bubble">
@@ -108,8 +108,8 @@
 {% include "partials/footer.html" %}
 <div class="toast" id="toast"><div class="t" id="toastT">提示</div><div class="m" id="toastM">--</div></div>
 <script>window.__SUPABASE_CONFIG__ = { url: '{{ supabase_url | default("https://dummy.supabase.co") }}', anonKey: '{{ supabase_anon_key | default("dummy") }}' };</script>
-<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=join-carousel-20261013"></script>
-<script src="{{ url_for('static', filename='js/common.js') }}?v=money-type-20261013"></script>
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=mobile-rwd-20261124"></script>
+<script src="{{ url_for('static', filename='js/common.js') }}?v=phone-layout-20261124"></script>
     <script src="{{ url_for('static', filename='js/podcast.js') }}?v=duo-dialogue-20261015"></script>
 </body>
 </html>

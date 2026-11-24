@@ -53,7 +53,53 @@
 .coach-page.refresh-1012 main .coach-reply-content .coach-market-up {color:#18745e!important;}
 .coach-page.refresh-1012 main .coach-reply-content .coach-market-down {color:#bd3f38!important;}
 .coach-page .coach-reply-content .coach-market-number {white-space:nowrap;font-variant-numeric:tabular-nums;}
-@media(max-width:900px){.coach-page.refresh-1012 .ai-coach-app {grid-template-columns:1fr;}}
+.coach-page .ai-coach-app > .coach-chat {transition-property:border-color,box-shadow,transform;}
+
+@media (max-width: 600px), (max-width: 960px) and (max-height: 540px) {
+  .coach-page .ai-coach-app {reading-flow:grid-order;}
+  .coach-page .ai-coach-app > .coach-chat {order:-1;}
+}
+
+@media (max-width: 900px), (max-width: 960px) and (max-height: 540px) {
+  .coach-page.refresh-1012 .ai-coach-app {grid-template-columns:1fr;}
+}
+
+.coach-side-toggle {display:none;}
+
+@media (max-width: 760px), (max-width: 960px) and (max-height: 540px) {
+  .coach-page.refresh-1012 .ai-coach-app {gap:12px;}
+  .coach-side-toggle[data-ready] {
+    display:flex;
+    align-items:center;
+    gap:10px;
+    width:100%;
+    padding:9px 12px;
+    border:1px solid var(--line);
+    border-radius:12px;
+    background:#fff;
+    color:var(--ink);
+    text-align:left;
+    cursor:pointer;
+  }
+  .coach-side-toggle>i:last-child {margin-left:auto;}
+  .coach-side-toggle[aria-expanded="true"]>i:last-child {transform:rotate(180deg);}
+  .coach-side-toggle[data-ready][aria-expanded="false"] + .coach-side-stack {display:none;}
+  .coach-page.refresh-1012 main .coach-chat {min-height:0;padding:14px;}
+  .coach-page.refresh-1012 .coach-chat>.chat-head {padding-bottom:12px;}
+  .coach-page .coach-context-row {margin-bottom:8px;}
+  .coach-page .coach-chat .chat-stream {
+    flex:none;
+    height:clamp(180px, 34vh, 300px);
+    height:clamp(180px, 34svh, 300px);
+    padding:12px;
+    overflow-wrap:anywhere;
+    overscroll-behavior-y:contain;
+  }
+  .coach-page .chat-input-row {grid-template-columns:minmax(0,1fr) auto;gap:6px;padding:10px 0 0;}
+  .coach-page .chat-input-row input {min-width:0;padding-inline:10px;}
+  .coach-page .chat-input-row button {padding-inline:10px;white-space:nowrap;}
+}
+
 @media(max-width:600px){
   .coach-page.refresh-1012 main .coach-view-tabs {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));}
   .coach-page.refresh-1012 main .coach-view-tab {min-width:0;padding:10px 8px;font-size:14px!important;}

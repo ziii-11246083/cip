@@ -296,7 +296,10 @@ function setAuthUiBySession(session) {
     renderUserAvatars(session?.user ? getProfile() : null);
 
     if (session && session.user) {
-        if (loginToggle) loginToggle.style.display = "none";
+        if (loginToggle) {
+            loginToggle.style.display = "none";
+            loginToggle.setAttribute("aria-expanded", "false");
+        }
         if (accountPopup) accountPopup.classList.remove("show");
         if (userSection) userSection.style.display = "block";
         if (userName) userName.innerText = getUserLabel(session.user);
@@ -308,6 +311,10 @@ function setAuthUiBySession(session) {
 }
 
 function openLoginPopup() {
+    if (window.__COMMON_UI_ACTIVE__) {
+        document.dispatchEvent(new Event("smartinvest:open-login"));
+        return;
+    }
     const accountPopup = document.getElementById("accountPopup");
     const emailInput = document.getElementById("emailInput");
     if (accountPopup) accountPopup.classList.add("show");

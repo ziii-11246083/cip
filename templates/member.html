@@ -1,4 +1,5 @@
 <!doctype html>
+{% from "partials/phone_copy.html" import phone_copy %}
 <html lang="zh-Hant">
 <head>
   <style>
@@ -7,23 +8,23 @@
   </style>
   <script>document.documentElement.classList.add('js-enabled');</script>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,interactive-widget=resizes-content" />
   <title>會員中心 | Smart Invest Crypto｜智慧虛擬貨幣平台</title>
-  <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo.jpg') }}">
+  <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo-compact.jpg') }}">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=brand-width-20261013">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=phone-copy-20261124">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/member.css') }}?v=orange-white-20261013">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/visual-refresh-1012.css') }}?v=orange-white-20261013">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/site-theme.css') }}?v=money-type-20261013">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/site-theme.css') }}?v=mobile-scale-20261124">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/member-workspace.css') }}?v=member-workspace-20261014">
-</head>
+{% include "partials/phone_layout.html" %}</head>
 <body class="member-page-body refresh-1012">
 {% include "partials/header.html" %}
 
 <main aria-label="會員中心">
   <section class="member-page"><div class="container wide-container member-workspace">
-    <div class="member-page-heading"><div><span class="member-eyebrow">MY ACCOUNT</span><h1>會員中心</h1><p>管理帳戶，掌握你的資產練習。</p></div><div class="member-heading-actions"><button id="memberRefresh" type="button"><i class="fas fa-rotate" aria-hidden="true"></i> 更新資產</button><small id="memberDataStatus" role="status">登入進階會員後載入資產</small></div></div>
+    <div class="member-page-heading"><div><span class="member-eyebrow">MY ACCOUNT</span><h1><i class="fas fa-user phone-heading-icon phone-only" aria-hidden="true"></i>會員中心</h1><p>管理帳戶，掌握你的資產練習。</p></div><div class="member-heading-actions"><button id="memberRefresh" type="button"><i class="fas fa-rotate" aria-hidden="true"></i> 更新資產</button><small id="memberDataStatus" role="status">登入進階會員後載入資產</small></div></div>
     <div class="member-lock-banner">
         <strong><i class="fas fa-lock"></i> 登入後即可使用會員中心</strong>
         <span>登入後可管理帳號；進階會員可查看資金、模擬持倉與交易紀錄。</span>
@@ -63,17 +64,17 @@
       <article class="member-card member-mix-card"><div class="member-chart-head"><div><span class="member-eyebrow">ASSET MIX</span><h2>配置一眼看懂</h2></div><div class="member-segments" role="group" aria-label="配置比例比較基準"><button type="button" data-allocation-mode="all" aria-pressed="true">全部資產</button><button type="button" data-allocation-mode="holdings" aria-pressed="false">持倉內</button></div></div><div class="member-allocation-layout"><div class="member-allocation-ring" id="memberAllocationRing" role="img" aria-label="等待配置資料"><div><small id="memberAllocationLabel">已投入</small><strong id="memberAllocationValue">--</strong><span id="memberAllocationCaption">含虛擬現金</span></div></div><div class="member-allocation-legend" id="memberAllocationLegend"></div></div><p class="member-chart-note" id="memberAllocationNote" role="status">等待帳戶資料</p></article>
       <article class="member-card member-trend-card"><div class="member-chart-head"><div><span class="member-eyebrow">ACCOUNT SNAPSHOTS</span><h2>資產快照走勢</h2></div><div class="member-segments" role="group" aria-label="資產快照期間"><button type="button" data-member-days="all" aria-pressed="true">全部</button><button type="button" data-member-days="7" aria-pressed="false">7 天</button><button type="button" data-member-days="30" aria-pressed="false">30 天</button></div></div><div class="member-trend-stage" id="memberTrendChart" role="region" aria-label="帳戶資產快照圖"></div><div class="member-chart-foot"><span id="memberTrendCaption">等待帳戶資料</span><small>含資金變動，不等同投資報酬</small></div></article>
     </section>
-    <section class="member-card holdings-card" id="memberHoldings" data-member-feature="持倉紀錄"><div class="member-card-head"><div><span class="member-eyebrow">MY HOLDINGS</span><h2>目前模擬持倉</h2><p>比較幣種市值與持倉內占比。</p></div><a href="/sim-trade"><i class="fas fa-right-left" aria-hidden="true"></i> 前往模擬交易</a></div><div class="member-holdings-summary"><span>持倉內占比 · 不含現金</span><span>未實現損益 <strong id="memberHoldingPnl">--</strong></span></div><div class="member-holding-cards" id="memberHoldingCards"></div><details class="member-holding-details"><summary>查看數量、價格與資產占比</summary><div class="holding-table" id="holdingTable"></div></details><div class="member-holdings-footer"><a href="/ai-coach"><i class="fas fa-cat" aria-hidden="true"></i> 用 AI 教練檢視配置</a><button class="ghost-danger" id="clearMemberData" type="button"><i class="fas fa-rotate-left" aria-hidden="true"></i> 重置模擬帳戶</button></div></section>
+    <section class="member-card holdings-card" id="memberHoldings" data-member-feature="持倉紀錄"><div class="member-card-head"><div><span class="member-eyebrow">MY HOLDINGS</span><h2><i class="fas fa-wallet phone-heading-icon phone-only" aria-hidden="true"></i>目前模擬持倉</h2><p>{{ phone_copy("比較幣種市值與持倉內占比。", "市值與持倉占比") }}</p></div><a href="/sim-trade"><i class="fas fa-right-left" aria-hidden="true"></i> 前往模擬交易</a></div><div class="member-holdings-summary"><span>持倉內占比 · 不含現金</span><span>未實現損益 <strong id="memberHoldingPnl">--</strong></span></div><div class="member-holding-cards" id="memberHoldingCards"></div><details class="member-holding-details"><summary>查看數量、價格與資產占比</summary><div class="holding-table" id="holdingTable"></div></details><div class="member-holdings-footer"><a href="/ai-coach"><i class="fas fa-cat" aria-hidden="true"></i> 用 AI 教練檢視配置</a><button class="ghost-danger" id="clearMemberData" type="button"><i class="fas fa-rotate-left" aria-hidden="true"></i> 重置模擬帳戶</button></div></section>
     <div class="member-grid" id="memberActions">
-      <section class="member-card" data-member-feature="資金投放紀錄"><div class="member-card-head"><div><span class="member-eyebrow">FUND YOUR PRACTICE</span><h2>資金投放</h2><p>新增可用於交易練習的虛擬現金。</p></div><i class="fas fa-coins member-section-icon" aria-hidden="true"></i></div><form class="member-form" id="capitalForm"><div><label for="capitalAmount">金額（USD）</label><input id="capitalAmount" type="number" min="1" step="1" placeholder="例如 10000" inputmode="decimal"></div><div><label for="capitalNote">備註</label><input id="capitalNote" placeholder="例如：本月定投資金"></div><button type="submit"><i class="fas fa-plus" aria-hidden="true"></i> 新增資金</button></form><p id="memberCapitalStatus" class="member-action-status" role="status"></p><div class="member-record-head"><strong>資金紀錄</strong><small id="memberCapitalRecordCount">--</small></div><div class="member-list" id="capitalList"></div></section>
-      <section class="member-card" data-member-feature="模擬下單"><div class="member-card-head"><div><span class="member-eyebrow">QUICK TRADE</span><h2>快速模擬下單</h2><p>建立後會同步更新模擬交易帳戶。</p></div><i class="fas fa-right-left member-section-icon" aria-hidden="true"></i></div><form class="member-form order-form" id="orderForm"><div><label for="orderSide">方向</label><select id="orderSide"><option value="buy">買入</option><option value="sell">賣出</option></select></div><div><label for="orderSymbol">幣種</label><select id="orderSymbol"><option>BTC</option><option>ETH</option><option>SOL</option><option>XRP</option><option>BNB</option><option>DOGE</option><option>USDT</option><option>USDC</option></select></div><div class="member-field-wide"><label for="orderAmount">金額（USD）</label><input id="orderAmount" type="number" min="1" step="1" placeholder="例如 5000" inputmode="decimal"></div><button type="submit"><i class="fas fa-paper-plane" aria-hidden="true"></i> 建立模擬單</button></form><p id="memberOrderStatus" class="member-action-status" role="status"></p><div class="member-record-head"><strong>最近交易</strong><a href="/sim-trade#simHistory">完整紀錄 <i class="fas fa-arrow-right" aria-hidden="true"></i></a></div><div class="member-list" id="orderList"></div></section>
+      <section class="member-card" data-member-feature="資金投放紀錄"><div class="member-card-head"><div><span class="member-eyebrow">FUND YOUR PRACTICE</span><h2>資金投放</h2><p>{{ phone_copy("新增可用於交易練習的虛擬現金。", "新增虛擬現金") }}</p></div><i class="fas fa-coins member-section-icon" aria-hidden="true"></i></div><form class="member-form" id="capitalForm"><div><label for="capitalAmount">金額（USD）</label><input id="capitalAmount" type="number" min="1" step="1" placeholder="例如 10000" inputmode="decimal"></div><div><label for="capitalNote">備註</label><input id="capitalNote" placeholder="例如：本月定投資金"></div><button type="submit"><i class="fas fa-plus" aria-hidden="true"></i> 新增資金</button></form><p id="memberCapitalStatus" class="member-action-status" role="status"></p><div class="member-record-head"><strong>資金紀錄</strong><small id="memberCapitalRecordCount">--</small></div><div class="member-list" id="capitalList"></div></section>
+      <section class="member-card" data-member-feature="模擬下單"><div class="member-card-head"><div><span class="member-eyebrow">QUICK TRADE</span><h2>快速模擬下單</h2><p>{{ phone_copy("建立後會同步更新模擬交易帳戶。", "同步至模擬交易") }}</p></div><i class="fas fa-right-left member-section-icon" aria-hidden="true"></i></div><form class="member-form order-form" id="orderForm"><div><label for="orderSide">方向</label><select id="orderSide"><option value="buy">買入</option><option value="sell">賣出</option></select></div><div><label for="orderSymbol">幣種</label><select id="orderSymbol"><option>BTC</option><option>ETH</option><option>SOL</option><option>XRP</option><option>BNB</option><option>DOGE</option><option>USDT</option><option>USDC</option></select></div><div class="member-field-wide"><label for="orderAmount">金額（USD）</label><input id="orderAmount" type="number" min="1" step="1" placeholder="例如 5000" inputmode="decimal"></div><button type="submit"><i class="fas fa-paper-plane" aria-hidden="true"></i> 建立模擬單</button></form><p id="memberOrderStatus" class="member-action-status" role="status"></p><div class="member-record-head"><strong>最近交易</strong><a href="/sim-trade#simHistory">完整紀錄 <i class="fas fa-arrow-right" aria-hidden="true"></i></a></div><div class="member-list" id="orderList"></div></section>
     </div>
     <section id="memberWallet" class="member-card real-asset-card" data-member-feature="真實資產唯讀同步">
         <div class="member-card-head">
           <div>
             <div class="eyebrow"><i class="fas fa-wallet"></i> Read-only Beta</div>
-            <h2>錢包連結預覽</h2>
-            <p>Ethereum 公開地址流程預覽，與模擬帳戶分開呈現。</p>
+            <h2><i class="fas fa-link phone-heading-icon phone-only" aria-hidden="true"></i>錢包連結預覽</h2>
+            <p>{{ phone_copy("Ethereum 公開地址流程預覽，與模擬帳戶分開呈現。", "Ethereum 公開地址 · 唯讀預覽") }}</p>
           </div>
           <span class="real-asset-safety"><i class="fas fa-shield-alt"></i> 不會代下單</span>
         </div>
@@ -170,8 +171,8 @@
     anonKey: '{{ supabase_anon_key | default("dummy") }}'
   };
 </script>
-<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=join-carousel-20261013"></script>
-<script src="{{ url_for('static', filename='js/common.js') }}?v=money-type-20261013"></script>
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=mobile-rwd-20261124"></script>
+<script src="{{ url_for('static', filename='js/common.js') }}?v=phone-layout-20261124"></script>
 <script src="{{ url_for('static', filename='js/member.js') }}?v=member-workspace-20261014"></script>
 </body>
 </html>

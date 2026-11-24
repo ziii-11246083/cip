@@ -24,7 +24,7 @@
 .refresh-1012:not(.home-page) main :is(span,small,em,label,td,th,a) {font-size:16px!important;line-height:1.55}
 .refresh-1012:not(.home-page) main :is(button,input,select,textarea) {font:inherit;font-size:16px!important;line-height:1.5}
 .refresh-1012 main [hidden]{display:none!important}
-.refresh-1012:not(.home-page) main :is(input:not([type=checkbox]):not([type=radio]):not([type=hidden]),select,button,.button) {min-height:48px}
+.refresh-1012:not(.home-page) main :is(input:not([type=checkbox]):not([type=radio]):not([type=hidden]),select,button,.button) {min-height:var(--mobile-touch-size,48px)}
 .refresh-1012:not(.home-page) main :is(input,select,textarea) {border-color:var(--line);background:#fff;color:var(--ink);border-radius:10px}
 .refresh-1012:not(.home-page) main :is(input,select,textarea):focus {outline:2px solid #ef7d2d44;outline-offset:2px;box-shadow:none;border-color:#ef7d2d}
 .refresh-1012:not(.home-page) main :is(h1,h2,h3) {font-family:var(--font)!important}

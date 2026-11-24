@@ -1,4 +1,5 @@
 <!doctype html>
+{% from "partials/phone_copy.html" import phone_copy %}
 <html lang="zh-Hant">
 <head>
   <style>
@@ -7,18 +8,18 @@
   </style>
   <script>document.documentElement.classList.add('js-enabled');</script>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,interactive-widget=resizes-content" />
   <title>模擬交易 | Smart Invest Crypto｜智慧虛擬貨幣平台</title>
-  <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo.jpg') }}">
+  <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo-compact.jpg') }}">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=brand-width-20261013">
+  <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=phone-copy-20261124">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/visual-refresh-1012.css') }}?v=orange-white-20261013">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/site-theme.css') }}?v=money-type-20261013">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/site-theme.css') }}?v=mobile-scale-20261124">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/sim-workspace.css') }}?v=scenario-visual-20261020">
-</head>
+{% include "partials/phone_layout.html" %}</head>
 <body class="sim-page refresh-1012">
 {% include "partials/header.html" %}
 
@@ -29,7 +30,7 @@
     <div class="container wide-container sim-shell">
       <div class="member-gate" id="memberGate">
         <h2>開通進階會員，開始模擬交易</h2>
-        <p>練習虛擬買賣、保存持倉與交易紀錄，需登入進階會員帳號。</p>
+        <p>{{ phone_copy("練習虛擬買賣、保存持倉與交易紀錄，需登入進階會員帳號。", "進階會員功能") }}</p>
         <div class="member-actions">
           <a class="button primary" href="/membership">查看會員方案</a>
           <a class="button" href="/register">註冊 / 登入會員</a>
@@ -40,19 +41,19 @@
 
       <div id="simApp" class="sim-app">
         <div class="sim-page-heading">
-          <div><span class="sim-eyebrow"><i class="fas fa-layer-group" aria-hidden="true"></i> PAPER TRADING</span><h1>模擬交易</h1><p>先觀察，再試算，最後練習下單。</p></div>
+          <div><span class="sim-eyebrow"><i class="fas fa-layer-group" aria-hidden="true"></i> PAPER TRADING</span><h1><i class="fas fa-right-left phone-heading-icon phone-only" aria-hidden="true"></i>模擬交易</h1><p>{{ phone_copy("先觀察，再試算，最後練習下單。", "看行情 · 試算 · 下單") }}</p></div>
           <div class="sim-heading-actions"><span class="sim-account-badge"><i class="fas fa-flask" aria-hidden="true"></i> 虛擬帳戶 · USD</span><button class="sim-icon-button" id="btnReload" type="button"><i class="fas fa-rotate" aria-hidden="true"></i> 更新資料</button><small id="simUpdatedAt" role="status">資料載入中</small></div>
         </div>
         <nav class="sim-section-nav sim-workflow-nav" aria-label="交易練習流程">
-          <a href="#simMarket"><b>01</b><span>觀察行情<small>選幣種 · 看走勢</small></span><i class="fas fa-arrow-right" aria-hidden="true"></i></a>
-          <a href="#simStress"><b>02</b><span>比較情境<small>試想漲跌 · 選填</small></span><i class="fas fa-arrow-right" aria-hidden="true"></i></a>
-          <a href="#orderPanel"><b>03</b><span>模擬下單<small>試算金額 · 確認買賣</small></span><i class="fas fa-arrow-right" aria-hidden="true"></i></a>
-          <a href="#simHistory"><b>04</b><span>交易回顧<small>核對紀錄 · 檢視結果</small></span><i class="fas fa-check" aria-hidden="true"></i></a>
+          <a href="#simMarket"><b aria-hidden="true"><span class="phone-hide">01</span><i class="fas fa-chart-line phone-only"></i></b><span>觀察行情<small>選幣種 · 看走勢</small></span><i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+          <a href="#simStress"><b aria-hidden="true"><span class="phone-hide">02</span><i class="fas fa-flask phone-only"></i></b><span>比較情境<small>試想漲跌 · 選填</small></span><i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+          <a href="#orderPanel"><b aria-hidden="true"><span class="phone-hide">03</span><i class="fas fa-right-left phone-only"></i></b><span>模擬下單<small>試算金額 · 確認買賣</small></span><i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+          <a href="#simHistory"><b aria-hidden="true"><span class="phone-hide">04</span><i class="fas fa-clock-rotate-left phone-only"></i></b><span>交易回顧<small>核對紀錄 · 檢視結果</small></span><i class="fas fa-check" aria-hidden="true"></i></a>
         </nav>
         <div class="sim-member-handoff"><span><i class="fas fa-lightbulb" aria-hidden="true"></i> 在這裡練習決策，帳戶管理留給會員中心。</span><a href="/member">資產 · 持倉 · 資金管理 <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i></a></div>
 
         <section class="card sim-market-card" id="simMarket" aria-labelledby="marketTitle" data-member-feature="模擬交易行情觀察">
-          <div class="sim-section-head"><div><span class="sim-eyebrow">01 / MARKET WATCH</span><h2 id="marketTitle">先看你想交易的幣種</h2></div><label class="sim-market-select" for="marketSymbol">觀察幣種<select id="marketSymbol"></select></label></div>
+          <div class="sim-section-head"><div><span class="sim-eyebrow">01 / MARKET WATCH</span><h2 id="marketTitle">{{ phone_copy("先看你想交易的幣種", "幣種行情") }}</h2></div><label class="sim-market-select" for="marketSymbol">觀察幣種<select id="marketSymbol"></select></label></div>
           <div class="sim-market-workspace">
             <div class="sim-market-quote">
               <div class="coin-market-head"><span class="sim-coin-icon" id="quoteCoinIcon" aria-hidden="true">₿</span><div><strong id="quoteSymbol">--</strong><small id="quoteName">選擇幣種後顯示行情</small></div></div>
@@ -65,7 +66,7 @@
         </section>
 
         <section class="card sim-scenario-card" id="simStress" data-member-feature="市場情境模擬">
-          <div class="sim-section-head"><div><span class="sim-eyebrow">02 / WHAT IF</span><h2 class="sim-title">下單前，先比較情境</h2></div><span class="sim-account-badge"><i class="fas fa-flask" aria-hidden="true"></i> 選填 · 假設試算</span></div>
+          <div class="sim-section-head"><div><span class="sim-eyebrow">02 / WHAT IF</span><h2 class="sim-title">{{ phone_copy("下單前，先比較情境", "情境試算") }}</h2></div><span class="sim-account-badge"><i class="fas fa-flask" aria-hidden="true"></i> 選填 · 假設試算</span></div>
           <p class="sim-scenario-desc">同一筆資金，遇到漲跌會變多少？<strong>假設試算，不代表目前行情。</strong></p>
           <div class="stress-controls"><label for="stressStrategy">配置方式<select id="stressStrategy"><option value="conservative">保守型 · 風險資產 35%</option><option value="balanced" selected>穩健型 · 風險資產 65%</option><option value="aggressive">積極型 · 風險資產 90%</option></select></label><label for="stressHorizon">假設期間（天）<input id="stressHorizon" type="number" min="7" max="365" step="1" value="90"></label><button type="button" id="runStressTest"><i class="fas fa-chart-bar" aria-hidden="true"></i> 比較四種情境</button></div>
           <details class="sim-stress-advanced"><summary>進階設定</summary><label for="stressSeed">情境編號<input id="stressSeed" type="number" min="0" max="2147483647" step="1" value="20260820"></label><small>同一編號可重現相同路徑；更換編號不改變期末目標。</small></details>
@@ -89,7 +90,7 @@
 
 
         <section class="card order-panel" id="orderPanel" data-member-feature="建立模擬訂單">
-          <div class="sim-section-head"><div><span class="sim-eyebrow">03 / PRACTICE</span><h2 class="sim-title">把想法變成一筆模擬單</h2></div><a class="sim-muted" href="/ai-coach">和 AI 教練討論 <i class="fas fa-arrow-right" aria-hidden="true"></i></a></div>
+          <div class="sim-section-head"><div><span class="sim-eyebrow">03 / PRACTICE</span><h2 class="sim-title">{{ phone_copy("把想法變成一筆模擬單", "模擬下單") }}</h2></div><a class="sim-muted" href="/ai-coach">和 AI 教練討論 <i class="fas fa-arrow-right" aria-hidden="true"></i></a></div>
           <div class="order-workspace">
             <div class="order-form-area"><div class="sim-cash-available"><span>可用模擬現金</span><strong id="kpiCash">--</strong></div>
               <div class="sim-order-direction" role="group" aria-label="模擬交易方向"><button type="button" data-order-side="buy" aria-pressed="true"><i class="fas fa-plus" aria-hidden="true"></i> 買入</button><button type="button" data-order-side="sell" aria-pressed="false"><i class="fas fa-minus" aria-hidden="true"></i> 賣出</button></div>
@@ -127,13 +128,13 @@
         </section>
 
         <section class="card trades-panel" id="simHistory" data-member-feature="交易紀錄">
-          <div class="sim-section-head"><div><span class="sim-eyebrow">04 / ACTIVITY</span><h2 class="sim-title">回顧你的交易</h2></div><span class="sim-muted">最近 100 筆 · 台北時間 UTC+8</span></div><div class="sim-review-summary">
+          <div class="sim-section-head"><div><span class="sim-eyebrow">04 / ACTIVITY</span><h2 class="sim-title">{{ phone_copy("回顧你的交易", "交易紀錄") }}</h2></div><span class="sim-muted">最近 100 筆 · 台北時間 UTC+8</span></div><div class="sim-review-summary">
             <div><span>目前帳戶總值</span><strong id="kpiTotal">--</strong></div>
             <div><span>尚未賣出的損益</span><strong id="kpiPnl">--</strong><small id="kpiPnlPct">--</small></div>
             <a href="/member">完整資產與持倉 <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
           </div><div class="trade-filter-bar"><label for="tradeSymbolFilter">幣種<select id="tradeSymbolFilter"><option value="all">全部幣種</option></select></label><div class="trade-side-filters" role="group" aria-label="交易方向"><button type="button" data-trade-side="all" aria-pressed="true">全部</button><button type="button" data-trade-side="buy" aria-pressed="false">買入</button><button type="button" data-trade-side="sell" aria-pressed="false">賣出</button></div><label for="tradeTimeFilter">時間<select id="tradeTimeFilter"><option value="all">全部時間</option><option value="7">最近 7 天</option><option value="30">最近 30 天</option><option value="90">最近 90 天</option></select></label><button type="button" id="tradeFilterReset">重設篩選</button><span id="tradeFilterCount" role="status"></span></div>
           <div class="sim-trade-totals"><span>篩選內買入總額 <strong id="tradeBuyTotal">--</strong></span><span>篩選內賣出總額 <strong id="tradeSellTotal">--</strong></span></div>
-          <div class="table-wrap">
+          <div class="table-wrap" tabindex="0" role="region" aria-label="模擬交易紀錄表">
             <table>
               <thead><tr><th>時間</th><th>方向</th><th>幣種</th><th>價格（USD）</th><th>數量</th><th>金額（USD）</th></tr></thead>
               <tbody id="tradesBody"></tbody>
@@ -159,8 +160,8 @@
     anonKey: '{{ supabase_anon_key | default("dummy") }}'
   };
 </script>
-<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=join-carousel-20261013"></script>
-<script src="{{ url_for('static', filename='js/common.js') }}?v=money-type-20261013"></script>
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=mobile-rwd-20261124"></script>
+<script src="{{ url_for('static', filename='js/common.js') }}?v=phone-layout-20261124"></script>
 <script src="{{ url_for('static', filename='js/sim_trade.js') }}?v=scenario-names-20261020"></script>
 </body>
 </html>

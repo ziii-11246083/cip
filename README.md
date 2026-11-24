@@ -77,9 +77,7 @@
 
 ## 本機啟動
 
-建議使用 Python 3.12：
-
-macOS / Linux：
+macOS / Linux（Python 3.12）
 
 ```bash
 python3.12 -m venv .venv
@@ -88,15 +86,15 @@ pip install -r requirements.txt
 python run_local.py
 ```
 
-Windows PowerShell（在專案根目錄執行）：
+Windows PowerShell（Python 3.13，在專案根目錄執行）
 
 ```powershell
-py -3.12 -m venv .venv
+py -3.13 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe run_local.py
 ```
 
-Windows 指令直接使用虛擬環境中的 Python，不需要先執行 `Activate.ps1`。
+Windows 指令直接使用虛擬環境中的 Python，不需要先執行 `Activate.ps1`。已有 `.venv` 可直接執行安裝套件的指令。Windows 上的 Python 3.12 及以上版本會使用 BM25 關鍵字檢索。若需要本機 Chroma 向量檢索，請用 64 位元 Python 3.11 建立虛擬環境。
 
 瀏覽器開啟：`http://127.0.0.1:5000`
 

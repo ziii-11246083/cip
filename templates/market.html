@@ -1,4 +1,5 @@
 <!doctype html>
+{% from "partials/phone_copy.html" import phone_copy %}
 <html lang="zh-Hant">
 <head>
   <style>
@@ -7,20 +8,20 @@
   </style>
   <script>document.documentElement.classList.add('js-enabled');</script>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,interactive-widget=resizes-content" />
   <title>市場總覽 | Smart Invest Crypto｜智慧虛擬貨幣平台</title>
 
-  <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo.jpg') }}">
+  <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo-compact.jpg') }}">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=brand-width-20261013">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=phone-copy-20261124">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/visual-refresh-1012.css') }}?v=orange-white-20261013">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/market.css') }}?v=orange-white-20261013">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/site-theme.css') }}?v=money-type-20261013">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/market-visual.css') }}?v=market-indicators-20261013">
-</head>
+  <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/site-theme.css') }}?v=mobile-scale-20261124">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/market-visual.css') }}?v=mobile-rwd-20261124">
+{% include "partials/phone_layout.html" %}</head>
 
 <body class="market-page refresh-1012 market-editorial-1013">
   
@@ -33,12 +34,12 @@
     <div class="container market-editorial-container">
       <div class="section-head reveal">
         <div>
-          <h2 class="section-title">主流幣種快照</h2>
-          <p class="section-copy">追蹤 BTC、ETH、SOL、XRP 的即時價格與 24 小時變化。</p>
+          <h2 class="section-title"><i class="fas fa-chart-line phone-heading-icon phone-only" aria-hidden="true"></i>主流幣種快照</h2>
+          <p class="section-copy">{{ phone_copy("追蹤 BTC、ETH、SOL、XRP 的即時價格與 24 小時變化。", "即時價格 · 24 小時漲跌") }}</p>
         </div>
         <div class="market-snapshot-tools"><div class="market-badge" id="snapTime">資料時間：載入中</div>
 <button class="button primary market-refresh-button" id="btnQuickDemo" type="button">
-          <i class="fas fa-rotate-right"></i> 重新整理市場資料
+          <i class="fas fa-rotate-right"></i> {{ phone_copy("重新整理市場資料", "更新") }}
         </button></div>
       </div>
 
@@ -74,21 +75,21 @@
           <span><i class="fas fa-satellite-dish"></i></span>
           <div>
             <strong>社群分析</strong>
-            <small>整理市場情緒與熱門話題，幫你快速區分噪音與真正有用的市場訊號。</small>
+            <small>{{ phone_copy("整理市場情緒與熱門話題，幫你快速區分噪音與真正有用的市場訊號。", "市場情緒與話題") }}</small>
           </div>
         </a>
         <a class="tool-link-card" href="/analysis/BTC">
           <span><i class="fas fa-microscope"></i></span>
           <div>
             <strong>BTC 深度分析</strong>
-            <small>針對單一幣種進一步看價格結構、風險位置與技術觀察重點。</small>
+            <small>{{ phone_copy("針對單一幣種進一步看價格結構、風險位置與技術觀察重點。", "價格結構與風險") }}</small>
           </div>
         </a>
         <a class="tool-link-card" href="/narrative-radar">
           <span><i class="fas fa-brain"></i></span>
           <div>
             <strong>敘事雷達</strong>
-            <small>追蹤熱門題材，搭配風險排名掌握市場主線。</small>
+            <small>{{ phone_copy("追蹤熱門題材，搭配風險排名掌握市場主線。", "熱門題材與風險") }}</small>
           </div>
         </a>
       </div>
@@ -96,13 +97,13 @@
       <div class="card reveal" id="marketSfiSection">
         <div class="section-head">
           <div>
-            <h2 class="section-title">SFI 風險排名</h2>
-            <p class="section-copy">SFI（系統性脆弱指數）衡量幣種在 BTC 下跌時的連動與脆弱程度，分數越高，越需要留意市場下跌風險。</p>
+            <h2 class="section-title"><i class="fas fa-shield-halved phone-heading-icon phone-only" aria-hidden="true"></i>SFI 風險排名</h2>
+            <p class="section-copy">{{ phone_copy("SFI（系統性脆弱指數）衡量幣種在 BTC 下跌時的連動與脆弱程度，分數越高，越需要留意市場下跌風險。", "分數越高，與 BTC 下跌的連動風險越高。") }}</p>
           </div>
           <a class="market-badge" href="/narrative-radar"><i class="fas fa-arrow-up-right-from-square"></i> 看完整排名</a>
         </div>
         <div class="divider"></div>
-        <div class="sfi-market-wrap">
+        <div class="sfi-market-wrap" tabindex="0" role="region" aria-label="SFI 風險排名表">
           <table class="sfi-market-table">
             <thead>
               <tr>
@@ -125,8 +126,8 @@
       <div class="card reveal" id="popularMarketSection">
         <div class="section-head">
           <div>
-            <h2 class="section-title">熱門市場</h2>
-            <p class="section-copy">依市值選出主要幣種。綠色是上漲、紅色是下跌；對比條越長，代表 24 小時變化越大。</p>
+            <h2 class="section-title"><i class="fas fa-fire phone-heading-icon phone-only" aria-hidden="true"></i>熱門市場</h2>
+            <p class="section-copy">{{ phone_copy("依市值選出主要幣種。綠色是上漲、紅色是下跌；對比條越長，代表 24 小時變化越大。", "依市值排序 · 24 小時漲跌") }}</p>
           </div>
           <div class="market-badge" id="popularMeta">市場熱度：載入中</div>
         </div>
@@ -138,8 +139,8 @@
       <div class="card reveal" id="marketComparisonSection">
         <div class="section-head">
           <div>
-            <h2 class="section-title">價格走勢比較</h2>
-            <p class="section-copy">選擇主要觀察幣種，再加入其他幣種做疊加比較，快速看相對強弱與區間波動。</p>
+            <h2 class="section-title"><i class="fas fa-code-compare phone-heading-icon phone-only" aria-hidden="true"></i>價格走勢比較</h2>
+            <p class="section-copy">{{ phone_copy("選擇主要觀察幣種，再加入其他幣種做疊加比較，快速看相對強弱與區間波動。", "比較不同幣種的走勢") }}</p>
           </div>
           <div class="market-badge" id="chartStatus">走勢圖：準備中</div>
         </div>
@@ -204,8 +205,8 @@
       <div class="card reveal technical-visual-panel" id="marketTechnicalSection">
         <div class="section-head">
           <div>
-            <h2 class="section-title">技術指標</h2>
-            <p class="section-copy">BTC 的動能、均價與趨勢，一眼看懂。</p>
+            <h2 class="section-title"><i class="fas fa-gauge-high phone-heading-icon phone-only" aria-hidden="true"></i>技術指標</h2>
+            <p class="section-copy">{{ phone_copy("BTC 的動能、均價與趨勢，一眼看懂。", "動能 · 均價 · 趨勢") }}</p>
           </div>
           <div class="market-badge" id="taStatus">技術分析載入中</div>
         </div>
@@ -248,8 +249,8 @@
       <div class="card reveal candle-visual-panel" id="marketCandleSection">
         <div class="section-head">
           <div>
-            <h2 class="section-title">BTC K 線圖</h2>
-            <p class="section-copy">綠色上漲、紅色下跌。移到 K 線上查看該期價格。</p>
+            <h2 class="section-title"><i class="fas fa-chart-area phone-heading-icon phone-only" aria-hidden="true"></i>BTC K 線圖</h2>
+            <p class="section-copy">{{ phone_copy("綠色上漲、紅色下跌。移到 K 線上查看該期價格。", "綠漲紅跌 · 點選查看價格") }}</p>
           </div>
           <a class="tv-open-link" href="https://www.tradingview.com/chart/?symbol=BINANCE%3ABTCUSDT" target="_blank" rel="noopener noreferrer"><i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i> 開啟 TradingView 完整圖表</a>
         </div>
@@ -297,8 +298,8 @@
   };
 </script>
 
-<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=join-carousel-20261013"></script>
-<script src="{{ url_for('static', filename='js/common.js') }}?v=money-type-20261013"></script>
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=mobile-rwd-20261124"></script>
+<script src="{{ url_for('static', filename='js/common.js') }}?v=phone-layout-20261124"></script>
 <script src="{{ url_for('static', filename='vendor/lightweight-charts/lightweight-charts.standalone.production.js') }}?v=5.2.1"></script>
 <script src="{{ url_for('static', filename='js/market.js') }}?v=market-indicators-20261015"></script>
 </body>

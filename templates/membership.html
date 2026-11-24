@@ -1,16 +1,17 @@
 <!doctype html>
+{% from "partials/phone_copy.html" import phone_copy %}
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1,interactive-widget=resizes-content">
   <title>會員方案 | Smart Invest Crypto｜智慧虛擬貨幣平台</title>
-  <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo.jpg') }}">
+  <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo-compact.jpg') }}">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=brand-width-20261013">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=phone-copy-20261124">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/membership.css') }}?v=orange-white-20261013">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/visual-refresh-1012.css') }}?v=orange-white-20261013">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/site-theme.css') }}?v=money-type-20261013">
-</head>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/site-theme.css') }}?v=mobile-scale-20261124">
+{% include "partials/phone_layout.html" %}</head>
 <body class="membership-body refresh-1012">
 {% include "partials/header.html" %}
 <main class="membership-page" aria-label="會員方案">
@@ -28,7 +29,7 @@
         </div>
         <p class="membership-account-status" id="membershipAccountStatus" role="status">正在確認會員狀態…</p>
         <p class="membership-price">免費 <span>免登入</span></p>
-        <p class="membership-plan-summary">免登入瀏覽市場資訊，使用公開分析與 Podcast。</p>
+        <p class="membership-plan-summary">{{ phone_copy("免登入瀏覽市場資訊，使用公開分析與 Podcast。", "市場、公開分析與 Podcast") }}</p>
         <ul>
           <li><i class="fas fa-check" aria-hidden="true"></i> 公開市場資訊、Podcast 與防詐提醒</li>
           <li><i class="fas fa-check" aria-hidden="true"></i> 社群分析、敘事雷達與幣種分析</li>
@@ -47,7 +48,7 @@
           <img src="{{ url_for('static', filename='images/agent-cat-focus.png') }}" alt="" width="76" height="76">
         </div>
         <p class="membership-price">99 TWD <span>／月</span></p>
-        <p class="membership-plan-summary">解鎖更多配置分析與資產管理工具。</p>
+        <p class="membership-plan-summary">{{ phone_copy("解鎖更多配置分析與資產管理工具。", "配置與資產管理") }}</p>
         <ul>
           <li><i class="fas fa-check" aria-hidden="true"></i> 包含所有公開功能</li>
           <li><i class="fas fa-check" aria-hidden="true"></i> 投資健康度、AI 投資教練與對話紀錄</li>
@@ -81,8 +82,8 @@
     anonKey: '{{ supabase_anon_key | default("dummy") }}'
   };
 </script>
-<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=join-carousel-20261013"></script>
-<script src="{{ url_for('static', filename='js/common.js') }}?v=money-type-20261013"></script>
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=mobile-rwd-20261124"></script>
+<script src="{{ url_for('static', filename='js/common.js') }}?v=phone-layout-20261124"></script>
 <script src="{{ url_for('static', filename='js/membership.js') }}?v=join-carousel-20261013"></script>
 </body>
 </html>

@@ -1,4 +1,5 @@
 <!doctype html>
+{% from "partials/phone_copy.html" import phone_copy %}
 <html lang="zh-Hant">
   <head>
     <style>
@@ -6,15 +7,15 @@
       html.js-enabled body.page-ready{opacity:1;}
     </style>
     <script>document.documentElement.classList.add('js-enabled');</script>
-    <meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><title>防詐檢測 | Smart Invest Crypto｜智慧虛擬貨幣平台</title><link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/logo.svg') }}"><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"><link rel="preconnect" href="https://cdn.jsdelivr.net"><script src="https://cdn.jsdelivr.net/npm/chart.js"></script><link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=brand-width-20261013"><link rel="stylesheet" href="{{ url_for('static', filename='css/scam_detect.css') }}?v=orange-white-20261013">  <link rel="stylesheet" href="{{ url_for('static', filename='css/visual-refresh-1012.css') }}?v=orange-white-20261013">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/site-theme.css') }}?v=money-type-20261013">
+    <meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1,interactive-widget=resizes-content" /><title>防詐檢測 | Smart Invest Crypto｜智慧虛擬貨幣平台</title><link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='img/logo-compact.jpg') }}"><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"><link rel="preconnect" href="https://cdn.jsdelivr.net"><link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}?v=phone-copy-20261124"><link rel="stylesheet" href="{{ url_for('static', filename='css/scam_detect.css') }}?v=orange-white-20261013">  <link rel="stylesheet" href="{{ url_for('static', filename='css/visual-refresh-1012.css') }}?v=orange-white-20261013">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/site-theme.css') }}?v=mobile-scale-20261124">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/scam-report.css') }}?v=compact-examples-20261014">
-</head><body class="scam-page refresh-1012">{% include "partials/header.html" %}
+{% include "partials/phone_layout.html" %}</head><body class="scam-page refresh-1012">{% include "partials/header.html" %}
 <main aria-label="防詐檢測">
   <section class="section"><div class="container wide-container scam-stack">
     <section class="card scam-input-card">
-      <h2 class="section-title">輸入可疑內容</h2>
-      <p class="section-copy">辨識文字警訊；對方身分、網站與交易安全仍需另行查證。</p>
+      <h2 class="section-title"><i class="fas fa-shield-halved phone-heading-icon phone-only" aria-hidden="true"></i>輸入可疑內容</h2>
+      <p class="section-copy">{{ phone_copy("辨識文字警訊；對方身分、網站與交易安全仍需另行查證。", "辨識文字警訊 · 仍須查證") }}</p>
       <div class="example-row" role="group" aria-label="文案範例">
         <span class="example-label">試試範例：</span>
         <button class="exampleChip" type="button" aria-pressed="false" data-example="保證獲利，每天固定 3%，請立刻匯款到指定錢包。">保證獲利</button>
@@ -27,10 +28,10 @@
       <label for="scamInput">可疑文案</label>
       <textarea id="scamInput" maxlength="12000" placeholder="貼上完整訊息，包含對方的要求、付款方式與相關上下文。"></textarea>
       <div class="char-count" id="charCounter">0 字</div>
-      <button class="button primary full" id="btnScan" type="button"><i class="fas fa-search" aria-hidden="true"></i> 開始文案風險辨識</button>
+      <button class="button primary full" id="btnScan" type="button"><i class="fas fa-search" aria-hidden="true"></i> {{ phone_copy("開始文案風險辨識", "辨識風險") }}</button>
     </section>
     <section class="card report-card" id="scamReportCard" data-risk="unknown" aria-label="風險辨識報告">
-      <div class="report-head"><div><strong>風險辨識結果</strong><span>文字警訊不等於詐騙定論；低風險也不代表安全。</span></div><em id="reportBadge" role="status">等待辨識</em></div>
+      <div class="report-head"><div><strong>風險辨識結果</strong><span>{{ phone_copy("文字警訊不等於詐騙定論；低風險也不代表安全。", "低風險仍須查證") }}</span></div><em id="reportBadge" role="status">等待辨識</em></div>
       <div class="report-empty" id="reportEmpty"><i class="fas fa-search" aria-hidden="true"></i><strong>先看訊號，再做查證。</strong><span>輸入訊息後，這裡會整理風險、原因與需要查證的地方。</span></div>
       <div class="scan-loading" id="scanLoading" role="status"><i class="fas fa-spinner fa-spin" aria-hidden="true"></i><strong>正在辨識文字警訊</strong><span>整理規則命中與分析內容，請稍候。</span></div>
       <div id="reportBox">
@@ -54,7 +55,7 @@
       <div class="report-actions"><button class="button" id="btnCopyReport" type="button" disabled><i class="fas fa-copy" aria-hidden="true"></i> 複製報告</button><button class="button" id="btnClearReport" type="button">清空內容</button></div>
     </section>
   </div></section>
-</main><div class="float-actions"><a href="/" class="float-btn" title="回首頁"><i class="fas fa-house"></i></a><button class="float-btn" id="backToTopBtn" type="button" title="回到頂部"><i class="fas fa-arrow-up"></i></button></div>{% include "partials/footer.html" %}<div class="toast" id="toast"><div class="t" id="toastT">提示</div><div class="m" id="toastM">--</div></div><script>window.__SUPABASE_CONFIG__ = { url: '{{ supabase_url | default("https://dummy.supabase.co") }}', anonKey: '{{ supabase_anon_key | default("dummy") }}' };</script><script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=join-carousel-20261013"></script><script src="{{ url_for('static', filename='js/common.js') }}?v=money-type-20261013"></script><script src="{{ url_for('static', filename='js/scam_detect.js') }}?v=visual-report-20261014"></script></body></html>
+</main><div class="float-actions"><a href="/" class="float-btn" title="回首頁"><i class="fas fa-house"></i></a><button class="float-btn" id="backToTopBtn" type="button" title="回到頂部"><i class="fas fa-arrow-up"></i></button></div>{% include "partials/footer.html" %}<div class="toast" id="toast"><div class="t" id="toastT">提示</div><div class="m" id="toastM">--</div></div><script>window.__SUPABASE_CONFIG__ = { url: '{{ supabase_url | default("https://dummy.supabase.co") }}', anonKey: '{{ supabase_anon_key | default("dummy") }}' };</script><script type="module" src="{{ url_for('static', filename='js/auth.js') }}?v=mobile-rwd-20261124"></script><script src="{{ url_for('static', filename='js/common.js') }}?v=phone-layout-20261124"></script><script src="{{ url_for('static', filename='js/scam_detect.js') }}?v=visual-report-20261014"></script></body></html>
 
 
 

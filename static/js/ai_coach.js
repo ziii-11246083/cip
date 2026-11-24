@@ -2,6 +2,7 @@
   const $ = (id) => document.getElementById(id);
   const CONVERSATION_KEY = "smartinvest_ai_coach_conversation_id";
   const LEGACY_AGENT_KEY = "smartinvest_ai_agent_conversation_id";
+  const phoneLayout = window.matchMedia?.("(max-width: 600px), (max-width: 960px) and (max-height: 540px)");
   const messageHistory = [];
   const newChatBtn = $("aiCoachNewChatBtn");
   let conversationCache = [];
@@ -439,7 +440,7 @@
     const stream = $("chatStream");
     if (!stream) return;
     stream.innerHTML = `
-      <div class="chat-row ai welcome-row"><div class="avatar coach-cat"><img src="${COACH_AVATAR_SRC}" alt="貓咪投資教練" width="52" height="52"></div><div class="bubble"><b>AI 投資教練</b><p>你好，請問你現在最想解決的投資問題是什麼？例如「BTC 目前占比太高怎麼辦？」或「買入前該檢查哪些風險？」</p></div></div>
+      <div class="chat-row ai welcome-row"><div class="avatar coach-cat"><img src="${COACH_AVATAR_SRC}" alt="貓咪投資教練" width="52" height="52"></div><div class="bubble"><b>AI 投資教練</b><p><span class="phone-hide">你好，請問你現在最想解決的投資問題是什麼？例如「BTC 目前占比太高怎麼辦？」或「買入前該檢查哪些風險？」</span><span class="phone-only">可問「BTC 占比太高怎麼辦？」</span></p></div></div>
     `;
     if ($("coachStartGuide")) $("coachStartGuide").hidden = false;
   }
@@ -528,6 +529,7 @@
     localStorage.setItem(CONVERSATION_KEY, conversationId);
     renderHistory([]);
     setActiveConversation(conversationId);
+    focusCoachViewOnPhone("chat");
     await loadHistory(conversationId);
   }
 
@@ -708,7 +710,6 @@
     }
 
     appendChatBubble("你", text, true);
-    recordMessage("user", text);
     inputEl.value = "";
     setSendLoading(true);
     showTypingBubble();
@@ -742,6 +743,11 @@
         return;
       }
 
+      if (data.status === "off_topic") {
+        appendChatBubble("AI 投資教練", data.reply);
+        return;
+      }
+
       if (data.conversation_id) {
         localStorage.setItem(CONVERSATION_KEY, data.conversation_id);
         loadConversations();
@@ -753,6 +759,7 @@
         confidence: data.confidence,
         trace_id: data.trace_id,
       });
+      recordMessage("user", text);
       recordMessage("assistant", replyText);
     } catch {
       removeTypingBubble();
@@ -764,8 +771,17 @@
   }
 
   function initChatEvents() {
+    const input = $("chatInput");
+    if (input?.dataset?.phonePlaceholder && phoneLayout) {
+      const desktopPlaceholder = input.placeholder;
+      const updatePlaceholder = () => {
+        input.placeholder = phoneLayout.matches ? input.dataset.phonePlaceholder : desktopPlaceholder;
+      };
+      phoneLayout.addEventListener("change", updatePlaceholder);
+      updatePlaceholder();
+    }
     $("btnSend")?.addEventListener("click", sendMessage);
-    $("chatInput")?.addEventListener("keydown", (event) => {
+    input?.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
       event.preventDefault();
       sendMessage();
@@ -777,6 +793,7 @@
       }
       localStorage.removeItem(CONVERSATION_KEY);
       resetChat(true);
+      focusCoachViewOnPhone("chat");
       loadConversations();
     });
   }
@@ -922,6 +939,12 @@
     }
     if (view === "portfolio") refreshPortfolio();
     if (view === "performance") refreshCoachPerformance();
+  }
+
+  function focusCoachViewOnPhone(view) {
+    if (!phoneLayout?.matches) return;
+    if (view) activateView(view);
+    document.querySelector('[data-coach-view][aria-selected="true"]')?.focus();
   }
 
   function addTextList(parent, title, items, tag) {
@@ -1269,7 +1292,10 @@
       button.addEventListener("click", () => selectPlanExample(button.dataset));
     });
     document.querySelectorAll("[data-coach-view-target]").forEach((button) => {
-      button.addEventListener("click", () => activateView(button.dataset.coachViewTarget));
+      button.addEventListener("click", () => {
+        activateView(button.dataset.coachViewTarget);
+        focusCoachViewOnPhone();
+      });
     });
     $("coachPlanForm")?.addEventListener("submit", submitPlan);
     $("coachPortfolioRefresh")?.addEventListener("click", refreshPortfolio);
@@ -1312,6 +1338,14 @@
   }
 
   document.addEventListener("DOMContentLoaded", async () => {
+    const sideToggle = $("coachSideToggle");
+    if (sideToggle) {
+      sideToggle.dataset.ready = "true";
+      sideToggle.addEventListener("click", () => {
+        const expanded = sideToggle.getAttribute("aria-expanded") === "true";
+        sideToggle.setAttribute("aria-expanded", String(!expanded));
+      });
+    }
     await window.waitForSmartInvestAuth?.();
     const loggedIn = Boolean(window.authManager?.isLoggedIn?.() || window.smartInvestMembership?.isMember);
     if (!loggedIn) {
