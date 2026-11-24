@@ -21,6 +21,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 import app as app_module  # noqa: E402
 
+from services.coach_scope import PLAN_SCOPE_REPLY, CoachTopicDecision, coach_topic_decision  # noqa: E402
 from services.rag_trace_service import InMemoryTraceStore, RAGTraceService  # noqa: E402
 
 DEMO_TOKEN = "smartinvest-demo-member-token"
@@ -159,6 +160,7 @@ class BaseEndpointTraceTest(unittest.TestCase):
         self.fake_llm = FakeLLM()
         self.fake_rag = FakeRAG()
         self.patchers = [
+            mock.patch.object(app_module, "coach_topic_decision", return_value=CoachTopicDecision(True)),
             mock.patch.object(app_module, "_trace", self.trace_svc),
             mock.patch.object(app_module, "client", self.fake_llm),
             mock.patch.object(app_module, "refresh_openai_client",
@@ -256,13 +258,38 @@ class AgentPlanTraceTests(BaseEndpointTraceTest):
 
     def test_missing_key_degraded_llm_unavailable(self):
         app_module.client = None
-        resp = self._post("/api/agent-plan", self.PAYLOAD, token=REAL_TOKEN_A)
+        with mock.patch.object(app_module, "coach_topic_decision", coach_topic_decision):
+            resp = self._post("/api/agent-plan", self.PAYLOAD, token=REAL_TOKEN_A)
         self.assertEqual(resp.status_code, 200)
         data = resp.get_json()
         self.assertIn("summary", data)
         r = self._last()
         self.assertEqual(r.status, "degraded")
         self.assertEqual(r.fallback_reason, "llm_unavailable")
+
+    def test_off_topic_goal_returns_guidance_without_allocation(self):
+        classification = types.SimpleNamespace(choices=[types.SimpleNamespace(
+            message=types.SimpleNamespace(content='{"in_scope":false,"place":"法國"}'))])
+        payload = {**self.PAYLOAD, "goal": "法國買甚麼好呢"}
+        with (
+            mock.patch.object(app_module, "coach_topic_decision", coach_topic_decision),
+            mock.patch.object(self.fake_llm.chat.completions, "create", return_value=classification) as classify,
+            mock.patch.object(self.fake_rag, "augment_agent") as retrieve,
+        ):
+            resp = self._post("/api/agent-plan", payload, token=REAL_TOKEN_A)
+            classify.assert_called_once()
+            args = json.loads(classify.call_args.kwargs["messages"][1]["content"])
+            self.assertEqual(args["feature"], "買入規劃")
+            retrieve.assert_not_called()
+            app_module.client = None
+            offline_resp = self._post("/api/agent-plan", payload, token=REAL_TOKEN_A)
+        self.assertEqual(resp.status_code, 422)
+        self.assertEqual(resp.get_json()["error_code"], "coach_off_topic")
+        self.assertIn("法國相關的投資風險", resp.get_json()["error"])
+        self.assertNotIn("allocation", resp.get_json())
+        self.assertEqual(offline_resp.status_code, 422)
+        self.assertEqual(offline_resp.get_json(), {"error": PLAN_SCOPE_REPLY, "error_code": "coach_off_topic"})
+        self.assertEqual(self.mem.recent(10), [])
 
     def test_empty_goal_no_trace(self):
         resp = self._post("/api/agent-plan", {"goal": ""}, token=REAL_TOKEN_A)
