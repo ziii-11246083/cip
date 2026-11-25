@@ -91,3 +91,5 @@
 @media(max-width:720px){
   .structured-report{grid-template-columns:1fr;padding:0 16px 18px}
 }
+
+.scam-image-preview{display:flex;align-items:center;gap:12px;margin:12px 0}.scam-image-preview[hidden]{display:none}.scam-image-preview img{display:block;max-width:min(100%,320px);max-height:240px;object-fit:contain;border-radius:12px;border:1px solid #ddd}
