@@ -117,6 +117,9 @@ function evidenceLabel(entry) {
   if (entry.type === "llm_text_analysis") {
     return `AI 文字分析｜${entry.status === "available" ? "已完成" : "未能完成"}`;
   }
+  if (entry.type === "llm_image_analysis") {
+    return `AI 圖片分析｜${entry.status === "available" ? "已完成" : "未能完成"}`;
+  }
   return `其他證據｜${entry.type || "unknown"}`;
 }
 
@@ -140,8 +143,12 @@ function renderStructuredResult(data) {
   const count = document.getElementById("scamRuleCount");
   if (count) count.textContent = rules ? `${new Set(rules).size} 項命中` : "未提供";
   const ai = Array.isArray(data.evidence) ? data.evidence.find(item => item?.type === "llm_text_analysis") : null;
+  const imageAi = Array.isArray(data.evidence) ? data.evidence.find(item => item?.type === "llm_image_analysis") : null;
   const aiState = document.getElementById("scamAiState");
-  if (aiState) aiState.textContent = !ai ? "未提供" : ai.status === "available" ? "已完成" : "未能完成";
+  if (aiState) {
+    const analysis = imageAi || ai;
+    aiState.textContent = !analysis ? "未提供" : analysis.status === "available" ? (imageAi ? "圖片分析已完成" : "文字分析已完成") : "未能完成";
+  }
 }
 
 function renderFormattedReport(text) {
@@ -207,11 +214,12 @@ function resetScamReport(message = "輸入訊息後，這裡會整理風險、�
   const copy = document.getElementById("btnCopyReport");
   if (copy) copy.disabled = true;
   const scan = document.getElementById("btnScan");
-  if (scan) { scan.disabled = false; scan.classList.remove("btn-loading"); scan.innerHTML = '<i class="fas fa-search" aria-hidden="true"></i> 開始文案風險辨識'; }
+  if (scan) { scan.disabled = false; scan.classList.remove("btn-loading"); scan.innerHTML = '<i class="fas fa-search" aria-hidden="true"></i> 開始風險辨識'; }
 }
 
 async function runScan() {
   const inputEl = document.getElementById("scamInput");
+  const imageInput = document.getElementById("scamImageInput");
   const btn = document.getElementById("btnScan");
   const reportBox = document.getElementById("reportBox");
   const reportContent = document.getElementById("reportContent");
@@ -221,10 +229,22 @@ async function runScan() {
   if (!inputEl || !btn || !reportBox || !reportContent || !reportEmpty || !scanLoading) return;
 
   const text = inputEl.value.trim();
-  if (!text) {
-    alert("請先貼上想檢測的內容。");
-    inputEl.focus();
+  const imageFile = imageInput?.files?.[0] || null;
+  if (!text && !imageFile) {
+    alert("請貼上可疑內容或選擇一張圖片。");
     return;
+  }
+  let imageData = "";
+  if (imageFile) {
+    if (imageFile.size > 5 * 1024 * 1024) { alert("圖片不可超過 5 MB。"); return; }
+    try {
+      imageData = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
+        reader.onerror = reject;
+        reader.readAsDataURL(imageFile);
+      });
+    } catch (_) { alert("讀取圖片失敗，請重新選擇。"); return; }
   }
 
   resetScamReport();
@@ -257,7 +277,7 @@ async function runScan() {
       method: "POST",
       headers: headers,
       signal: controller.signal,
-      body: JSON.stringify({ text: text })
+      body: JSON.stringify({ text: text, image_data: imageData, image_mime: imageFile?.type || "" })
     });
 
     if (generation !== scanGeneration) return;
@@ -302,6 +322,30 @@ async function runScan() {
 function initExamples() {
   const input = document.getElementById("scamInput");
   if (!input) return;
+
+  const imageInput = document.getElementById("scamImageInput");
+  const preview = document.getElementById("scamImagePreview");
+  const previewImg = document.getElementById("scamImagePreviewImg");
+  const removeImage = document.getElementById("scamImageRemove");
+  if (imageInput) imageInput.addEventListener("change", () => {
+    let file = imageInput.files?.[0];
+    if (file && !["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      alert("請選擇 JPG、PNG 或 WebP 圖片。"); imageInput.value = ""; file = null;
+    } else if (file && file.size > 5 * 1024 * 1024) {
+      alert("圖片不可超過 5 MB。"); imageInput.value = ""; file = null;
+    }
+    if (preview && previewImg) {
+      preview.hidden = !file;
+      previewImg.src = file ? URL.createObjectURL(file) : "";
+    }
+    resetScamReport("內容已更新，請重新辨識。");
+  });
+  if (removeImage) removeImage.addEventListener("click", () => {
+    if (imageInput) imageInput.value = "";
+    if (preview) preview.hidden = true;
+    if (previewImg) previewImg.src = "";
+    resetScamReport("圖片已移除。請重新辨識。");
+  });
 
   document.querySelectorAll(".exampleChip").forEach(function(btn) {
     btn.addEventListener("click", function() {
@@ -350,6 +394,12 @@ function initReportButtons() {
     btnClear.addEventListener("click", function() {
       resetScamReport();
       if (input) input.value = "";
+      const imageInput = document.getElementById("scamImageInput");
+      const imagePreview = document.getElementById("scamImagePreview");
+      const imagePreviewImg = document.getElementById("scamImagePreviewImg");
+      if (imageInput) imageInput.value = "";
+      if (imagePreview) imagePreview.hidden = true;
+      if (imagePreviewImg) imagePreviewImg.src = "";
       if (reportContent) reportContent.textContent = "";
       renderTextList("scamReasons", [], "沒有可顯示的規則原因");
       renderTextList("scamWarnings", [], "仍需自行查證");
